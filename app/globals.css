@@ -1011,4 +1011,57 @@ table tbody tr:last-child {
   user-select: none;
 }
 
+/* ==========================================================================
+   Appearance settings
+   --------------------------------------------------------------------------
+   Driven by the Administration Center via data attributes set on <html> in
+   hooks/useAppearanceSettings.ts. Keeping these as CSS rules means appearance
+   preferences apply globally without components needing to know about them.
+   ========================================================================== */
+
+/* Motion. Honour an explicit "off" choice, and always respect the OS-level
+   reduced-motion preference regardless of the stored setting. */
+html[data-animations='off'],
+html[data-animations='off'] *,
+html[data-animations='off'] *::before,
+html[data-animations='off'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Compact mode and dashboard density expose spacing scales that layout code can
+   consume, so density is tuned in one place rather than per component. */
+html {
+  --app-density-gap: 16px;
+  --app-density-padding: 16px;
+}
+
+html[data-density='cozy'] {
+  --app-density-gap: 12px;
+  --app-density-padding: 12px;
+}
+
+html[data-density='compact'] {
+  --app-density-gap: 8px;
+  --app-density-padding: 8px;
+}
+
+html[data-compact='on'] {
+  --app-density-gap: 8px;
+  --app-density-padding: 8px;
+}
+
 

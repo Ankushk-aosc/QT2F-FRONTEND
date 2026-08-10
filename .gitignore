@@ -19,6 +19,9 @@ yarn-error.log*
 # env files
 .env*
 .env.local
+
+# runtime settings store written by the Administration Center
+/.data/
 # vercel
 .vercel
 

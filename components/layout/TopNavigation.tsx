@@ -23,7 +23,7 @@ import {
 import { useAuth } from "@/hooks/useAuth"
 import { useUIStore } from "@/stores/ui.store"
 import { useDashboardStore } from "@/stores/dashboard.store"
-import { SettingsDrawer } from "./SettingsDrawer"
+import { SettingsCenter } from "@/components/settings/SettingsCenter"
 import Image from "next/image"
 
 const useStyles = makeStyles({
@@ -229,7 +229,7 @@ export function TopNavigation() {
           </button>
         )}
 
-        <SettingsDrawer />
+        <SettingsCenter />
 
         <Menu
           open={isUserDropdownOpen}
