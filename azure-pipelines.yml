@@ -1,0 +1,93 @@
+trigger:
+  branches:
+    include:
+      - dev
+      - test
+      - main
+
+variables:
+  vmImage: 'ubuntu-latest'
+  dockerfilePath: 'dockerfile'
+  buildContext: '.'
+
+stages:
+# ==========================
+# DEV STAGE
+# ==========================
+- stage: Dev
+  displayName: 'Build & Push Dev'
+  condition: eq(variables['Build.SourceBranch'], 'refs/heads/dev')
+  jobs:
+  - deployment: BuildDev
+    environment: 'Development'
+    pool: { vmImage: $(vmImage) }
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+          - task: Docker@2
+            displayName: 'Build and Push to Dev'
+            inputs:
+              containerRegistry: $(acrDev)
+              repository: '$(imageName)-dev'
+              command: buildAndPush
+              Dockerfile: $(dockerfilePath)
+              buildContext: $(buildContext)
+              tags: |
+                latest
+                $(Build.BuildId)
+
+# ==========================
+# TEST STAGE (Requires Approval)
+# ==========================
+- stage: Test
+  displayName: 'Build & Push Test'
+  condition: eq(variables['Build.SourceBranch'], 'refs/heads/test')
+  jobs:
+  - deployment: BuildTest
+    environment: 'Testing' # This triggers the approval you set in the UI
+    pool: { vmImage: $(vmImage) }
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+          - task: Docker@2
+            displayName: 'Build and Push to Test'
+            inputs:
+              containerRegistry: $(acrTest)
+              repository: '$(imageName)-test'
+              command: buildAndPush
+              Dockerfile: $(dockerfilePath)
+              buildContext: $(buildContext)
+              tags: |
+                latest
+                $(Build.BuildId)
+
+# ==========================
+# PROD STAGE (Requires Approval)
+# ==========================
+- stage: Prod
+  displayName: 'Build & Push Prod'
+  condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+  jobs:
+  - deployment: BuildProd
+    environment: 'Production' # This triggers the approval you set in the UI
+    pool: { vmImage: $(vmImage) }
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+          - task: Docker@2
+            displayName: 'Build and Push to Prod'
+            inputs:
+              containerRegistry: $(acrProd)
+              repository: '$(imageName)-prod'
+              command: buildAndPush
+              Dockerfile: $(dockerfilePath)
+              buildContext: $(buildContext)
+              tags: |
+                latest
+                $(Build.BuildId)
