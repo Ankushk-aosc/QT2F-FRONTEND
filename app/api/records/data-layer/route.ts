@@ -35,7 +35,8 @@ export async function GET(req: NextRequest) {
     }
 
     const baseUrl = logsBase.replace(/\/$/, "");
-    const targetUrl = new URL(`${baseUrl}/data-layer`); // Based on /api/records base
+    // LOGS_API_BASE is ".../api", so "records/" must be explicit.
+    const targetUrl = new URL(`${baseUrl}/records/data-layer`);
 
     targetUrl.searchParams.append("project_id", project_id);
     targetUrl.searchParams.append("run_id", run_id);

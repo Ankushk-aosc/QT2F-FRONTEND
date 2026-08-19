@@ -3,41 +3,52 @@ import { useAgentStore } from "@/stores/agent.store"
 import { useDashboardStore } from "@/stores/dashboard.store"
 import { useParsingStore } from "@/stores/parsing.store"
 import { matchesAgent } from "@/lib/agentNames"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
+import { Spinner } from "@/components/ui/spinner"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-    Badge,
-    Button,
-    Card,
-    mergeClasses,
-    Popover,
-    PopoverSurface,
-    PopoverTrigger,
-    Spinner,
-    Tab,
-    Table,
-    TableBody,
-    TableCell,
-    TableHeader,
-    TableHeaderCell,
-    TableRow,
-    TabList,
-    Text,
-    tokens
-} from "@fluentui/react-components"
-import {
-    ChevronDown20Regular,
-    ChevronRight20Regular,
-    Database24Regular,
-    DocumentHeader24Regular,
-    Filter24Regular,
-    Flash24Regular,
-    Image24Regular,
-    Info24Regular,
-    Key24Regular,
-    Shapes24Regular,
-    Sparkle24Regular
-} from "@fluentui/react-icons"
-import type { ReactNode } from "react"
+    ChevronDown,
+    ChevronRight,
+    Database,
+    FileText,
+    Filter,
+    Zap,
+    Image as ImageIcon,
+    Info,
+    Key,
+    Shapes,
+    Sparkles
+} from "lucide-react"
+import type { ReactNode, HTMLAttributes } from "react"
 import { useEffect, useMemo, useState, isValidElement, Fragment } from "react"
+
+function cx(...parts: Array<string | undefined | false>) {
+    return parts.filter(Boolean).join(" ")
+}
+
+const WEIGHT_MAP: Record<string, number> = { regular: 400, medium: 500, semibold: 600, bold: 700 }
+const SIZE_MAP: Record<number, number> = { 100: 10, 200: 12, 300: 14, 400: 16, 500: 20, 600: 24, 700: 28, 800: 32, 900: 40, 1000: 68 }
+
+function Text({
+    weight,
+    size,
+    style,
+    ...props
+}: { weight?: "regular" | "medium" | "semibold" | "bold"; size?: number } & HTMLAttributes<HTMLSpanElement>) {
+    return (
+        <span
+            style={{
+                fontWeight: weight ? WEIGHT_MAP[weight] : undefined,
+                fontSize: size ? `${SIZE_MAP[size]}px` : undefined,
+                ...style,
+            }}
+            {...props}
+        />
+    )
+}
 
 /* ═══════════════════════════════════════════════════════════════════════
    TYPES
@@ -177,7 +188,7 @@ function Empty({ label = "No data available." }: { label?: string }) {
 }
 
 function SectionCard({ title, children, className }: { title?: string; children: ReactNode; className?: string }) {
-  const styles = useStyles(); return (<Card className={mergeClasses(styles.sectionCard, className)}> {title && <div className={styles.sectionHeader} style={{ marginBottom: "20px" }}>{title}</div>} {children} </Card>)
+  const styles = useStyles(); return (<Card className={cx(styles.sectionCard, className)}> {title && <div className={styles.sectionHeader} style={{ marginBottom: "20px" }}>{title}</div>} {children} </Card>)
 }
 
 interface ColDef<Row = any> { key: keyof Row | string; label: string; mono?: boolean; muted?: boolean; align?: "left" | "center" | "right"; render?: (row: Row, isPdfMode?: boolean) => ReactNode }
@@ -280,13 +291,13 @@ function LogicalLineage({ relationships, isPdfMode = false }: { relationships: L
     return { positions, nodeWidth, nodeHeight, width, height }
   }, [nodes, relationships])
 
-  const edgeColor = tokens.colorBrandStroke1
+  const edgeColor = "var(--primary)"
   const pdfScale = isPdfMode && layout.width > 1000 ? 1000 / layout.width : 1;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <div style={{
-        border: `1px solid ${tokens.colorNeutralStroke2}`,
+        border: `1px solid var(--border)`,
         borderRadius: "12px",
         background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
         overflowX: isPdfMode ? "hidden" : "auto",
@@ -339,8 +350,8 @@ function LogicalLineage({ relationships, isPdfMode = false }: { relationships: L
                   width: layout.nodeWidth,
                   minHeight: layout.nodeHeight,
                   borderRadius: "10px",
-                  border: `1px solid ${tokens.colorNeutralStroke1}`,
-                  background: tokens.colorNeutralBackground1,
+                  border: `1px solid var(--border)`,
+                  background: "var(--surface)",
                   padding: "10px 12px",
                   display: "flex",
                   flexDirection: "column",
@@ -349,11 +360,11 @@ function LogicalLineage({ relationships, isPdfMode = false }: { relationships: L
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                   <Text weight="semibold" style={{ color: "#0f172a", overflowWrap: "anywhere" }}>{name}</Text>
-                  <Database24Regular fontSize={16} primaryFill={tokens.colorBrandForeground1} />
+                  <Database size={16} color={"var(--primary)"} />
                 </div>
                 <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                  <Badge size="small" appearance="outline" color="informative">In {meta.incoming}</Badge>
-                  <Badge size="small" appearance="outline" color="brand">Out {meta.outgoing}</Badge>
+                  <Badge variant="secondary">In {meta.incoming}</Badge>
+                  <Badge variant="default">Out {meta.outgoing}</Badge>
                 </div>
               </Card>
             )
@@ -369,23 +380,22 @@ function LogicalLineage({ relationships, isPdfMode = false }: { relationships: L
               key={`rel-${idx}`}
               style={{
                 borderRadius: "10px",
-                border: `1px solid ${tokens.colorNeutralStroke2}`,
-                background: tokens.colorNeutralBackground1,
+                border: `1px solid var(--border)`,
+                background: "var(--surface)",
                 padding: "12px 14px"
               }}
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                  <Badge appearance="outline" color="brand">{r.left}</Badge>
+                  <Badge variant="default">{r.left}</Badge>
                   <Text style={{ color: "#64748b", fontWeight: 600 }}>to</Text>
-                  <Badge appearance="outline" color="brand">{r.right}</Badge>
+                  <Badge variant="default">{r.right}</Badge>
                 </div>
-                <Badge appearance="tint" color="informative" style={{ whiteSpace: "nowrap" }}>{val || "Unknown"}</Badge>
+                <Badge variant="secondary" style={{ whiteSpace: "nowrap" }}>{val || "Unknown"}</Badge>
               </div>
               <div style={{ marginTop: "12px", display: "flex" }}>
                 <Badge 
-                  appearance="outline" 
-                  color="subtle" 
+                  variant="secondary" 
                   style={{ 
                     fontFamily: T.mono, 
                     fontSize: "12px",
@@ -424,22 +434,22 @@ function DataTable<Row extends Record<string, any>>({ cols, rows, pageSize = 5, 
   return (
     <div>
       <div className={styles.tableContainer}>
-        <Table style={{ tableLayout: "auto", width: "100%", borderCollapse: "collapse" }}>
-          <TableHeader><TableRow>{cols.map(c => (<TableHeaderCell key={String(c.key)} style={{ whiteSpace: "nowrap", fontWeight: "bold" }} align={c.align === "center" ? "center" : "left"}>{c.label}</TableHeaderCell>))}</TableRow></TableHeader>
-          <TableBody>
+        <table style={{ tableLayout: "auto", width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr>{cols.map(c => (<th key={String(c.key)} style={{ whiteSpace: "nowrap", fontWeight: "bold" }} align={c.align === "center" ? "center" : "left"}>{c.label}</th>))}</tr></thead>
+          <tbody>
             {pageRows.map((row, i) => (
-              <TableRow key={i}>
+              <tr key={i}>
                 {cols.map(c => (
-                  <TableCell key={String(c.key)} className={styles.wrapCell} align={c.align === "center" ? "center" : "left"}>
+                  <td key={String(c.key)} className={styles.wrapCell} align={c.align === "center" ? "center" : "left"}>
                     <Text style={{ fontFamily: c.mono ? T.mono : "inherit", color: c.muted ? "#64748b" : "inherit" }}>
                       {renderCell(row, c)}
                     </Text>
-                  </TableCell>
+                  </td>
                 ))}
-              </TableRow>
+              </tr>
             ))}
-          </TableBody>
-        </Table>
+          </tbody>
+        </table>
       </div>
       {needsPagination && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "12px", padding: "12px 16px", borderTop: "1px solid #e2e8f0", fontSize: "13px", color: "#64748b" }}>
@@ -479,7 +489,7 @@ function Section({ title, children, defaultOpen = false, isPdfMode = false }: { 
   return (
     <Card className={styles.sectionCard} style={{ padding: "16px 20px" }}>
       <div className={styles.sectionHeaderRow} onClick={() => !isPdfMode && setIsOpen(!isOpen)} style={{ marginBottom: isOpen ? "16px" : "0", cursor: isPdfMode ? "default" : "pointer" }}>
-        {isOpen ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+        {isOpen ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
         <div className={styles.sectionHeader}>{title}</div>
       </div>
       {isOpen && <div>{children}</div>}
@@ -497,7 +507,7 @@ function ItemCard({
 }: {
   name: string,
   typeBadgeLabel?: string,
-  typeBadgeColor?: "brand" | "important" | "informative" | "success" | "warning" | "danger" | "subtle",
+  typeBadgeColor?: "default" | "success" | "warning" | "secondary" | "destructive" | "outline",
   usageCount?: number,
   sourceText?: string,
   codeBlock?: string
@@ -507,8 +517,8 @@ function ItemCard({
     <div className={styles.infoItem} style={{ marginBottom: "12px", backgroundColor: "#ffffff" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", flexWrap: "wrap" }}>
         <strong style={{ fontSize: "14px", color: "#0f172a" }}>{safeRender(name)}</strong>
-        {typeBadgeLabel && <Badge appearance="tint" color={typeBadgeColor || "subtle"}>{typeBadgeLabel}</Badge>}
-        {usageCount !== undefined && <Badge appearance="tint" color="brand">Used: {usageCount}</Badge>}
+        {typeBadgeLabel && <Badge variant={typeBadgeColor || "secondary"}>{typeBadgeLabel}</Badge>}
+        {usageCount !== undefined && <Badge variant="default">Used: {usageCount}</Badge>}
         {sourceText && <span style={{ fontSize: "12px", color: "#64748b" }}>{sourceText}</span>}
       </div>
       {codeBlock && <div className={styles.codeBlock}>{codeBlock}</div>}
@@ -657,51 +667,53 @@ export function ParsingTab({ workbookId, projectId: propProjectId, runId: propRu
               scrollbarWidth: "none", 
               msOverflowStyle: "none",
               WebkitOverflowScrolling: "touch",
-              borderBottom: `1px solid ${tokens.colorNeutralStroke2}`
+              borderBottom: `1px solid var(--border)`
             }}>
               <style>{`
                 .${styles.tabListWrapper}::-webkit-scrollbar {
                   display: none;
                 }
               `}</style>
-              <TabList selectedValue={tab} onTabSelect={(_, data) => setTab(data.value as TabKey)} className={styles.tabList} style={{ minWidth: "max-content", borderBottom: "none" }}>
-                {P_TABS.map(t => (<Tab key={t.key} value={t.key} className={styles.noHoverTab}>{t.label}</Tab>))}
-              </TabList>
+              <Tabs value={tab} onValueChange={(value) => setTab(value as TabKey)}>
+                <TabsList className={styles.tabList} style={{ minWidth: "max-content", borderBottom: "none" }}>
+                  {P_TABS.map(t => (<TabsTrigger key={t.key} value={t.key} className={styles.noHoverTab}>{t.label}</TabsTrigger>))}
+                </TabsList>
+              </Tabs>
             </div>
 
             <div className={styles.tabContent}>
               {isPdfMode ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
                   <div style={{ pageBreakInside: "avoid" }}>
-                    <div style={{ fontSize: "20px", fontWeight: 600, color: tokens.colorBrandForeground1, marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid ${tokens.colorBrandBackground}` }}>
+                    <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
                       Data Sources
                     </div>
                     <P_Sources d={d} isPdfMode={isPdfMode} />
                   </div>
 
                   <div style={{ pageBreakInside: "avoid" }}>
-                    <div style={{ fontSize: "20px", fontWeight: 600, color: tokens.colorBrandForeground1, marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid ${tokens.colorBrandBackground}` }}>
+                    <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
                       Data Model
                     </div>
                     <P_Model d={d} isPdfMode={isPdfMode} />
                   </div>
 
                   <div style={{ pageBreakInside: "avoid" }}>
-                    <div style={{ fontSize: "20px", fontWeight: 600, color: tokens.colorBrandForeground1, marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid ${tokens.colorBrandBackground}` }}>
+                    <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
                       Analytical Model
                     </div>
                     <P_FieldsAndLODs d={d} isPdfMode={isPdfMode} />
                   </div>
 
                   <div style={{ pageBreakInside: "avoid" }}>
-                    <div style={{ fontSize: "20px", fontWeight: 600, color: tokens.colorBrandForeground1, marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid ${tokens.colorBrandBackground}` }}>
+                    <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
                       Parameters & Sets
                     </div>
                     <P_Params d={d} isPdfMode={isPdfMode} />
                   </div>
 
                   <div style={{ pageBreakInside: "avoid" }}>
-                    <div style={{ fontSize: "20px", fontWeight: 600, color: tokens.colorBrandForeground1, marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid ${tokens.colorBrandBackground}` }}>
+                    <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
                       Insights
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
@@ -712,14 +724,14 @@ export function ParsingTab({ workbookId, projectId: propProjectId, runId: propRu
                   </div>
 
                   <div style={{ pageBreakInside: "avoid" }}>
-                    <div style={{ fontSize: "20px", fontWeight: 600, color: tokens.colorBrandForeground1, marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid ${tokens.colorBrandBackground}` }}>
+                    <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
                       Permissions
                     </div>
                     <P_Permissions d={d} isPdfMode={isPdfMode} />
                   </div>
 
                   <div style={{ pageBreakInside: "avoid" }}>
-                    <div style={{ fontSize: "20px", fontWeight: 600, color: tokens.colorBrandForeground1, marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid ${tokens.colorBrandBackground}` }}>
+                    <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
                       Embedded Assets
                     </div>
                     <P_EmbeddedAssets d={d} isPdfMode={isPdfMode} />
@@ -797,12 +809,12 @@ function P_Sources({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: bo
                     </td>
                     <td style={{ padding: "16px", color: "#475569" }}>{r.type}</td>
                     <td style={{ padding: "16px" }}>
-                      <Badge appearance="tint" color={r.originalSource.mode === "Live" ? "informative" : "important"} style={{ textTransform: "lowercase" }}>{r.originalSource.mode === "Live" ? "live" : "extract"}</Badge>
+                      <Badge variant={r.originalSource.mode === "Live" ? "secondary" : "default"} style={{ textTransform: "lowercase" }}>{r.originalSource.mode === "Live" ? "live" : "extract"}</Badge>
                     </td>
 
                     <td style={{ padding: "16px", color: "#666666", fontSize: "13px", wordBreak: "break-word" }}>{r.server || "—"}</td>
                     <td style={{ padding: "16px" }}>
-                      {r.originalSource.custom_sql ? <Badge appearance="tint" color="danger">Yes</Badge> : <span style={{ color: "#64748b" }}>No</span>}
+                      {r.originalSource.custom_sql ? <Badge variant="destructive">Yes</Badge> : <span style={{ color: "#64748b" }}>No</span>}
                     </td>
                     <td style={{ padding: "16px" }}>
                       {(() => {
@@ -813,10 +825,10 @@ function P_Sources({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: bo
                           : [];
                         return matchedParams.length > 0 ? (
                           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                            <Badge appearance="tint" color="brand" style={{ fontWeight: 600, alignSelf: "flex-start" }}>Yes</Badge>
+                            <Badge variant="default" style={{ fontWeight: 600, alignSelf: "flex-start" }}>Yes</Badge>
                             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "2px" }}>
                               {matchedParams.map((p, pi) => (
-                                <Badge key={pi} appearance="tint" color="informative" size="small">{p}</Badge>
+                                <Badge key={pi} variant="secondary">{p}</Badge>
                               ))}
                             </div>
                           </div>
@@ -836,7 +848,7 @@ function P_Sources({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: bo
       {d.custom_sql_queries && d.custom_sql_queries.length > 0 && (
         <Card className={styles.sectionCard}>
           <div className={styles.sectionHeaderRow} onClick={() => !isPdfMode && setShowCustomSql(!showCustomSql)} style={{ cursor: isPdfMode ? "default" : "pointer" }}>
-            {showCustomSql ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+            {showCustomSql ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
             <div className={styles.sectionHeader}>
               Custom SQL Queries
               <span style={{ fontSize: "14px", color: "#64748b", marginLeft: "12px" }}>({d.custom_sql_queries.length})</span>
@@ -848,9 +860,9 @@ function P_Sources({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: bo
                 <div key={i} className={styles.infoItem} style={{ backgroundColor: "#ffffff" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", flexWrap: "wrap" }}>
                     <strong style={{ fontSize: "14px", color: "#0f172a" }}>{sql.table_name || sql.datasource}</strong>
-                    <Badge appearance="tint" color="warning" style={{ whiteSpace: "nowrap" }}>Custom SQL</Badge>
+                    <Badge variant="warning" style={{ whiteSpace: "nowrap" }}>Custom SQL</Badge>
                     {sql.parameters && sql.parameters.length > 0 && (
-                      <Badge appearance="tint" color="brand" style={{ whiteSpace: "nowrap" }}>Uses Parameters</Badge>
+                      <Badge variant="default" style={{ whiteSpace: "nowrap" }}>Uses Parameters</Badge>
                     )}
                   </div>
                   <div className={styles.codeBlock}>{sql.query}</div>
@@ -858,7 +870,7 @@ function P_Sources({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: bo
                     <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                       <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}>Parameters:</span>
                       {sql.parameters.map((p, pi) => (
-                        <Badge key={pi} appearance="tint" color="informative" size="small">{p}</Badge>
+                        <Badge key={pi} variant="secondary">{p}</Badge>
                       ))}
                     </div>
                   )}
@@ -909,7 +921,7 @@ function P_Model({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: bool
                   <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
                     <td style={{ padding: "14px 16px", fontWeight: 500, color: "#0f172a" }}>{r.left}</td>
                     <td style={{ padding: "14px 16px", fontWeight: 500, color: "#0f172a" }}>{r.right}</td>
-                    <td style={{ padding: "14px 16px" }}><Badge appearance="tint" color="warning">{r.join_type}</Badge></td>
+                    <td style={{ padding: "14px 16px" }}><Badge variant="warning">{r.join_type}</Badge></td>
                     <td style={{ padding: "14px 16px" }}>
                       <span style={{ display: "inline-block", padding: "4px 10px", background: "#fef3c7", border: "1px solid #fde68a", borderRadius: "6px", fontFamily: "ui-monospace, Consolas, monospace", fontSize: "12px", color: "#92400e", wordBreak: "break-word" }}>{r.condition}</span>
                     </td>
@@ -940,9 +952,9 @@ function P_TablesAndColumns({ d, isPdfMode = false }: { d: ParsingPayload, isPdf
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <div style={{ background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden" }}>
             <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: "10px", borderBottom: "1px solid #e2e8f0", background: "#ffffff" }}>
-              <Database24Regular fontSize={18} primaryFill="#6366f1" />
+              <Database size={18} color="#6366f1" />
               <Text size={400} weight="bold" style={{ color: "#0f172a" }}>Workbook Tables</Text>
-              <Badge appearance="tint" color="brand" style={{ marginLeft: "auto" }}>{tables.length} table{tables.length !== 1 ? "s" : ""}</Badge>
+              <Badge variant="default" style={{ marginLeft: "auto" }}>{tables.length} table{tables.length !== 1 ? "s" : ""}</Badge>
             </div>
             <div style={{ overflowX: "auto", width: "100%" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: "600px" }}>
@@ -984,21 +996,21 @@ function P_TablesAndColumns({ d, isPdfMode = false }: { d: ParsingPayload, isPdf
                           </div>
                         </td>
                         <td style={{ padding: "12px 14px" }}>
-                          <Badge appearance="outline" color="brand" style={{ textTransform: "capitalize" }}>{(t.relation_type || "table").replace(/_/g, " ")}</Badge>
+                          <Badge variant="default" style={{ textTransform: "capitalize" }}>{(t.relation_type || "table").replace(/_/g, " ")}</Badge>
                         </td>
                         {!isPdfMode && (
                           <td style={{ padding: "12px 14px" }}>
                             {t.columns && t.columns.length > 0 ? (
                               <Popover withArrow positioning="below-start">
                                 <PopoverTrigger disableButtonEnhancement>
-                                  <Button appearance="subtle" icon={<DocumentHeader24Regular fontSize={14} />} iconPosition="before" style={{ color: tokens.colorBrandForeground1, fontWeight: 600, padding: "4px 8px" }}>
+                                  <Button variant="ghost" style={{ color: "var(--primary)", fontWeight: 600, padding: "4px 8px" }}><FileText size={14} />
                                     {t.columns.length} Columns
                                   </Button>
                                 </PopoverTrigger>
-                                <PopoverSurface style={{ width: "340px", padding: "16px", maxHeight: "400px", overflowY: "auto", backgroundColor: "#ffffff", border: `1px solid ${tokens.colorNeutralStroke1}`, boxShadow: tokens.shadow16, borderRadius: "12px" }}>
-                                  <div style={{ borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, paddingBottom: "8px", marginBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <PopoverContent style={{ width: "340px", padding: "16px", maxHeight: "400px", overflowY: "auto", backgroundColor: "#ffffff", border: `1px solid var(--border)`, boxShadow: "var(--shadow-md)", borderRadius: "12px" }}>
+                                  <div style={{ borderBottom: `1px solid var(--border)`, paddingBottom: "8px", marginBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                     <Text weight="bold" size={400} style={{ color: "#0f172a" }}>{t.table_name} Columns</Text>
-                                    <Badge appearance="outline" color="brand">{t.columns.length}</Badge>
+                                    <Badge variant="default">{t.columns.length}</Badge>
                                   </div>
                                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                                     {t.columns.map((c, cIdx) => (
@@ -1009,11 +1021,11 @@ function P_TablesAndColumns({ d, isPdfMode = false }: { d: ParsingPayload, isPdf
                                             <span style={{ fontSize: "10px", color: "#94a3b8", fontFamily: "monospace", wordBreak: "break-word", overflowWrap: "anywhere" }}>orig: {c.name}</span>
                                           )}
                                         </div>
-                                        <Badge appearance="tint" color="informative" size="small">{c.datatype}</Badge>
+                                        <Badge variant="secondary">{c.datatype}</Badge>
                                       </div>
                                     ))}
                                   </div>
-                                </PopoverSurface>
+                                </PopoverContent>
                               </Popover>
                             ) : <span style={{ color: "#94a3b8", fontSize: "12px", fontStyle: "italic" }}>No columns detected</span>}
                           </td>
@@ -1035,7 +1047,7 @@ function P_TablesAndColumns({ d, isPdfMode = false }: { d: ParsingPayload, isPdf
                                   <tr key={cIdx} style={{ borderBottom: "1px solid #f1f5f9" }}>
                                     <td style={{ padding: "8px 12px", fontWeight: 600, color: "#334155" }}>{c.renamed_column_name || c.name}</td>
                                     <td style={{ padding: "8px 12px", color: "#64748b", fontFamily: "monospace" }}>{c.renamed_column_name && c.renamed_column_name !== c.name ? c.name : "—"}</td>
-                                    <td style={{ padding: "8px 12px", textAlign: "right" }}><Badge appearance="tint" color="subtle" size="small">{c.datatype}</Badge></td>
+                                    <td style={{ padding: "8px 12px", textAlign: "right" }}><Badge variant="secondary">{c.datatype}</Badge></td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -1070,7 +1082,7 @@ function P_FieldsAndLODs({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMod
       {/* Dimensions — collapsible */}
       <Card className={styles.sectionCard} style={{ padding: "20px 28px" }}>
         <div className={styles.sectionHeaderRow} onClick={() => toggleSection("dimensions")} style={{ marginBottom: openSections.dimensions ? "16px" : "0", cursor: isPdfMode ? "default" : "pointer" }}>
-          {openSections.dimensions ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+          {openSections.dimensions ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
           <div className={styles.sectionHeader} style={{ fontSize: "20px" }}>
             Dimensions
             <span style={{ fontSize: "14px", color: "#64748b", marginLeft: "12px" }}>({d.fields?.dimensions?.length || 0})</span>
@@ -1090,7 +1102,7 @@ function P_FieldsAndLODs({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMod
       {/* Measures — collapsible */}
       <Card className={styles.sectionCard} style={{ padding: "20px 28px" }}>
         <div className={styles.sectionHeaderRow} onClick={() => toggleSection("measures")} style={{ marginBottom: openSections.measures ? "16px" : "0", cursor: isPdfMode ? "default" : "pointer" }}>
-          {openSections.measures ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+          {openSections.measures ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
           <div className={styles.sectionHeader} style={{ fontSize: "20px" }}>
             Measures
             <span style={{ fontSize: "14px", color: "#64748b", marginLeft: "12px" }}>({d.fields?.measures?.length || 0})</span>
@@ -1110,7 +1122,7 @@ function P_FieldsAndLODs({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMod
       {/* LODs — collapsible */}
       <Card className={styles.sectionCard} style={{ padding: "20px 28px" }}>
         <div className={styles.sectionHeaderRow} onClick={() => toggleSection("lods")} style={{ marginBottom: openSections.lods ? "16px" : "0", cursor: isPdfMode ? "default" : "pointer" }}>
-          {openSections.lods ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+          {openSections.lods ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
           <div className={styles.sectionHeader} style={{ fontSize: "20px" }}>
             LODs
             <span style={{ fontSize: "14px", color: "#64748b", marginLeft: "12px" }}>({lods.length})</span>
@@ -1120,7 +1132,7 @@ function P_FieldsAndLODs({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMod
           <div>
             {lods.length > 0 ? (
               <PaginatedList items={lods} isPdfMode={isPdfMode} renderItem={(c, i) => (
-                <ItemCard key={`lod-${i}`} name={c.name} typeBadgeLabel={c.lod_type ? c.lod_type.toUpperCase() : "LOD"} typeBadgeColor="important" usageCount={c.usage_count} sourceText={c.source} codeBlock={c.formula} />
+                <ItemCard key={`lod-${i}`} name={c.name} typeBadgeLabel={c.lod_type ? c.lod_type.toUpperCase() : "LOD"} typeBadgeColor="default" usageCount={c.usage_count} sourceText={c.source} codeBlock={c.formula} />
               )} />
             ) : <Empty label="No LOD expressions found." />}
           </div>
@@ -1157,7 +1169,7 @@ function P_Params({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: boo
                     return (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                         {r.allowable_list.map((v, i) => (
-                          <Badge key={i} appearance="tint" color="informative" size="small">{v.display_as}</Badge>
+                          <Badge key={i} variant="secondary">{v.display_as}</Badge>
                         ))}
                       </div>
                     );
@@ -1165,12 +1177,12 @@ function P_Params({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: boo
                   return (
                     <Popover withArrow positioning="below-start">
                       <PopoverTrigger disableButtonEnhancement>
-                        <Button appearance="subtle" style={{ color: tokens.colorBrandForeground1, fontWeight: 600, padding: "4px 8px" }}>
+                        <Button variant="ghost" style={{ color: "var(--primary)", fontWeight: 600, padding: "4px 8px" }}>
                           List ({r.allowable_list.length} values)
                         </Button>
                       </PopoverTrigger>
-                      <PopoverSurface style={{ width: "340px", padding: "16px", maxHeight: "350px", overflowY: "auto", backgroundColor: "#ffffff", border: `1px solid ${tokens.colorNeutralStroke1}`, boxShadow: tokens.shadow16, borderRadius: "12px" }}>
-                        <div style={{ borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, paddingBottom: "8px", marginBottom: "12px" }}><Text weight="bold" size={400} style={{ color: "#0f172a" }}>Allowable Values</Text></div>
+                      <PopoverContent style={{ width: "340px", padding: "16px", maxHeight: "350px", overflowY: "auto", backgroundColor: "#ffffff", border: `1px solid var(--border)`, boxShadow: "var(--shadow-md)", borderRadius: "12px" }}>
+                        <div style={{ borderBottom: `1px solid var(--border)`, paddingBottom: "8px", marginBottom: "12px" }}><Text weight="bold" size={400} style={{ color: "#0f172a" }}>Allowable Values</Text></div>
                         <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 12px", marginBottom: "8px", borderBottom: "1px solid #e2e8f0" }}>
                           <Text weight="semibold" size={200} style={{ color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Displayed Value</Text>
                           <Text weight="semibold" size={200} style={{ color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Actual Value</Text>
@@ -1179,11 +1191,11 @@ function P_Params({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: boo
                           {r.allowable_list.map((v, i) => (
                             <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: "#f8fafc", padding: "8px 12px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
                               <span style={{ fontSize: "13px", fontWeight: 500, color: "#666666" }}>{v.display_as}</span>
-                              <Badge appearance="tint" color="informative">{v.value}</Badge>
+                              <Badge variant="secondary">{v.value}</Badge>
                             </div>
                           ))}
                         </div>
-                      </PopoverSurface>
+                      </PopoverContent>
                     </Popover>
                   )
                 }
@@ -1204,8 +1216,8 @@ function P_Params({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: boo
         const topBottomCols: ColDef<SetDef>[] = [
           { key: "name", label: "Name", render: r => <strong>{r.name}</strong> },
           { key: "base_field", label: "Base Field", mono: true },
-          { key: "subtype", label: "Subtype", render: r => <Badge appearance="tint" color="informative" style={{ height: "auto", padding: "4px 10px", lineHeight: "1.2", textAlign: "center" }}>{r.subtype || "—"}</Badge> },
-          { key: "mode", label: "Mode", render: r => <Badge appearance="tint" color={r.mode === "top" ? "success" : "warning"}>{r.mode || "—"}</Badge> },
+          { key: "subtype", label: "Subtype", render: r => <Badge variant="secondary" style={{ height: "auto", padding: "4px 10px", lineHeight: "1.2", textAlign: "center" }}>{r.subtype || "—"}</Badge> },
+          { key: "mode", label: "Mode", render: r => <Badge variant={r.mode === "top" ? "success" : "warning"}>{r.mode || "—"}</Badge> },
           { key: "count", label: "Count", render: r => <strong>{r.count ?? "—"}</strong> },
           { key: "expression", label: "Expression", mono: true, muted: true, render: r => r.expression || "—" },
         ];
@@ -1213,7 +1225,7 @@ function P_Params({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: boo
         const conditionCols: ColDef<SetDef>[] = [
           { key: "name", label: "Name", render: r => <strong>{r.name}</strong> },
           { key: "base_field", label: "Base Field", mono: true },
-          { key: "subtype", label: "Subtype", render: r => <Badge appearance="tint" color="informative" style={{ height: "auto", padding: "4px 10px", lineHeight: "1.2", textAlign: "center" }}>{r.subtype || "condition"}</Badge> },
+          { key: "subtype", label: "Subtype", render: r => <Badge variant="secondary" style={{ height: "auto", padding: "4px 10px", lineHeight: "1.2", textAlign: "center" }}>{r.subtype || "condition"}</Badge> },
           { key: "condition", label: "Condition", mono: true, muted: true, render: r => r.condition || "—" },
           { key: "expression", label: "Expression", mono: true, muted: true, render: r => r.expression || "—" },
         ];
@@ -1228,19 +1240,19 @@ function P_Params({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: boo
               if (isPdfMode) {
                 return (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-                    {members.map((m, i) => <Badge key={i} appearance="tint" color="informative" size="small">{m}</Badge>)}
+                    {members.map((m, i) => <Badge key={i} variant="secondary">{m}</Badge>)}
                   </div>
                 );
               }
               return (
                 <Popover withArrow positioning="below-start">
                   <PopoverTrigger disableButtonEnhancement>
-                    <Button appearance="subtle" style={{ color: tokens.colorBrandForeground1, fontWeight: 600, padding: "4px 8px" }}>
+                    <Button variant="ghost" style={{ color: "var(--primary)", fontWeight: 600, padding: "4px 8px" }}>
                       {members.length} Members
                     </Button>
                   </PopoverTrigger>
-                  <PopoverSurface style={{ width: "300px", padding: "16px", maxHeight: "350px", overflowY: "auto", backgroundColor: "#ffffff", border: `1px solid ${tokens.colorNeutralStroke1}`, boxShadow: tokens.shadow16, borderRadius: "12px" }}>
-                    <div style={{ borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, paddingBottom: "8px", marginBottom: "12px" }}><Text weight="bold" size={400} style={{ color: "#0f172a" }}>Selected Members</Text></div>
+                  <PopoverContent style={{ width: "300px", padding: "16px", maxHeight: "350px", overflowY: "auto", backgroundColor: "#ffffff", border: `1px solid var(--border)`, boxShadow: "var(--shadow-md)", borderRadius: "12px" }}>
+                    <div style={{ borderBottom: `1px solid var(--border)`, paddingBottom: "8px", marginBottom: "12px" }}><Text weight="bold" size={400} style={{ color: "#0f172a" }}>Selected Members</Text></div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                       {members.map((m, i) => (
                         <div key={i} style={{ display: "flex", alignItems: "center", backgroundColor: "#f8fafc", padding: "8px 12px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
@@ -1248,7 +1260,7 @@ function P_Params({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: boo
                         </div>
                       ))}
                     </div>
-                  </PopoverSurface>
+                  </PopoverContent>
                 </Popover>
               );
             }
@@ -1265,10 +1277,12 @@ function P_Params({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: boo
               </div>
 
               <div style={{ borderBottom: "1px solid #e2e8f0", marginBottom: "16px" }}>
-                <TabList selectedValue={dynSubTab} onTabSelect={(_, data) => setDynSubTab(data.value as string)}>
-                  <Tab value="top_bottom" className={styles.noHoverTab} style={{ fontSize: "14px", fontWeight: 500 }}>Top / Bottom ({topBottomSets.length})</Tab>
-                  <Tab value="condition" className={styles.noHoverTab} style={{ fontSize: "14px", fontWeight: 500 }}>Condition ({conditionSets.length})</Tab>
-                </TabList>
+                <Tabs value={dynSubTab} onValueChange={(value) => setDynSubTab(value)}>
+                  <TabsList>
+                    <TabsTrigger value="top_bottom" className={styles.noHoverTab} style={{ fontSize: "14px", fontWeight: 500 }}>Top / Bottom ({topBottomSets.length})</TabsTrigger>
+                    <TabsTrigger value="condition" className={styles.noHoverTab} style={{ fontSize: "14px", fontWeight: 500 }}>Condition ({conditionSets.length})</TabsTrigger>
+                  </TabsList>
+                </Tabs>
               </div>
 
               {dynSubTab === "top_bottom" && (
@@ -1314,14 +1328,14 @@ const filterCol: ColDef<Worksheet> = {
         return (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
             {r.filters_detail!.map((f, i) => (
-              <Badge key={i} appearance="tint" color={f.type.toLowerCase() === 'measure' ? "success" : "informative"} size="small">{f.name}</Badge>
+              <Badge key={i} variant={f.type.toLowerCase() === 'measure' ? "success" : "secondary"}>{f.name}</Badge>
             ))}
           </div>
         );
       }
       return (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-          {r.filters!.map((f, i) => <Badge key={i} appearance="tint" color="informative" size="small">{f}</Badge>)}
+          {r.filters!.map((f, i) => <Badge key={i} variant="secondary">{f}</Badge>)}
         </div>
       );
     }
@@ -1331,14 +1345,14 @@ const filterCol: ColDef<Worksheet> = {
       return (
         <Popover withArrow positioning="below-start">
           <PopoverTrigger disableButtonEnhancement>
-            <Button appearance="subtle" icon={<Filter24Regular fontSize={16} />} iconPosition="before" style={{ color: tokens.colorBrandForeground1, fontWeight: 600, padding: "4px 8px" }}>{basicCount} Filters</Button>
+            <Button variant="ghost" style={{ color: "var(--primary)", fontWeight: 600, padding: "4px 8px" }}><Filter size={16} />{basicCount} Filters</Button>
           </PopoverTrigger>
-          <PopoverSurface style={{ width: "260px", padding: "16px", maxHeight: "400px", overflowY: "auto", backgroundColor: "#ffffff" }}>
-            <div style={{ borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, paddingBottom: "8px", marginBottom: "12px" }}><Text weight="bold" size={400}>Applied Filters</Text></div>
+          <PopoverContent style={{ width: "260px", padding: "16px", maxHeight: "400px", overflowY: "auto", backgroundColor: "#ffffff" }}>
+            <div style={{ borderBottom: `1px solid var(--border)`, paddingBottom: "8px", marginBottom: "12px" }}><Text weight="bold" size={400}>Applied Filters</Text></div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-              {r.filters!.map((f, i) => <Badge key={i} appearance="tint" color="informative" style={{ whiteSpace: "nowrap" }}>{f}</Badge>)}
+              {r.filters!.map((f, i) => <Badge key={i} variant="secondary" style={{ whiteSpace: "nowrap" }}>{f}</Badge>)}
             </div>
-          </PopoverSurface>
+          </PopoverContent>
         </Popover>
       );
     }
@@ -1346,19 +1360,19 @@ const filterCol: ColDef<Worksheet> = {
     return (
       <Popover withArrow positioning="below-start">
         <PopoverTrigger disableButtonEnhancement>
-          <Button appearance="subtle" icon={<Filter24Regular fontSize={16} />} iconPosition="before" style={{ color: tokens.colorBrandForeground1, fontWeight: 600, padding: "4px 8px" }}>{detailCount} Filters</Button>
+          <Button variant="ghost" style={{ color: "var(--primary)", fontWeight: 600, padding: "4px 8px" }}><Filter size={16} />{detailCount} Filters</Button>
         </PopoverTrigger>
-        <PopoverSurface style={{ width: "300px", padding: "16px", maxHeight: "400px", overflowY: "auto", backgroundColor: "#ffffff", border: `1px solid ${tokens.colorNeutralStroke1}`, boxShadow: tokens.shadow16, borderRadius: "12px" }}>
-          <div style={{ borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, paddingBottom: "8px", marginBottom: "12px" }}><Text weight="bold" size={400} style={{ color: "#0f172a" }}>Applied Filters</Text></div>
+        <PopoverContent style={{ width: "300px", padding: "16px", maxHeight: "400px", overflowY: "auto", backgroundColor: "#ffffff", border: `1px solid var(--border)`, boxShadow: "var(--shadow-md)", borderRadius: "12px" }}>
+          <div style={{ borderBottom: `1px solid var(--border)`, paddingBottom: "8px", marginBottom: "12px" }}><Text weight="bold" size={400} style={{ color: "#0f172a" }}>Applied Filters</Text></div>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {r.filters_detail!.map((f, i) => (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: "#f8fafc", padding: "8px 12px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
                 <span style={{ fontSize: "13px", fontWeight: 500, color: "#666666" }}>{f.name}</span>
-                <Badge appearance="tint" color={f.type.toLowerCase() === 'measure' ? "success" : "informative"}>{f.type}</Badge>
+                <Badge variant={f.type.toLowerCase() === 'measure' ? "success" : "secondary"}>{f.type}</Badge>
               </div>
             ))}
           </div>
-        </PopoverSurface>
+        </PopoverContent>
       </Popover>
     )
   }
@@ -1426,14 +1440,14 @@ const formattingCol: ColDef<Worksheet> = {
               <div style={{ fontSize: "10px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", marginBottom: "6px", letterSpacing: "0.5px" }}>FONTS ({vpFonts.length})</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
                 {vpFonts.map((f, i) => (
-                   <Badge key={i} appearance="outline" size="small" style={{ fontSize: "10px", height: "auto", padding: "2px 6px", background: "#f8fafc", color: "#475569" }}>{cleanLabel(f.font || "Arial")}</Badge>
+                   <Badge key={i} style={{ fontSize: "10px", height: "auto", padding: "2px 6px", background: "#f8fafc", color: "#475569" }}>{cleanLabel(f.font || "Arial")}</Badge>
                 ))}
               </div>
             </div>
           )}
           {hasMarks && (
             <div style={{ marginTop: "4px" }}>
-              <Badge appearance="tint" color="brand" size="small" style={{ fontWeight: 700 }}>Custom Marks</Badge>
+              <Badge variant="default" style={{ fontWeight: 700 }}>Custom Marks</Badge>
             </div>
           )}
         </div>
@@ -1443,10 +1457,10 @@ const formattingCol: ColDef<Worksheet> = {
     return (
       <Popover withArrow positioning="below-start">
         <PopoverTrigger disableButtonEnhancement>
-          <Button appearance="subtle" icon={<Sparkle24Regular fontSize={16} />} iconPosition="before" style={{ color: tokens.colorBrandForeground1, fontWeight: 600, padding: "4px 8px" }}>View Styles</Button>
+          <Button variant="ghost" style={{ color: "var(--primary)", fontWeight: 600, padding: "4px 8px" }}><Sparkles size={16} />View Styles</Button>
         </PopoverTrigger>
-        <PopoverSurface style={{ width: "380px", padding: "16px", maxHeight: "500px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "20px", backgroundColor: "#ffffff", border: `1px solid ${tokens.colorNeutralStroke1}`, boxShadow: tokens.shadow16, borderRadius: "12px" }}>
-          <div style={{ borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, paddingBottom: "8px" }}><Text weight="bold" size={400} style={{ color: "#0f172a" }}>Formatting Details</Text></div>
+        <PopoverContent style={{ width: "380px", padding: "16px", maxHeight: "500px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "20px", backgroundColor: "#ffffff", border: `1px solid var(--border)`, boxShadow: "var(--shadow-md)", borderRadius: "12px" }}>
+          <div style={{ borderBottom: `1px solid var(--border)`, paddingBottom: "8px" }}><Text weight="bold" size={400} style={{ color: "#0f172a" }}>Formatting Details</Text></div>
 
           {/* Visual Properties — Colors with applied_to */}
           {vpColors.length > 0 && (
@@ -1459,7 +1473,7 @@ const formattingCol: ColDef<Worksheet> = {
                       {isHexColor(c.color) && <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: typeof c.color === 'string' ? c.color.trim() : "" }} />}
                       <span style={{ fontFamily: "monospace", fontSize: "12px", color: "#666666" }}>{cleanLabel(c.color)}</span>
                     </div>
-                    <Badge appearance="tint" color="subtle" size="small" style={{ whiteSpace: "nowrap" }}>{c.applied_to}</Badge>
+                    <Badge variant="secondary" style={{ whiteSpace: "nowrap" }}>{c.applied_to}</Badge>
                   </div>
                 ))}
               </div>
@@ -1472,7 +1486,7 @@ const formattingCol: ColDef<Worksheet> = {
               <Text weight="semibold" size={200} style={{ color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Worksheet Colors ({colorsCount})</Text>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                 {r.colors!.map((c, i) => (
-                  <Badge key={`clr-${i}`} appearance="tint" color="informative" shape="rounded" style={{ padding: "4px 8px", whiteSpace: "nowrap" }}>
+                  <Badge key={`clr-${i}`} variant="secondary" style={{ padding: "4px 8px", whiteSpace: "nowrap" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                       {isHexColor(c) && <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: typeof c === 'string' ? c.trim() : "" }} />}
                       <span>{safeRender(c)}</span>
@@ -1505,8 +1519,8 @@ const formattingCol: ColDef<Worksheet> = {
                     <div key={`vpf-${i}`} style={{ border: "1px solid #e2e8f0", borderRadius: "10px", overflow: "hidden" }}>
                       {/* Header — applied_to */}
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                        <Badge appearance="tint" color="informative" size="small">{appliedTo}</Badge>
-                        {props.bold && <Badge appearance="tint" color="warning" size="small">Bold</Badge>}
+                        <Badge variant="secondary">{appliedTo}</Badge>
+                        {props.bold && <Badge variant="warning">Bold</Badge>}
                       </div>
                       {/* Property rows */}
                       <div style={{ display: "flex", flexDirection: "column" }}>
@@ -1571,7 +1585,7 @@ const formattingCol: ColDef<Worksheet> = {
                   <div key={`vpa-${i}`} style={{ border: "1px solid #e2e8f0", borderRadius: "10px", overflow: "hidden" }}>
                     {/* Header — target */}
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                      <Badge appearance="tint" color="warning" size="small">{ax.target || "Axis"}</Badge>
+                      <Badge variant="warning">{ax.target || "Axis"}</Badge>
                     </div>
                     {/* Property rows */}
                     <div style={{ display: "flex", flexDirection: "column" }}>
@@ -1581,7 +1595,7 @@ const formattingCol: ColDef<Worksheet> = {
                           <span style={{ fontSize: "12px", color: "#64748b" }}>Title</span>
                           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                             <span style={{ fontSize: "12px", fontWeight: 600, color: "#0f172a" }}>{ax.axis_title.text || "—"}</span>
-                            {ax.axis_title.custom && <Badge appearance="tint" color="brand" size="small">Custom</Badge>}
+                            {ax.axis_title.custom && <Badge variant="default">Custom</Badge>}
                           </div>
                         </div>
                       )}
@@ -1590,7 +1604,7 @@ const formattingCol: ColDef<Worksheet> = {
                         <>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 12px", borderBottom: "1px solid #f1f5f9" }}>
                             <span style={{ fontSize: "12px", color: "#64748b" }}>Range</span>
-                            <Badge appearance="tint" color={ax.range.type === "fixed" ? "important" : "informative"} size="small">{ax.range.type || "auto"}</Badge>
+                            <Badge variant={ax.range.type === "fixed" ? "default" : "secondary"}>{ax.range.type || "auto"}</Badge>
                           </div>
                           {ax.range.type === "fixed" && (
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 12px", borderBottom: "1px solid #f1f5f9" }}>
@@ -1618,13 +1632,13 @@ const formattingCol: ColDef<Worksheet> = {
                           {ax.scale.reversed && (
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 12px", borderBottom: "1px solid #f1f5f9" }}>
                               <span style={{ fontSize: "12px", color: "#64748b" }}>Reversed</span>
-                              <Badge appearance="tint" color="warning" size="small">Yes</Badge>
+                              <Badge variant="warning">Yes</Badge>
                             </div>
                           )}
                           {ax.scale.logarithmic && (
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 12px" }}>
                               <span style={{ fontSize: "12px", color: "#64748b" }}>Logarithmic</span>
-                              <Badge appearance="tint" color="warning" size="small">Yes</Badge>
+                              <Badge variant="warning">Yes</Badge>
                             </div>
                           )}
                         </>
@@ -1645,7 +1659,7 @@ const formattingCol: ColDef<Worksheet> = {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
                     <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}>Text</span>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", justifyContent: "flex-end" }}>
-                      {marksText.map((m, mi) => <Badge key={`mt-${mi}`} appearance="tint" color="informative" size="small" style={{ fontFamily: "'Cascadia Code','Consolas',monospace", fontSize: "11px", whiteSpace: "nowrap" }}>{safeRender(m)}</Badge>)}
+                      {marksText.map((m, mi) => <Badge key={`mt-${mi}`} variant="secondary" style={{ fontFamily: "'Cascadia Code','Consolas',monospace", fontSize: "11px", whiteSpace: "nowrap" }}>{safeRender(m)}</Badge>)}
                     </div>
                   </div>
                 )}
@@ -1653,7 +1667,7 @@ const formattingCol: ColDef<Worksheet> = {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", borderBottom: "1px solid #f1f5f9" }}>
                     <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}>Color</span>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", justifyContent: "flex-end" }}>
-                      {marksColor.map((m, mi) => <Badge key={`mc-${mi}`} appearance="tint" color="success" size="small" style={{ whiteSpace: "nowrap" }}>{safeRender(m)}</Badge>)}
+                      {marksColor.map((m, mi) => <Badge key={`mc-${mi}`} variant="success" style={{ whiteSpace: "nowrap" }}>{safeRender(m)}</Badge>)}
                     </div>
                   </div>
                 )}
@@ -1661,7 +1675,7 @@ const formattingCol: ColDef<Worksheet> = {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", borderBottom: "1px solid #f1f5f9" }}>
                     <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}>Detail</span>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", justifyContent: "flex-end" }}>
-                      {marksDetail.map((m, mi) => <Badge key={`md-${mi}`} appearance="tint" color="subtle" size="small" style={{ whiteSpace: "nowrap" }}>{safeRender(m)}</Badge>)}
+                      {marksDetail.map((m, mi) => <Badge key={`md-${mi}`} variant="secondary" style={{ whiteSpace: "nowrap" }}>{safeRender(m)}</Badge>)}
                     </div>
                   </div>
                 )}
@@ -1669,7 +1683,7 @@ const formattingCol: ColDef<Worksheet> = {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px" }}>
                     <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}>Size</span>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", justifyContent: "flex-end" }}>
-                      {marksSize.map((m, mi) => <Badge key={`ms-${mi}`} appearance="tint" color="brand" size="small" style={{ whiteSpace: "nowrap" }}>{safeRender(m)}</Badge>)}
+                      {marksSize.map((m, mi) => <Badge key={`ms-${mi}`} variant="default" style={{ whiteSpace: "nowrap" }}>{safeRender(m)}</Badge>)}
                     </div>
                   </div>
                 )}
@@ -1678,7 +1692,7 @@ const formattingCol: ColDef<Worksheet> = {
           )}
 
           {/* Formatting list fonts */}
-          {fontsCount > 0 && (<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}><Text weight="semibold" size={200} style={{ color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Fonts ({fontsCount})</Text><div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>{r.fonts!.map((f: any, i: number) => (<Badge key={`font-${i}`} appearance="tint" color="informative" shape="rounded" style={{ padding: "4px 8px" }}>{safeRender(f)}</Badge>))}</div></div>)}
+          {fontsCount > 0 && (<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}><Text weight="semibold" size={200} style={{ color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Fonts ({fontsCount})</Text><div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>{r.fonts!.map((f: any, i: number) => (<Badge key={`font-${i}`} variant="secondary" style={{ padding: "4px 8px" }}>{safeRender(f)}</Badge>))}</div></div>)}
 
           {/* Merged & Deduplicated Tooltip formatting */}
           {uniqueTooltips.length > 0 && (
@@ -1692,12 +1706,12 @@ const formattingCol: ColDef<Worksheet> = {
                         <strong>Fields:</strong>
                         {Array.isArray(t.fields_used) ? (
                           t.fields_used.map((f: any, fi: number) => (
-                            <Badge key={`tf-${fi}`} appearance="tint" color="informative" size="small" style={{ fontFamily: "'Cascadia Code','Consolas',monospace", fontSize: "11px", whiteSpace: "nowrap" }}>
+                            <Badge key={`tf-${fi}`} variant="secondary" style={{ fontFamily: "'Cascadia Code','Consolas',monospace", fontSize: "11px", whiteSpace: "nowrap" }}>
                               {safeRender(f)}
                             </Badge>
                           ))
                         ) : (
-                          <Badge appearance="tint" color="informative" size="small" style={{ fontFamily: "'Cascadia Code','Consolas',monospace", fontSize: "11px", whiteSpace: "nowrap" }}>
+                          <Badge variant="secondary" style={{ fontFamily: "'Cascadia Code','Consolas',monospace", fontSize: "11px", whiteSpace: "nowrap" }}>
                             {safeRender(t.fields_used)}
                           </Badge>
                         )}
@@ -1727,8 +1741,8 @@ const formattingCol: ColDef<Worksheet> = {
                     <div key={`axis-${i}`} style={{ border: "1px solid #e2e8f0", borderRadius: "10px", overflow: "hidden" }}>
                       {/* Header */}
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                        {target && <Badge appearance="tint" color="warning" size="small">{target}</Badge>}
-                        {style_rule !== undefined && <Badge appearance="tint" color={style_rule ? "success" : "subtle"} size="small">Style Rule: {String(style_rule)}</Badge>}
+                        {target && <Badge variant="warning">{target}</Badge>}
+                        {style_rule !== undefined && <Badge variant={style_rule ? "success" : "secondary"}>Style Rule: {String(style_rule)}</Badge>}
                       </div>
                       {/* Properties */}
                       <div style={{ display: "flex", flexDirection: "column" }}>
@@ -1746,11 +1760,11 @@ const formattingCol: ColDef<Worksheet> = {
             </div>
           )}
 
-          {bordersCount > 0 && (<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}><Text weight="semibold" size={200} style={{ color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Borders ({bordersCount})</Text><div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>{r.borders!.map((b: any, i: number) => (<Badge key={`border-${i}`} appearance="tint" color="subtle" shape="rounded" style={{ padding: "4px 8px" }}>{typeof b === 'string' ? b : JSON.stringify(b)}</Badge>))}</div></div>)}
+          {bordersCount > 0 && (<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}><Text weight="semibold" size={200} style={{ color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Borders ({bordersCount})</Text><div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>{r.borders!.map((b: any, i: number) => (<Badge key={`border-${i}`} variant="secondary" style={{ padding: "4px 8px" }}>{typeof b === 'string' ? b : JSON.stringify(b)}</Badge>))}</div></div>)}
 
 
 
-        </PopoverSurface>
+        </PopoverContent>
       </Popover>
     );
   }
@@ -1765,7 +1779,7 @@ function P_Visuals({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: bo
 
   const commonCols = [
     { key: "name", label: "Sheet Name", render: (r: Worksheet) => <div><strong style={{ color: "#0f172a", fontSize: "14px" }}>{r.name}</strong></div> },
-    { key: "mark_type", label: "Mark Type", render: (r: Worksheet) => <Badge appearance="tint" color="informative" style={{ textTransform: "capitalize", whiteSpace: "nowrap" }}>{r.mark_type}</Badge> },
+    { key: "mark_type", label: "Mark Type", render: (r: Worksheet) => <Badge variant="secondary" style={{ textTransform: "capitalize", whiteSpace: "nowrap" }}>{r.mark_type}</Badge> },
   ];
   const rowColCols = [
     ...commonCols,
@@ -1778,7 +1792,7 @@ function P_Visuals({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: bo
     key: "marks_text", label: "Mark Text",
     render: (r: Worksheet) => r.marks_text && r.marks_text.length > 0
       ? <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-        {r.marks_text.map((m, i) => <Badge key={i} appearance="tint" color="informative" size="small" style={{ fontFamily: "'Cascadia Code','Consolas',monospace", fontSize: "11px", whiteSpace: "nowrap" }}>{safeRender(m)}</Badge>)}
+        {r.marks_text.map((m, i) => <Badge key={i} variant="secondary" style={{ fontFamily: "'Cascadia Code','Consolas',monospace", fontSize: "11px", whiteSpace: "nowrap" }}>{safeRender(m)}</Badge>)}
       </div>
       : <span style={{ color: "#94a3b8" }}>—</span>
   };
@@ -1791,13 +1805,13 @@ function P_Visuals({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: bo
       {isPdfMode ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
           <div>
-            <div style={{ fontSize: "16px", fontWeight: 600, color: tokens.colorBrandForeground1, marginBottom: "16px", paddingBottom: "4px", borderBottom: `1px solid ${tokens.colorBrandBackground}` }}>
+            <div style={{ fontSize: "16px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "4px", borderBottom: `1px solid var(--primary)` }}>
               Sheets ({sheetsWithRowsCols.length})
             </div>
             {sheetsWithRowsCols.length > 0 ? <DataTable<Worksheet> cols={rowColCols} rows={sheetsWithRowsCols} isPdfMode={isPdfMode} /> : <Empty label="No sheets with rows/columns found." />}
           </div>
           <div>
-            <div style={{ fontSize: "16px", fontWeight: 600, color: tokens.colorBrandForeground1, marginBottom: "16px", paddingBottom: "4px", borderBottom: `1px solid ${tokens.colorBrandBackground}` }}>
+            <div style={{ fontSize: "16px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "4px", borderBottom: `1px solid var(--primary)` }}>
               KPI & Summary ({kpiSheets.length})
             </div>
             {kpiSheets.length > 0 ? <DataTable<Worksheet> cols={kpiCols} rows={kpiSheets} isPdfMode={isPdfMode} /> : <Empty label="No KPI/summary sheets found." />}
@@ -1810,7 +1824,7 @@ function P_Visuals({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: bo
             scrollbarWidth: "none", 
             msOverflowStyle: "none",
             WebkitOverflowScrolling: "touch",
-            borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+            borderBottom: `1px solid var(--border)`,
             marginBottom: "16px"
           }} className="vl-tablist-scroll-wrapper">
             <style>{`
@@ -1818,10 +1832,12 @@ function P_Visuals({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: bo
                 display: none;
               }
             `}</style>
-            <TabList selectedValue={visualTab} onTabSelect={(_, data) => setVisualTab(data.value as string)} className={styles.tabList} style={{ minWidth: "max-content", borderBottom: "none" }}>
-              <Tab value="sheets" className={styles.noHoverTab} style={{ fontSize: "14px", fontWeight: 500 }}>Sheets ({sheetsWithRowsCols.length})</Tab>
-              <Tab value="kpi" className={styles.noHoverTab} style={{ fontSize: "14px", fontWeight: 500 }}>KPI & Summary ({kpiSheets.length})</Tab>
-            </TabList>
+            <Tabs value={visualTab} onValueChange={(value) => setVisualTab(value)}>
+              <TabsList className={styles.tabList} style={{ minWidth: "max-content", borderBottom: "none" }}>
+                <TabsTrigger value="sheets" className={styles.noHoverTab} style={{ fontSize: "14px", fontWeight: 500 }}>Sheets ({sheetsWithRowsCols.length})</TabsTrigger>
+                <TabsTrigger value="kpi" className={styles.noHoverTab} style={{ fontSize: "14px", fontWeight: 500 }}>KPI & Summary ({kpiSheets.length})</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
 
           {visualTab === "sheets" && (
@@ -1913,9 +1929,9 @@ function DeviceLayoutTree({ nodes }: { nodes: any[] }) {
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px", padding: "4px" }}>
       {items.map((item, idx) => (
         <Card key={idx} style={{ 
-          background: tokens.colorNeutralBackground1,
-          border: `1px solid ${tokens.colorNeutralStroke1}`,
-          boxShadow: tokens.shadow8,
+          background: "var(--surface)",
+          border: `1px solid var(--border)`,
+          boxShadow: "var(--shadow-sm)",
           borderRadius: "12px",
           padding: "16px",
           display: "flex",
@@ -1924,14 +1940,14 @@ function DeviceLayoutTree({ nodes }: { nodes: any[] }) {
           transition: "transform 0.2s, box-shadow 0.2s",
           cursor: "default"
         }} className="vl-hover-card">
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, paddingBottom: "10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", borderBottom: `1px solid var(--border)`, paddingBottom: "10px" }}>
             <div style={{ background: "#eff6ff", padding: "6px", borderRadius: "8px" }}>
-              <Sparkle24Regular fontSize={18} primaryFill="#3b82f6" />
+              <Sparkles size={18} color="#3b82f6" />
             </div>
             <Text weight="bold" size={400} style={{ color: "#0f172a", wordBreak: "break-word" }}>
               {item.name}
             </Text>
-            {item.type && <Badge appearance="tint" color="subtle" size="small" style={{ textTransform: "capitalize" }}>{item.type}</Badge>}
+            {item.type && <Badge variant="secondary" style={{ textTransform: "capitalize" }}>{item.type}</Badge>}
           </div>
 
           {/* Functional Params (e.g. URLs) */}
@@ -2095,7 +2111,7 @@ function DashboardCard({ db, isPdfMode = false }: { db: DashboardEntry, isPdfMod
           <div style={{ fontSize: "22px", fontWeight: 600, color: "#0f172a" }}>{db.containers}</div>
           {db.containers_list && db.containers_list.length > 0 && (
             <div style={{ marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "4px" }}>
-              {db.containers_list.map((c, i) => <Badge key={i} appearance="tint" color="subtle" size="small" style={{ whiteSpace: "nowrap" }}>{c}</Badge>)}
+              {db.containers_list.map((c, i) => <Badge key={i} variant="secondary" style={{ whiteSpace: "nowrap" }}>{c}</Badge>)}
             </div>
           )}
         </div>
@@ -2112,7 +2128,7 @@ function DashboardCard({ db, isPdfMode = false }: { db: DashboardEntry, isPdfMod
           <div className={styles.sectionHeader} style={{ fontSize: "16px", marginBottom: "16px" }}>Dashboard Objects ({db.objects.length})</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", padding: "4px 0" }}>
             {db.objects.map((obj, i) => (
-              <Badge key={i} appearance="outline" color="brand" shape="rounded" size="medium" style={{ whiteSpace: "nowrap" }}>{obj}</Badge>
+              <Badge key={i} variant="default" style={{ whiteSpace: "nowrap" }}>{obj}</Badge>
             ))}
           </div>
         </Card>
@@ -2124,7 +2140,7 @@ function DashboardCard({ db, isPdfMode = false }: { db: DashboardEntry, isPdfMod
           <div className={styles.sectionHeader} style={{ fontSize: "16px", marginBottom: "16px" }}>Device Layouts ({db.device_layouts_list.length})</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", padding: "4px 0" }}>
             {db.device_layouts_list.map((dl, i) => (
-              <Badge key={i} appearance="outline" color="brand" shape="rounded" size="medium">{dl}</Badge>
+              <Badge key={i} variant="default">{dl}</Badge>
             ))}
           </div>
         </Card>
@@ -2132,7 +2148,7 @@ function DashboardCard({ db, isPdfMode = false }: { db: DashboardEntry, isPdfMod
 
       {/* Actions as proper table */}
       <div style={{ fontWeight: 600, fontSize: "16px", marginBottom: "12px", color: "#0f172a", display: "flex", alignItems: "center", gap: "6px" }}>
-        <Flash24Regular fontSize={14} /> Actions ({db.actionsList?.length || 0})
+        <Zap size={14} /> Actions ({db.actionsList?.length || 0})
       </div>
       {db.actionsList && db.actionsList.length > 0 ? (
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
@@ -2151,16 +2167,16 @@ function DashboardCard({ db, isPdfMode = false }: { db: DashboardEntry, isPdfMod
                   <td style={{ padding: "10px 16px" }}>
                     {(() => {
                       const t = (act.type || "").toLowerCase()
-                      let c: "success" | "warning" | "brand" | "informative" | "subtle" = "subtle"
+                      let c: "success" | "warning" | "default" | "secondary" = "secondary"
                       if (t.includes("filter")) c = "success"
                       else if (t.includes("highlight")) c = "warning"
-                      else if (t.includes("url") || t.includes("hyperlink")) c = "brand"
-                      else if (t.includes("parameter") || t.includes("set")) c = "informative"
-                      else if (t.includes("navigation")) c = "brand"
-                      return <Badge appearance="outline" color={c} size="small">{act.type}</Badge>
+                      else if (t.includes("url") || t.includes("hyperlink")) c = "default"
+                      else if (t.includes("parameter") || t.includes("set")) c = "secondary"
+                      else if (t.includes("navigation")) c = "default"
+                      return <Badge variant={c}>{act.type}</Badge>
                     })()}
                   </td>
-                  <td style={{ padding: "10px 16px" }}><Badge appearance="tint" color="brand" size="small">{act.activation}</Badge></td>
+                  <td style={{ padding: "10px 16px" }}><Badge variant="default">{act.activation}</Badge></td>
                 </tr>
               );
             })}
@@ -2193,12 +2209,12 @@ function DashboardCard({ db, isPdfMode = false }: { db: DashboardEntry, isPdfMod
                   textAlign: "center",
                   cursor: hasData ? "pointer" : "not-allowed",
                   borderRadius: "10px",
-                  border: isSelected ? `2px solid ${tokens.colorBrandStroke1}` : `1px solid ${tokens.colorNeutralStroke1}`,
-                  background: isSelected ? "#eff6ff" : (hasData ? tokens.colorNeutralBackground1 : "#f1f5f9"),
+                  border: isSelected ? `2px solid var(--primary)` : `1px solid var(--border)`,
+                  background: isSelected ? "#eff6ff" : (hasData ? "var(--surface)" : "#f1f5f9"),
                   fontWeight: isSelected ? 700 : 500,
-                  color: isSelected ? tokens.colorBrandForeground1 : (hasData ? tokens.colorNeutralForeground1 : "#94a3b8"),
+                  color: isSelected ? "var(--primary)" : (hasData ? "var(--text)" : "#94a3b8"),
                   opacity: hasData ? 1 : 0.6,
-                  boxShadow: isSelected ? tokens.shadow8 : "none",
+                  boxShadow: isSelected ? "var(--shadow-sm)" : "none",
                   transition: "all 0.2s ease",
                   display: "flex",
                   alignItems: "center",
@@ -2206,9 +2222,9 @@ function DashboardCard({ db, isPdfMode = false }: { db: DashboardEntry, isPdfMod
                   gap: "6px"
                 }}
               >
-                {l === "Main" && <Sparkle24Regular fontSize={14} />}
+                {l === "Main" && <Sparkles size={14} />}
                 {l}
-                {hasData && <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: isSelected ? tokens.colorBrandForeground1 : "#22c55e" }} />}
+                {hasData && <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: isSelected ? "var(--primary)" : "#22c55e" }} />}
               </div>
             );
           })}
@@ -2225,7 +2241,7 @@ function DashboardCard({ db, isPdfMode = false }: { db: DashboardEntry, isPdfMod
                     <Text weight="semibold" size={300} style={{ color: "#475569", marginBottom: "12px", display: "block" }}>Visible Worksheets</Text>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                       {db.device_layouts_styling[selectedLayoutTab].visible_worksheets.map((ws: string, i: number) => (
-                        <Badge key={i} appearance="tint" color="brand" shape="rounded">{ws}</Badge>
+                        <Badge key={i} variant="default">{ws}</Badge>
                       ))}
                     </div>
                   </div>
@@ -2273,7 +2289,7 @@ function P_TableCalculations({ d, isPdfMode = false }: { d: ParsingPayload, isPd
   return (
     <Card className={styles.sectionCard} style={{ padding: "20px 28px" }}>
       <div className={styles.sectionHeaderRow} onClick={() => !isPdfMode && setIsOpen(!isOpen)} style={{ marginBottom: isOpen ? "16px" : "0", cursor: isPdfMode ? "default" : "pointer" }}>
-        {isOpen ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+        {isOpen ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
         <div className={styles.sectionHeader} style={{ fontSize: "20px" }}>
           Table Calculations
           <span style={{ fontSize: "14px", color: "#64748b", marginLeft: "12px" }}>({tableCalcs.length})</span>
@@ -2407,7 +2423,7 @@ function P_Permissions({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?
         ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", padding: "8px 0" }}>
             {(d.tags || []).map((tag, i) => (
-              <Badge key={i} appearance="outline" color="brand" shape="rounded" size="medium">{tag}</Badge>
+              <Badge key={i} variant="default">{tag}</Badge>
             ))}
           </div>
         )}
@@ -2417,7 +2433,7 @@ function P_Permissions({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?
       {(d.permissions || []).length > 0 ? (
         <Card className={styles.sectionCard}>
           <div className={styles.sectionHeaderRow} onClick={() => !isPdfMode && setOpenPermissions(!openPermissions)} style={{ cursor: isPdfMode ? "default" : "pointer" }}>
-            {openPermissions ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+            {openPermissions ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
             <div className={styles.sectionHeader}>
               Workbook Permissions
               <span style={{ fontSize: "14px", color: "#64748b", marginLeft: "12px" }}>({d.permissions.length} grantees)</span>
@@ -2429,14 +2445,14 @@ function P_Permissions({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?
               {(d.permissions || []).map((perm, idx) => (
                 <div key={idx} style={{ marginBottom: "20px", padding: "16px", background: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px", fontWeight: 600, fontSize: "15px" }}>
-                    <Badge appearance="tint" color={perm.grantee_type === "User" ? "brand" : "subtle"} size="medium">{perm.grantee_type}</Badge>
+                    <Badge variant={perm.grantee_type === "User" ? "default" : "secondary"}>{perm.grantee_type}</Badge>
                     <span style={{ color: "#666666" }}><span style={{ fontWeight: 700 }}>ID:- </span>{perm.grantee_id}</span>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
                     {(perm.capabilities || []).map((cap, j) => (
                       <div key={j} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: cap.value === "Allow" ? "#f0fdf4" : "#fef2f2", borderRadius: "8px", border: `1px solid ${cap.value === "Allow" ? "#bbf7d0" : "#fecaca"}` }}>
                         <span style={{ fontSize: "14px", color: "#1e293b" }}>{cap.name}</span>
-                        <Badge appearance="tint" color={cap.value === "Allow" ? "success" : "danger"} size="small">{cap.value?.toUpperCase()}</Badge>
+                        <Badge variant={cap.value === "Allow" ? "success" : "destructive"}>{cap.value?.toUpperCase()}</Badge>
                       </div>
                     ))}
                   </div>
@@ -2506,10 +2522,10 @@ function P_EmbeddedAssets({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMo
           onClick={() => !isPdfMode && toggleAsset(key)}
           style={{ display: "flex", alignItems: "center", gap: "10px", padding: "14px 16px", cursor: isPdfMode ? "default" : "pointer", transition: "background 0.15s", background: isOpen ? "#f8fafc" : "transparent" }}
         >
-          {isOpen ? <ChevronDown20Regular fontSize={16} /> : <ChevronRight20Regular fontSize={16} />}
+          {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           {icon}
           <span style={{ fontWeight: 600, color: "#0f172a", fontSize: "14px", flex: 1 }}>{asset.name}</span>
-          <Badge appearance="tint" color="subtle" size="small">{asset.size_kb} KB</Badge>
+          <Badge variant="secondary">{asset.size_kb} KB</Badge>
 
         </div>
         {isOpen && (
@@ -2517,7 +2533,7 @@ function P_EmbeddedAssets({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMo
 
             <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: "#f8fafc", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
               <span style={{ fontSize: "13px", color: "#64748b", fontWeight: 600 }}>Source</span>
-              <Badge appearance="tint" color="informative">{asset.source}</Badge>
+              <Badge variant="secondary">{asset.source}</Badge>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: "#f8fafc", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
               <span style={{ fontSize: "13px", color: "#64748b", fontWeight: 600 }}>Embedded</span>
@@ -2562,9 +2578,9 @@ function P_EmbeddedAssets({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMo
             {hyperPreviews.map((hp, i) => (
               <div key={i} style={{ background: "linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden" }}>
                 <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: "10px", borderBottom: "1px solid #e2e8f0" }}>
-                  <Database24Regular fontSize={18} primaryFill="#3b82f6" />
+                  <Database size={18} color="#3b82f6" />
                   <Text size={400} weight="bold" style={{ color: "#0f172a", wordBreak: "break-word" }}>{hp.hyper_file}</Text>
-                  {hp.details && <Badge appearance="tint" color="brand" style={{ marginLeft: "auto" }}>{hp.details.length} table{hp.details.length !== 1 ? "s" : ""}</Badge>}
+                  {hp.details && <Badge variant="default" style={{ marginLeft: "auto" }}>{hp.details.length} table{hp.details.length !== 1 ? "s" : ""}</Badge>}
                 </div>
                 {hp.details && hp.details.length > 0 && (
                   <div style={{ overflowX: "auto", width: "100%" }}>
@@ -2581,7 +2597,7 @@ function P_EmbeddedAssets({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMo
                         {hp.details.map((detail, idx) => (
                           <Fragment key={idx}>
                             <tr style={{ background: idx % 2 === 0 ? "#ffffff" : "#fafbff", borderBottom: isPdfMode ? "none" : "1px solid #e2e8f0" }}>
-                              <td style={{ padding: "10px 14px" }}><Badge appearance="tint" color="informative">{detail.schema}</Badge></td>
+                              <td style={{ padding: "10px 14px" }}><Badge variant="secondary">{detail.schema}</Badge></td>
                               <td style={{ padding: "10px 14px", fontFamily: "monospace", color: "#666666", wordBreak: "break-word" }}>{detail.table}</td>
                               <td style={{ padding: "10px 14px", fontWeight: 700, color: "#0f172a" }}>{detail.row_count.toLocaleString()}</td>
                               <td style={{ padding: "10px 14px" }}>
@@ -2589,27 +2605,27 @@ function P_EmbeddedAssets({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMo
                                   detail.columns && detail.columns.length > 0 ? (
                                     <Popover withArrow positioning="below-start">
                                       <PopoverTrigger disableButtonEnhancement>
-                                        <Button appearance="subtle" icon={<DocumentHeader24Regular fontSize={14} />} iconPosition="before" style={{ color: tokens.colorBrandForeground1, fontWeight: 600, padding: "4px 8px" }}>
+                                        <Button variant="ghost" style={{ color: "var(--primary)", fontWeight: 600, padding: "4px 8px" }}><FileText size={14} />
                                           {detail.columns.length} Columns
                                         </Button>
                                       </PopoverTrigger>
-                                      <PopoverSurface style={{ width: "320px", padding: "16px", maxHeight: "400px", overflowY: "auto", backgroundColor: "#ffffff", border: `1px solid ${tokens.colorNeutralStroke1}`, boxShadow: tokens.shadow16, borderRadius: "12px" }}>
-                                        <div style={{ borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, paddingBottom: "8px", marginBottom: "12px" }}>
+                                      <PopoverContent style={{ width: "320px", padding: "16px", maxHeight: "400px", overflowY: "auto", backgroundColor: "#ffffff", border: `1px solid var(--border)`, boxShadow: "var(--shadow-md)", borderRadius: "12px" }}>
+                                        <div style={{ borderBottom: `1px solid var(--border)`, paddingBottom: "8px", marginBottom: "12px" }}>
                                           <Text weight="bold" size={400} style={{ color: "#0f172a" }}>Column Details</Text>
                                         </div>
                                         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                                           {detail.columns.map((c, cIdx) => (
                                             <div key={cIdx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: "#f8fafc", padding: "8px 12px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
                                               <span style={{ fontSize: "13px", fontWeight: 500, color: "#666666" }}>{c.name}</span>
-                                              <Badge appearance="tint" color="informative">{c.type}</Badge>
+                                              <Badge variant="secondary">{c.type}</Badge>
                                             </div>
                                           ))}
                                         </div>
-                                      </PopoverSurface>
+                                      </PopoverContent>
                                     </Popover>
                                   ) : <span style={{ color: "#94a3b8", fontSize: "12px", fontStyle: "italic" }}>—</span>
                                 )}
-                                {isPdfMode && <Badge appearance="outline" color="brand" size="small">{detail.columns?.length || 0} columns</Badge>}
+                                {isPdfMode && <Badge variant="default">{detail.columns?.length || 0} columns</Badge>}
                               </td>
                             </tr>
                             {isPdfMode && detail.columns && detail.columns.length > 0 && (
@@ -2626,7 +2642,7 @@ function P_EmbeddedAssets({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMo
                                       {detail.columns.map((c, cIdx) => (
                                         <tr key={cIdx} style={{ borderBottom: "1px solid #f1f5f9" }}>
                                           <td style={{ padding: "8px 12px", fontWeight: 600, color: "#334155" }}>{c.name}</td>
-                                          <td style={{ padding: "8px 12px", textAlign: "right" }}><Badge appearance="tint" color="subtle" size="small">{c.type}</Badge></td>
+                                          <td style={{ padding: "8px 12px", textAlign: "right" }}><Badge variant="secondary">{c.type}</Badge></td>
                                         </tr>
                                       ))}
                                     </tbody>
@@ -2652,7 +2668,7 @@ function P_EmbeddedAssets({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMo
         <div style={{ fontSize: "14px", color: "#64748b", marginBottom: "16px" }}>Click on any item to view details</div>
         {images.length === 0 ? <Empty label="No embedded images found." /> : (
           <div style={{ border: "1px solid #e2e8f0", borderRadius: "10px", overflow: "hidden" }}>
-            <PaginatedList items={images} renderItem={(asset, i) => renderExpandableItem(asset, i, "img", <Image24Regular fontSize={14} primaryFill="#3b82f6" />)} />
+            <PaginatedList items={images} renderItem={(asset, i) => renderExpandableItem(asset, i, "img", <ImageIcon size={14} color="#3b82f6" />)} />
           </div>
         )}
       </Card>
@@ -2663,9 +2679,9 @@ function P_EmbeddedAssets({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMo
         <div style={{ fontSize: "14px", color: "#64748b", marginBottom: "16px" }}>Click on any item to view details</div>
         {shapes.length === 0 ? <Empty label="No custom shapes found." /> : (
           <div style={{ border: "1px solid #e2e8f0", borderRadius: "10px", overflow: "hidden" }}>
-            <PaginatedList items={shapes} renderItem={(asset, i) => renderExpandableItem(asset, i, "shape", <Shapes24Regular fontSize={14} primaryFill="#8b5cf6" />, [
-              { label: "Palette", value: <Badge appearance="tint" color="brand" style={{ whiteSpace: "nowrap" }}>{asset.palette}</Badge> },
-              { label: "Mapped To", value: <Badge appearance="tint" color="informative" style={{ whiteSpace: "nowrap" }}>{asset.mapped_to}</Badge> },
+            <PaginatedList items={shapes} renderItem={(asset, i) => renderExpandableItem(asset, i, "shape", <Shapes size={14} color="#8b5cf6" />, [
+              { label: "Palette", value: <Badge variant="default" style={{ whiteSpace: "nowrap" }}>{asset.palette}</Badge> },
+              { label: "Mapped To", value: <Badge variant="secondary" style={{ whiteSpace: "nowrap" }}>{asset.mapped_to}</Badge> },
             ])} />
           </div>
         )}
@@ -2681,7 +2697,7 @@ function P_EmbeddedAssets({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMo
               <div style={{ background: "linear-gradient(135deg, #fafafa 0%, #f0f4ff 100%)", borderRadius: "12px", border: "1px solid #e2e8f0", padding: "20px", position: "relative", overflow: "hidden" }}>
                 <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "4px", background: cred.embed_password ? "linear-gradient(90deg, #22c55e, #16a34a)" : "linear-gradient(90deg, #3b82f6, #2563eb)" }} />
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-                  <Key24Regular fontSize={16} primaryFill="#6366f1" />
+                  <Key size={16} color="#6366f1" />
                   <Text size={400} weight="bold" style={{ color: "#0f172a", textTransform: "capitalize" }}>{cred.connection_type}</Text>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -2691,11 +2707,11 @@ function P_EmbeddedAssets({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMo
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
                     <span style={{ fontSize: "13px", color: "#64748b", fontWeight: 600 }}>Auth Type</span>
-                    <Badge appearance="tint" color="informative" style={{ textTransform: "uppercase", whiteSpace: "nowrap" }}>{cred.authentication}</Badge>
+                    <Badge variant="secondary" style={{ textTransform: "uppercase", whiteSpace: "nowrap" }}>{cred.authentication}</Badge>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: cred.embed_password ? "#f0fdf4" : "#fef2f2", borderRadius: "8px", border: `1px solid ${cred.embed_password ? "#bbf7d0" : "#fecaca"}` }}>
                     <span style={{ fontSize: "13px", color: "#64748b", fontWeight: 600 }}>Embed Password</span>
-                    <Badge appearance="tint" color={cred.embed_password ? "success" : "danger"} size="small" style={{ whiteSpace: "nowrap" }}>{cred.embed_password ? "YES" : "NO"}</Badge>
+                    <Badge variant={cred.embed_password ? "success" : "destructive"} style={{ whiteSpace: "nowrap" }}>{cred.embed_password ? "YES" : "NO"}</Badge>
                   </div>
                 </div>
               </div>

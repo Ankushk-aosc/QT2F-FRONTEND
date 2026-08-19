@@ -1,19 +1,14 @@
 "use client"
 
 import React from "react"
-import { Badge, Text, makeStyles, tokens } from "@fluentui/react-components"
 
 import { SETTINGS_SECTIONS } from "@/lib/settings/navigation"
 import { useSettingsStore } from "@/stores/settings.store"
+import { Badge } from "@/components/ui/badge"
 
 import { SettingRow, SettingsGroup, SettingsPanel } from "../SettingsPrimitives"
 
-const useStyles = makeStyles({
-  mono: { fontFamily: tokens.fontFamilyMonospace },
-})
-
 export function AboutSection() {
-  const styles = useStyles()
   const applicationVersion = useSettingsStore((state) => state.applicationVersion)
   const updatedAt = useSettingsStore((state) => state.updatedAt)
   const schemaVersion = useSettingsStore((state) => state.settings.schemaVersion)
@@ -32,32 +27,28 @@ export function AboutSection() {
     >
       <SettingsGroup title="Build">
         <SettingRow label="Platform" hint="Unified Qlik and Tableau migration platform.">
-          <Text size={300}>Switchblade Unified Platform</Text>
+          <span>Switchblade Unified Platform</span>
         </SettingRow>
 
         <SettingRow label="Application version" hint="Read from the running build at runtime.">
-          <Text size={300} className={styles.mono}>
-            {applicationVersion || "—"}
-          </Text>
+          <span style={{ fontFamily: "monospace" }}>{applicationVersion || "—"}</span>
         </SettingRow>
 
         <SettingRow label="Settings schema" hint="Version of the persisted settings document.">
-          <Text size={300} className={styles.mono}>
-            v{schemaVersion}
-          </Text>
+          <span style={{ fontFamily: "monospace" }}>v{schemaVersion}</span>
         </SettingRow>
       </SettingsGroup>
 
       <SettingsGroup title="Configuration">
         <SettingRow label="Settings last saved" hint="Timestamp of the most recent change.">
-          <Text size={300}>{formattedUpdatedAt}</Text>
+          <span>{formattedUpdatedAt}</span>
         </SettingRow>
 
         <SettingRow
           label="Administration sections"
           hint="Sections currently wired up versus the full planned menu."
         >
-          <Badge appearance="tint" color="informative">
+          <Badge variant="secondary">
             {availableCount} of {totalCount} available
           </Badge>
         </SettingRow>

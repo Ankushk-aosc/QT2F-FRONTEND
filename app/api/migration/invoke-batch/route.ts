@@ -13,7 +13,22 @@ export interface InvokeBatchRequest {
   site_id?: string;
   source_type?: string;
   connection_id?: string;
-  items: Array<{ project_id: string; workbook_id: string; workbook_name?: string }>;
+  /**
+   * Source-specific. Tableau items carry `project_id`/`workbook_id`; Qlik items
+   * carry `workspace_id`/`app_id`. They are not mixed in one request.
+   */
+  items: Array<{
+    project_id?: string;
+    workbook_id?: string;
+    workbook_name?: string;
+    workspace_id?: string;
+    workspace_name?: string;
+    app_id?: string;
+    app_name?: string;
+  }>;
+  model?: string;
+  deployment_type?: string;
+  fabric_group_id?: string;
   group_id?: string;
   workspace_id?: string;
   folder_name?: string;
@@ -40,12 +55,17 @@ export async function POST(req: NextRequest) {
     }
 
     const { email, tableau_server_url, items } = body;
+    // The orchestrator takes both sources on this endpoint. Qlik items are
+    // keyed by workspace/app, Tableau items by project/workbook, so validation
+    // has to follow the declared source rather than assuming Tableau — which
+    // previously rejected every Qlik item with "missing project_id".
+    const isQlik = body.source_type?.trim().toLowerCase() === "qlik";
 
     if (!email?.trim()) {
       return NextResponse.json({ error: "email is required" }, { status: 400 });
     }
 
-    if (!tableau_server_url?.trim()) {
+    if (!isQlik && !tableau_server_url?.trim()) {
       return NextResponse.json({ error: "tableau_server_url is required" }, { status: 400 });
     }
 
@@ -54,10 +74,18 @@ export async function POST(req: NextRequest) {
     }
 
     for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (!item.project_id?.trim() || !item.workbook_id?.trim()) {
+      const item = items[i] as Record<string, string | undefined>;
+      const missing = isQlik
+        ? !item.workspace_id?.trim() || !item.app_id?.trim()
+        : !item.project_id?.trim() || !item.workbook_id?.trim();
+
+      if (missing) {
         return NextResponse.json(
-          { error: `Item ${i + 1} missing project_id or workbook_id` },
+          {
+            error: isQlik
+              ? `Item ${i + 1} missing workspace_id or app_id`
+              : `Item ${i + 1} missing project_id or workbook_id`,
+          },
           { status: 400 }
         );
       }

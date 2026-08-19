@@ -62,7 +62,8 @@ export async function GET(req: NextRequest) {
     }
 
     const baseUrl = logsBase.replace(/\/$/, "");           // remove trailing slash if any
-    const targetUrl = new URL(`${baseUrl}/activities`);    // â† this gives /api/records/activities
+    // LOGS_API_BASE is ".../api", so the "records/" segment must be explicit here.
+    const targetUrl = new URL(`${baseUrl}/records/activities`);
 
     // Forward all relevant query parameters
     targetUrl.searchParams.append("project_id", project_id);

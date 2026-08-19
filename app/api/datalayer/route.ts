@@ -1,6 +1,5 @@
 // app/api/datalayer/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { httpClient } from "@/lib/api/httpClient";
 import { serverFetchWithAuth as fetchWithAuth } from "@/lib/api/serverFetch";
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +21,7 @@ export async function GET(req: NextRequest) {
         }
 
         const baseUrl = logsBase.replace(/\/$/, "");
-        const targetUrl = `${baseUrl}/data-layer?${query}`;
+        const targetUrl = `${baseUrl}/records/data-layer?${query}`;
 
         console.log(`[API /api/datalayer GET] Target URL: ${targetUrl}`);
 
@@ -60,15 +59,21 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Missing fields" }, { status: 400 });
         }
 
-        const data = await httpClient.post<{ status: string }>(
-            "/data-layer",
-            body,
-            {
-                apiType: "semantic",
-                headers: { "Authorization": authHeader }
-            }
+        // Semantic Kernel has no /data-layer endpoint. The data-layer agent runs
+        // as a stage of /invoke-batch; its results are read back from
+        // /api/records/data-layer.
+        console.warn(
+            `[API /api/datalayer POST] No /data-layer endpoint exists upstream (run ${body.run_id}) — returning 501.`
         );
-        return NextResponse.json(data);
+        return NextResponse.json(
+            {
+                error: "Starting the data layer agent directly is not supported.",
+                details:
+                    "Semantic Kernel runs the data-layer agent as a stage of POST /api/migration/invoke-batch. " +
+                    "Read its output from GET /api/records/data-layer.",
+            },
+            { status: 501 }
+        );
     } catch (err: any) {
         console.error("[API /api/datalayer POST] Error:", err.message);
         const status = err.status || 500;

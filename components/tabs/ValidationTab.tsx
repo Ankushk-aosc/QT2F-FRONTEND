@@ -7,36 +7,19 @@ import { useMappingStore } from "@/stores/mapping.store"
 import { useValidationStore } from "@/stores/validation.store"
 import { useGenerationStore } from "@/stores/generation.store"
 import { useRunHistoryStore } from "@/stores/runHistory.store"
-import { 
-    Badge,
-    Button,
-    Card,
-    Spinner,
-    Tab,
-    Table,
-    TableBody,
-    TableCell,
-    TableHeader,
-    TableHeaderCell,
-    TableRow,
-    TabList,
-    Text,
-    tokens,
-} from "@fluentui/react-components"
-import { 
-    BrainCircuit24Regular, 
-    ClipboardTaskListLtr24Regular, 
-    Table24Regular, 
-    LockClosed24Regular,
-    ChevronUp20Regular,
-    ChevronDown20Regular,
-    Wrench24Regular,
-    DismissCircle24Regular,
-    Warning24Regular,
-    CheckmarkCircle24Regular,
-    Lightbulb24Regular,
-    ArrowClockwise24Regular
-} from "@fluentui/react-icons"
+import { Badge, type BadgeProps } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Spinner } from "@/components/ui/spinner"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+    BrainCircuit,
+    Wrench,
+    XCircle,
+    AlertTriangle,
+    CheckCircle2,
+    RefreshCw,
+} from "lucide-react"
 import { useMonitoringStore } from "@/stores/monitoring.store"
 import { useMemo, useEffect, useState, useCallback } from "react"
 import { MigrationValidationView } from "./MigrationValidationView"
@@ -130,7 +113,7 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
   }, [rawHistoricRunData, workbookId]);
   const isHistoricGenerationReady = historicRunData?.generation_status?.toLowerCase() === "completed" || historicRunData?.generation_status?.toLowerCase() === "success"
   const isGenerationReady = !!useGenerationStore((state: any) => state.generationData[workbookId])
-  
+
   const effectivelyGenerationReady = isHistoricalRun ? isHistoricGenerationReady : isGenerationReady
 
   const isValidationComplete = useMemo(() => {
@@ -177,14 +160,14 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
         const valStatusRaw = (historicRunData?.validation_status || (typeof valStep === 'object' ? (valStep?.status || valStep?.final_status) : valStep) || "").toLowerCase();
         const isHistoricallyCompleted = ["completed", "success", "passed", "done", "validated"].includes(valStatusRaw);
         const isValidationStartedLocally = isAuthorized || manualValidationStarted || isHistoricallyCompleted;
-        
+
         if (isValidationStartedLocally) {
           console.log(`[ValidationTab] Fetching historical data for ${workbookId}`);
           await fetchValidationResult(projectId, workbookId, runId);
-          
+
           const currentData = useValidationStore.getState().validationData[workbookId];
           const hasMetrics = !!currentData?.metrics;
-          
+
           if (!hasMetrics) {
             timeoutId = setTimeout(pollHistoricalValidation, 4000);
           }
@@ -276,13 +259,14 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
     return (
       <div className={styles.container}>
         <Card className={styles.tabsCard} style={{ padding: "48px", display: "flex", flexDirection: "column", gap: "20px", alignItems: "center", justifyContent: "center" }}>
-          <Warning24Regular style={{ fontSize: "40px", color: "#f59e0b" }} />
-          <Text weight="bold" size={500} style={{ color: "#92400e" }}>Validation Failed</Text>
-          <Text size={300} style={{ color: "#64748b", textAlign: "center", maxWidth: "480px", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+          <AlertTriangle size={40} style={{ color: "#f59e0b" }} />
+          <span style={{ fontWeight: 700, fontSize: "18px", color: "#92400e" }}>Validation Failed</span>
+          <span style={{ fontSize: "14px", color: "#64748b", textAlign: "center", maxWidth: "480px", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
             {validationError}
-          </Text>
+          </span>
           <div style={{ marginTop: "16px" }}>
-            <Button appearance="primary" icon={isLoadingValidation ? <Spinner size="tiny" /> : <ArrowClockwise24Regular />} onClick={handleStartValidation} disabled={isLoadingValidation}>
+            <Button onClick={handleStartValidation} disabled={isLoadingValidation}>
+              {isLoadingValidation ? <Spinner size="tiny" /> : <RefreshCw size={20} />}
               {isLoadingValidation ? "Restarting..." : "Re-run Validation"}
             </Button>
           </div>
@@ -309,14 +293,15 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
           return (
             <div className={styles.container}>
               <Card className={styles.tabsCard} style={{ padding: "48px", display: "flex", flexDirection: "column", gap: "20px", alignItems: "center", justifyContent: "center" }}>
-                <Warning24Regular style={{ fontSize: "40px", color: "#f59e0b" }} />
-                <Text weight="bold" size={500} style={{ color: "#92400e" }}>Workbook Not Synced in Fabric</Text>
-                <Text size={300} style={{ color: "#64748b", textAlign: "center", maxWidth: "480px", lineHeight: "1.6" }}>
+                <AlertTriangle size={40} style={{ color: "#f59e0b" }} />
+                <span style={{ fontWeight: 700, fontSize: "18px", color: "#92400e" }}>Workbook Not Synced in Fabric</span>
+                <span style={{ fontSize: "14px", color: "#64748b", textAlign: "center", maxWidth: "480px", lineHeight: "1.6" }}>
                   {syncWarningMessage}
-                </Text>
+                </span>
                 <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
-                  <Button appearance="secondary" onClick={() => setSyncWarningMessage(null)}>Cancel</Button>
-                  <Button appearance="primary" icon={<CheckmarkCircle24Regular />} onClick={handleMarkSyncedAndRun} disabled={isLoadingValidation}>
+                  <Button variant="secondary" onClick={() => setSyncWarningMessage(null)}>Cancel</Button>
+                  <Button onClick={handleMarkSyncedAndRun} disabled={isLoadingValidation}>
+                    <CheckCircle2 size={20} />
                     {isLoadingValidation ? "Starting..." : "Synced — Run Validation"}
                   </Button>
                 </div>
@@ -328,12 +313,12 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
         return (
           <div className={styles.container}>
             <Card className={styles.tabsCard} style={{ padding: "60px", display: "flex", flexDirection: "column", gap: "16px", alignItems: "center", justifyContent: "center" }}>
-              <Button appearance="primary" size="large" onClick={handleStartValidation} disabled={isLoadingValidation}>
+              <Button size="lg" onClick={handleStartValidation} disabled={isLoadingValidation}>
                 {isLoadingValidation ? "Starting..." : "Run Validation"}
               </Button>
-              <Text style={{ color: "#64748b" }}>
+              <span style={{ color: "#64748b" }}>
                 Validation has not been executed for this workbook. Click to start validation.
-              </Text>
+              </span>
             </Card>
           </div>
         )
@@ -352,12 +337,12 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
   const overallPct = ((metrics.passedChecks / Math.max(1, metrics.totalChecks)) * 100).toFixed(0)
   const passRate = Number(overallPct)
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): NonNullable<BadgeProps["variant"]> => {
     switch (status.toLowerCase()) {
       case "passed": case "pass": case "success": return "success"
-      case "failed": case "fail": case "error": return "danger"
+      case "failed": case "fail": case "error": return "destructive"
       case "warning": case "warn": return "warning"
-      default: return "subtle"
+      default: return "secondary"
     }
   }
 
@@ -377,7 +362,7 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
                 <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
                     <div style={{ backgroundColor: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "12px", overflow: "hidden" }}>
                         <div style={{ padding: "12px 16px", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                            <Text size={200} weight="semibold" style={{ color: "#64748b", textTransform: "uppercase" }}>Execution Trace</Text>
+                            <span style={{ fontSize: "12px", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>Execution Trace</span>
                         </div>
                         <div style={{ minHeight: "300px" }}>
                             {currentLogs.map((log: any, idx: number) => {
@@ -386,9 +371,9 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
                                 }
                                 if (!log) return null;
                                 return (
-                                <div key={idx} style={{ 
-                                    fontFamily: "monospace", fontSize: "12px", padding: "8px 16px", 
-                                    borderBottom: "1px solid #f1f5f9", color: log.toLowerCase().includes("error") ? "#ef4444" : "#334155" 
+                                <div key={idx} style={{
+                                    fontFamily: "monospace", fontSize: "12px", padding: "8px 16px",
+                                    borderBottom: "1px solid #f1f5f9", color: log.toLowerCase().includes("error") ? "#ef4444" : "#334155"
                                 }}>
                                     {log}
                                 </div>
@@ -415,17 +400,17 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
                     {sections.map(s => (
                         <Card key={s.id} className={styles.sectionCard} style={{ padding: "20px" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
-                                <Text weight="bold">{s.title}</Text>
-                                <Badge color={getStatusColor(s.data.status || "PASS") as any}>{s.data.status || "PASS"}</Badge>
+                                <span style={{ fontWeight: 700 }}>{s.title}</span>
+                                <Badge variant={getStatusColor(s.data.status || "PASS")}>{s.data.status || "PASS"}</Badge>
                             </div>
-                            <Text size={200} style={{ color: "#64748b", marginBottom: "12px", display: "block" }}>
+                            <span style={{ fontSize: "12px", color: "#64748b", marginBottom: "12px", display: "block" }}>
                                 {s.data.reasoning || s.data.summary || "Technical verification complete."}
-                            </Text>
+                            </span>
                             <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "12px", display: "flex", justifyContent: "space-between" }}>
-                                <Text size={100} weight="bold">ACCURACY</Text>
-                                <Text weight="bold" color={(s.data.accuracy_percentage || 0) >= 90 ? "success" : "neutralHighlight" as any}>
+                                <span style={{ fontSize: "10px", fontWeight: 700 }}>ACCURACY</span>
+                                <span style={{ fontWeight: 700, color: (s.data.accuracy_percentage || 0) >= 90 ? "var(--success)" : "var(--text-secondary)" }}>
                                     {s.data.accuracy_percentage || s.data.accuracy || 0}%
-                                </Text>
+                                </span>
                             </div>
                         </Card>
                     ))}
@@ -436,8 +421,8 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
 
     return (
         <div className={styles.emptyState} style={{ padding: "60px" }}>
-            <BrainCircuit24Regular style={{ fontSize: "40px", opacity: 0.2, marginBottom: "16px" }} />
-            <Text>No technical logs available for this workbook.</Text>
+            <BrainCircuit size={40} style={{ opacity: 0.2, marginBottom: "16px" }} />
+            <span>No technical logs available for this workbook.</span>
         </div>
     )
   }
@@ -449,19 +434,19 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
       <div className={styles.header}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", width: "100%" }}>
             <div>
-                <Text className={styles.title} style={{ fontSize: "32px", fontWeight: 600 }}>Validation Results</Text>
-                <Text className={styles.subtitle}>
+                <span className={styles.title} style={{ fontSize: "32px", fontWeight: 600 }}>Validation Results</span>
+                <span className={styles.subtitle}>
                   Comprehensive validation metrics for <span style={{ color: "#0f172a", fontWeight: 600 }}>{workbookName || workbookId}</span>
-                </Text>
+                </span>
             </div>
             {/* TEMPORARILY DISABLED - ENABLE LATER */}
             {ENABLE_RERUN_VALIDATION && isValidationComplete && hasData && (
-                <Button 
-                    appearance="outline" 
-                    icon={<ArrowClockwise24Regular />} 
-                    onClick={handleStartValidation} 
+                <Button
+                    variant="outline"
+                    onClick={handleStartValidation}
                     disabled={isLoadingValidation}
                 >
+                    <RefreshCw size={20} />
                     {isLoadingValidation ? "Restarting..." : "Re-run Validation"}
                 </Button>
             )}
@@ -501,15 +486,12 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
 
       {/* ── TAB NAVIGATION ── */}
       <div style={{ marginBottom: "24px", marginTop: "20px", display: "flex", justifyContent: "center" }}>
-        <TabList
-          selectedValue={activeTab}
-          onTabSelect={(_, d) => setActiveTab(d.value as any)}
-          appearance="subtle"
-          size="large"
-        >
-          <Tab value="overview">Validation Details</Tab>
-          <Tab value="technical">Technical Logs</Tab>
-        </TabList>
+        <Tabs value={activeTab} onValueChange={(value: string) => setActiveTab(value as any)}>
+          <TabsList>
+            <TabsTrigger value="overview">Validation Details</TabsTrigger>
+            <TabsTrigger value="technical">Technical Logs</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {activeTab === 'technical' ? (
@@ -527,7 +509,7 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 {issues.map((issue, idx) => (
                   <div key={idx} className={styles.infoItem} style={{ background: "#fef2f2", borderLeft: "3px solid #ef4444" }}>
-                    <Text style={{ fontSize: "13px", color: "#991b1b" }}>{issue}</Text>
+                    <span style={{ fontSize: "13px", color: "#991b1b" }}>{issue}</span>
                   </div>
                 ))}
               </div>
@@ -544,14 +526,14 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
                 <div className={styles.infoLabel}>Data Validation</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "8px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Text style={{ fontSize: "13px", color: "#475569" }}>Row Count Match</Text>
-                    <Badge appearance="tint" color={metrics.rowCountMatch ? "success" : "danger"}>
+                    <span style={{ fontSize: "13px", color: "#475569" }}>Row Count Match</span>
+                    <Badge variant={metrics.rowCountMatch ? "success" : "destructive"}>
                       {metrics.rowCountMatch ? "✓ Passed" : "✗ Failed"}
                     </Badge>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Text style={{ fontSize: "13px", color: "#475569" }}>Aggregate Accuracy</Text>
-                    <Text style={{ fontWeight: 700, color: "#0f172a" }}>{metrics.aggregateAccuracy}%</Text>
+                    <span style={{ fontSize: "13px", color: "#475569" }}>Aggregate Accuracy</span>
+                    <span style={{ fontWeight: 700, color: "#0f172a" }}>{metrics.aggregateAccuracy}%</span>
                   </div>
                 </div>
               </div>
@@ -561,12 +543,12 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
                 <div className={styles.infoLabel}>Visual Validation</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "8px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Text style={{ fontSize: "13px", color: "#475569" }}>Fidelity Score</Text>
-                    <Text style={{ fontWeight: 700, color: "#0f172a" }}>{metrics.visualFidelityScore}%</Text>
+                    <span style={{ fontSize: "13px", color: "#475569" }}>Fidelity Score</span>
+                    <span style={{ fontWeight: 700, color: "#0f172a" }}>{metrics.visualFidelityScore}%</span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Text style={{ fontSize: "13px", color: "#475569" }}>Chart Type Match</Text>
-                    <Badge appearance="tint" color="success">PASS</Badge>
+                    <span style={{ fontSize: "13px", color: "#475569" }}>Chart Type Match</span>
+                    <Badge variant="success">PASS</Badge>
                   </div>
                 </div>
               </div>
@@ -576,10 +558,10 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
                 <div className={styles.infoLabel}>Validation Progress</div>
                 <div style={{ marginTop: "8px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                    <Text style={{ fontSize: "13px", fontWeight: 600, color: "#334155" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 600, color: "#334155" }}>
                       {metrics.passedChecks} of {metrics.totalChecks} Checks
-                    </Text>
-                    <Text style={{ fontWeight: 700, color: passRate === 100 ? "#16a34a" : "#4338ca" }}>{overallPct}%</Text>
+                    </span>
+                    <span style={{ fontWeight: 700, color: passRate === 100 ? "#16a34a" : "#4338ca" }}>{overallPct}%</span>
                   </div>
                   <div style={{ height: "6px", backgroundColor: "#e2e8f0", borderRadius: "4px", overflow: "hidden" }}>
                     <div style={{
@@ -643,8 +625,7 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
                         {check.name}
                       </span>
                       <Badge
-                        appearance="tint"
-                        color={getStatusColor(check.status) as any}
+                        variant={getStatusColor(check.status)}
                         style={{ fontWeight: 600, letterSpacing: "0.4px", textTransform: "uppercase", fontSize: "10px" }}
                       >
                         {check.status}
@@ -662,35 +643,35 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
                 <div>
                   <div className={styles.sectionHeader} style={{ marginBottom: "4px" }}>Data Accuracy · Row Counts</div>
-                  <Text style={{ fontSize: "13px", color: "#64748b" }}>Expected row counts extracted for validation</Text>
+                  <span style={{ fontSize: "13px", color: "#64748b" }}>Expected row counts extracted for validation</span>
                 </div>
-                <Badge appearance="tint" color="success" shape="rounded" style={{ fontWeight: 600 }}>
+                <Badge variant="success" style={{ fontWeight: 600, borderRadius: "999px" }}>
                   {validationData.extractionStatus}
                 </Badge>
               </div>
               <div className={styles.tableContainer}>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHeaderCell style={{ fontWeight: 700, color: "#0f172a", fontSize: "13px" }}>Table / Object</TableHeaderCell>
-                      <TableHeaderCell style={{ fontWeight: 700, color: "#0f172a", fontSize: "13px" }}>Expected Rows</TableHeaderCell>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ fontWeight: 700, color: "#0f172a", fontSize: "13px", textAlign: "left", padding: "10px 12px" }}>Table / Object</th>
+                      <th style={{ fontWeight: 700, color: "#0f172a", fontSize: "13px", textAlign: "left", padding: "10px 12px" }}>Expected Rows</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {validationData.rowCounts.map((rc: any, idx: number) => (
-                      <TableRow key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                        <TableCell className={styles.wrapCell} style={{ fontWeight: 500, color: "#334155", fontSize: "13.5px" }}>
+                      <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                        <td className={styles.wrapCell} style={{ fontWeight: 500, color: "#334155", fontSize: "13.5px", padding: "10px 12px" }}>
                           {rc.tableName}
-                        </TableCell>
-                        <TableCell className={styles.wrapCell}>
-                          <Badge appearance="tint" color="informative" shape="rounded" style={{ fontWeight: 600 }}>
+                        </td>
+                        <td className={styles.wrapCell} style={{ padding: "10px 12px" }}>
+                          <Badge variant="secondary" style={{ fontWeight: 600, borderRadius: "999px" }}>
                             {rc.expectedRowCount.toLocaleString()}
                           </Badge>
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     ))}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
             </Card>
           )}
@@ -700,43 +681,41 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
             <Card className={styles.sectionCard}>
               <div className={styles.sectionHeader} style={{ marginBottom: "20px" }}>Validation Summary</div>
               <div className={styles.tableContainer}>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHeaderCell style={{ fontWeight: 700, color: "#0f172a", fontSize: "13px" }}>Check Name</TableHeaderCell>
-                      <TableHeaderCell style={{ fontWeight: 700, color: "#0f172a", fontSize: "13px" }}>Category</TableHeaderCell>
-                      <TableHeaderCell style={{ fontWeight: 700, color: "#0f172a", fontSize: "13px" }}>Status</TableHeaderCell>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ fontWeight: 700, color: "#0f172a", fontSize: "13px", textAlign: "left", padding: "10px 12px" }}>Check Name</th>
+                      <th style={{ fontWeight: 700, color: "#0f172a", fontSize: "13px", textAlign: "left", padding: "10px 12px" }}>Category</th>
+                      <th style={{ fontWeight: 700, color: "#0f172a", fontSize: "13px", textAlign: "left", padding: "10px 12px" }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {validationChecks.map((check) => (
-                      <TableRow key={check.name} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                        <TableCell className={styles.wrapCell} style={{ fontWeight: 500, color: "#334155", fontSize: "13.5px" }}>
+                      <tr key={check.name} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                        <td className={styles.wrapCell} style={{ fontWeight: 500, color: "#334155", fontSize: "13.5px", padding: "10px 12px" }}>
                           {check.name}
-                        </TableCell>
-                        <TableCell className={styles.wrapCell}>
-                          <Badge appearance="tint" color="informative" shape="rounded" style={{ fontSize: "12px" }}>
+                        </td>
+                        <td className={styles.wrapCell} style={{ padding: "10px 12px" }}>
+                          <Badge variant="secondary" style={{ fontSize: "12px", borderRadius: "999px" }}>
                             {check.name.toLowerCase().includes("row") || check.name.toLowerCase().includes("aggregate")
                               ? "Data"
                               : check.name.toLowerCase().includes("visual")
                                 ? "Visual"
                                 : "Schema"}
                           </Badge>
-                        </TableCell>
-                        <TableCell className={styles.wrapCell}>
+                        </td>
+                        <td className={styles.wrapCell} style={{ padding: "10px 12px" }}>
                           <Badge
-                            appearance="tint"
-                            color={getStatusColor(check.status) as any}
-                            size="small"
+                            variant={getStatusColor(check.status)}
                             style={{ fontWeight: 600, textTransform: "capitalize" }}
                           >
                             {check.status.charAt(0).toUpperCase() + check.status.slice(1)}
                           </Badge>
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     ))}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
             </Card>
           )}

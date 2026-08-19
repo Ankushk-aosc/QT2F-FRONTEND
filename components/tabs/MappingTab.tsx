@@ -1,44 +1,71 @@
 "use client"
 
 import { matchesAgent } from "@/lib/agentNames";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Dialog, DialogTrigger, DialogClose, DialogContent as DialogSurfaceContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dropdown, Option } from "@/components/ui/dropdown";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip } from "@/components/ui/tooltip";
 import {
-  Badge,
-  Button,
-  Card,
-  Dialog,
-  DialogActions,
-  DialogBody,
-  DialogContent,
-  DialogSurface,
-  DialogTitle,
-  DialogTrigger,
-  Dropdown,
-  Link,
-  Option,
-  Popover,
-  PopoverSurface,
-  PopoverTrigger,
-  Spinner,
-  Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableHeader,
-  TableHeaderCell,
-  TableRow,
-  TabList,
-  Text,
-  Title2,
-  Tooltip,
-  tokens
-} from "@fluentui/react-components";
-import {
-  Braces20Regular,
-  ChevronRight20Regular,
-  Filter20Regular,
-  Sparkle20Regular
-} from "@fluentui/react-icons";
+  ChevronRight,
+  Filter,
+  Sparkles
+} from "lucide-react";
 import React, { useEffect, useMemo, useState } from 'react';
+
+function cx(...parts: Array<string | undefined | false>) {
+  return parts.filter(Boolean).join(" ");
+}
+
+const WEIGHT_MAP: Record<string, number> = { regular: 400, medium: 500, semibold: 600, bold: 700 };
+const SIZE_MAP: Record<number, number> = { 100: 10, 200: 12, 300: 14, 400: 16, 500: 20, 600: 24, 700: 28, 800: 32, 900: 40, 1000: 68 };
+
+function Text({
+  weight,
+  size,
+  italic,
+  color,
+  style,
+  ...props
+}: {
+  weight?: "regular" | "medium" | "semibold" | "bold";
+  size?: number;
+  italic?: boolean;
+  color?: string;
+} & React.HTMLAttributes<HTMLSpanElement>) {
+  return (
+    <span
+      style={{
+        fontWeight: weight ? WEIGHT_MAP[weight] : undefined,
+        fontSize: size ? `${SIZE_MAP[size]}px` : undefined,
+        fontStyle: italic ? "italic" : undefined,
+        color: color === "neutralTertiary" ? "var(--text-muted)" : color,
+        ...style,
+      }}
+      {...props}
+    />
+  );
+}
+
+function Title2({ style, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
+  return <h2 style={{ margin: 0, fontSize: "24px", fontWeight: 700, ...style }} {...props} />;
+}
+
+function Link({ style, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
+  return <a style={{ color: "var(--primary)", textDecoration: "none", ...style }} {...props} />;
+}
+
+/** The previous Fluent `DialogContent` was the inner scrollable body, distinct
+ * from the dialog surface itself — so it becomes a plain div here, while
+ * `DialogSurfaceContent` (aliased from `@/components/ui/dialog`'s `DialogContent`)
+ * takes over as the actual surface/backdrop. */
+function DialogContent({ style, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div style={style} {...props} />;
+}
 
 // 1. Import stores
 import { useAgentStore } from "@/stores/agent.store";
@@ -167,30 +194,30 @@ const renderConfidenceReview = (score: number | null, notes: string | null, link
       {notes && (
         <Dialog>
           <DialogTrigger disableButtonEnhancement>
-            <Button appearance="subtle" size="small" style={{ fontSize: "12px", fontWeight: 700, color: "#2563eb", padding: "0 6px", minWidth: "auto", cursor: "pointer" }}>Details</Button>
+            <Button variant="ghost" size="sm" style={{ fontSize: "12px", fontWeight: 700, color: "#2563eb", padding: "0 6px", minWidth: "auto", cursor: "pointer" }}>Details</Button>
           </DialogTrigger>
-          <DialogSurface>
-            <DialogBody>
+          <DialogSurfaceContent>
+            <DialogHeader>
               <DialogTitle>Mapping Review Notes</DialogTitle>
-              <DialogContent>
-                <div style={{ fontSize: "14px", color: "#334155", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
-                  {notes}
+            </DialogHeader>
+            <DialogContent>
+              <div style={{ fontSize: "14px", color: "#334155", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                {notes}
+              </div>
+              {link && (
+                <div style={{ marginTop: "16px" }}>
+                  <Link href={link} target="_blank" style={{ fontSize: "14px", fontWeight: 600 }}>
+                    How to import custom visual ➔
+                  </Link>
                 </div>
-                {link && (
-                  <div style={{ marginTop: "16px" }}>
-                    <Link href={link} target="_blank" style={{ fontSize: "14px", fontWeight: 600 }}>
-                      How to import custom visual ➔
-                    </Link>
-                  </div>
-                )}
-              </DialogContent>
-              <DialogActions>
-                <DialogTrigger disableButtonEnhancement>
-                  <Button appearance="secondary">Close</Button>
-                </DialogTrigger>
-              </DialogActions>
-            </DialogBody>
-          </DialogSurface>
+              )}
+            </DialogContent>
+            <DialogFooter>
+              <DialogClose>
+                <Button variant="secondary">Close</Button>
+              </DialogClose>
+            </DialogFooter>
+          </DialogSurfaceContent>
         </Dialog>
       )}
     </div>
@@ -234,9 +261,8 @@ const VisualsDetailPopover = ({
       <PopoverTrigger disableButtonEnhancement>
         <Tooltip content={title} relationship="label">
           <Button
-            icon={type === "formatting" ? <Sparkle20Regular style={{ fontSize: "20px" }} /> : icon}
-            appearance="transparent"
-            size="small"
+            variant="ghost"
+            size="sm"
             style={{
               color: "#0284c7",
               fontWeight: 600,
@@ -247,6 +273,7 @@ const VisualsDetailPopover = ({
               height: "auto"
             }}
           >
+            {type === "formatting" ? <Sparkles style={{ fontSize: "20px" }} /> : icon}
             {type === "filters" ? (
               `${data.length} Filters`
             ) : (
@@ -258,7 +285,7 @@ const VisualsDetailPopover = ({
           </Button>
         </Tooltip>
       </PopoverTrigger>
-      <PopoverSurface className={styles.popoverContent} style={{ minWidth: "420px", maxWidth: "520px" }}>
+      <PopoverContent className={styles.popoverContent} style={{ minWidth: "420px", maxWidth: "520px" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           <Text weight="bold" style={{ fontSize: "16px", color: "#0f172a", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px", display: "block" }}>
             {type === "filters" ? "Applied Filters" : "Formatting Details"}
@@ -282,14 +309,14 @@ const VisualsDetailPopover = ({
                       {cleanLabel(item.name || item.key || `Item ${idx + 1}`)}
                     </span>
                     {item.value && (
-                      <Badge appearance="tint" color="subtle" shape="rounded" style={{ fontSize: "11px" }}>
+                      <Badge variant="secondary" style={{ fontSize: "11px" }}>
                         {item.value}
                       </Badge>
                     )}
                   </div>
                   {item.pbiMapped && (
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "6px" }}>
-                      <Badge appearance="tint" color="brand" shape="rounded" style={{ fontSize: "11px", flexShrink: 0 }}>
+                      <Badge variant="default" style={{ fontSize: "11px", flexShrink: 0 }}>
                         {item.pbiMapped}
                       </Badge>
                       {item.pbiInstruction && (
@@ -330,7 +357,7 @@ const VisualsDetailPopover = ({
                               {cleanLabel(item.name)}
                             </span>
                           </div>
-                          <Badge appearance="outline" color="subtle" style={{ backgroundColor: "#ffffff", border: "1px solid #e2e8f0", color: "#94a3b8", fontSize: "10px" }}>
+                          <Badge variant="secondary" style={{ backgroundColor: "#ffffff", border: "1px solid #e2e8f0", color: "#94a3b8", fontSize: "10px" }}>
                             {item.target || "Sheet Title"}
                           </Badge>
                         </div>
@@ -342,7 +369,7 @@ const VisualsDetailPopover = ({
             </div>
           )}
         </div>
-      </PopoverSurface>
+      </PopoverContent>
     </Popover>
   );
 };
@@ -394,7 +421,7 @@ function MappingAgentActionsCard({ acts, styles }: { acts: any[]; styles: Return
       >
         <span style={{ fontSize: "16px" }}>⚡</span>
         <span className={styles.sectionHeader} style={{ flex: 1, margin: 0 }}>Mapping Agent Actions</span>
-        <Badge appearance="tint" color="brand" shape="rounded">{filteredActs.length} steps</Badge>
+        <Badge variant="default">{filteredActs.length} steps</Badge>
         <span style={{ fontSize: "12px", color: "#64748b" }}>{collapsed ? "▶" : "▼"}</span>
       </div>
 
@@ -460,13 +487,13 @@ function CollapsibleActionCard({ item, styles }: { item: any; styles: ReturnType
         onClick={() => setOpen(o => !o)}
         style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
       >
-        <ChevronRight20Regular style={{ color: "#94a3b8", flexShrink: 0, transition: "transform 0.2s", transform: open ? "rotate(90deg)" : "rotate(0deg)" }} />
+        <ChevronRight style={{ color: "#94a3b8", flexShrink: 0, transition: "transform 0.2s", transform: open ? "rotate(90deg)" : "rotate(0deg)" }} />
         <span style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a", flex: 1 }}>{item.id}</span>
-        <Badge appearance="tint" color="informative" style={{ fontSize: "11px", fontWeight: 600, textTransform: "uppercase" }}>
+        <Badge variant="secondary" style={{ fontSize: "11px", fontWeight: 600, textTransform: "uppercase" }}>
           {item.type.replace(/_/g, " ")}
         </Badge>
         {item.activation && item.activation !== "-" && (
-          <Badge appearance="tint" color="brand" style={{ fontSize: "11px" }}>{item.activation}</Badge>
+          <Badge variant="default" style={{ fontSize: "11px" }}>{item.activation}</Badge>
         )}
       </div>
 
@@ -513,7 +540,7 @@ function CollapsibleActionCard({ item, styles }: { item: any; styles: ReturnType
             <div style={{ padding: "9px 14px", background: "#f0f9ff", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: "6px" }}>
               <span style={{ fontSize: "11px", fontWeight: 700, color: "#0284c7", textTransform: "uppercase", letterSpacing: "0.7px" }}>Power BI Equivalent</span>
               {item.displayType && item.displayType !== "-" && (
-                <Badge appearance="tint" color="brand" style={{ fontSize: "10px", marginLeft: "6px" }}>{item.displayType.replace(/_/g, " ")}</Badge>
+                <Badge variant="default" style={{ fontSize: "10px", marginLeft: "6px" }}>{item.displayType.replace(/_/g, " ")}</Badge>
               )}
             </div>
 
@@ -530,7 +557,7 @@ function CollapsibleActionCard({ item, styles }: { item: any; styles: ReturnType
                 {item.keepFilters !== null && (
                   <div style={{ backgroundColor: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "10px 14px" }}>
                     <div style={{ fontSize: "10px", fontWeight: 700, color: "#2c6bc2ff", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>Keep Filters</div>
-                    <Badge size="small" appearance="tint" color={item.keepFilters ? "success" : "danger"}>{item.keepFilters ? "Enabled" : "Disabled"}</Badge>
+                    <Badge variant={item.keepFilters ? "success" : "destructive"}>{item.keepFilters ? "Enabled" : "Disabled"}</Badge>
                   </div>
                 )}
               </div>
@@ -541,7 +568,7 @@ function CollapsibleActionCard({ item, styles }: { item: any; styles: ReturnType
                   <div style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Drillthrough Fields</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                     {item.drillthroughFields.map((f: string, idx: number) => (
-                      <Badge key={idx} size="small" appearance="tint" color="brand" style={{ fontSize: "11px" }}>{f}</Badge>
+                      <Badge key={idx} variant="default" style={{ fontSize: "11px" }}>{f}</Badge>
                     ))}
                   </div>
                 </div>
@@ -604,7 +631,7 @@ function CollapsibleActionCard({ item, styles }: { item: any; styles: ReturnType
                           {vi.target_visual || vi.targetVisual}
                         </div>
                         <div style={{ width: "70px", display: "flex", justifyContent: "flex-end" }}>
-                          <Badge appearance="outline" color="brand" shape="rounded" style={{ fontSize: "11px", fontWeight: 600, padding: "2px 8px" }}>
+                          <Badge variant="default" style={{ fontSize: "11px", fontWeight: 600, padding: "2px 8px" }}>
                             {vi.type || "DataFilter"}
                           </Badge>
                         </div>
@@ -632,7 +659,7 @@ function DashboardGroup({ name, actions, styles, defaultOpen = false }: { name: 
         onClick={() => setOpen(o => !o)}
         style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
       >
-        <ChevronRight20Regular style={{ color: "#64748b", transition: "transform 0.2s", transform: open ? "rotate(90deg)" : "rotate(0deg)", flexShrink: 0 }} />
+        <ChevronRight style={{ color: "#64748b", transition: "transform 0.2s", transform: open ? "rotate(90deg)" : "rotate(0deg)", flexShrink: 0 }} />
         <span className={styles.sectionHeader} style={{ margin: 0 }}>{name}</span>
         <span style={{ fontSize: "13px", color: "#64748b", fontWeight: 400 }}>({actions.length} action{actions.length !== 1 ? "s" : ""})</span>
       </div>
@@ -658,7 +685,7 @@ function CollapsibleCalcCard({ sec, calcCols, styles, defaultOpen = false }: { s
         onClick={() => setOpen(o => !o)}
         style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
       >
-        <ChevronRight20Regular
+        <ChevronRight
           style={{ color: "#64748b", transition: "transform 0.2s", transform: open ? "rotate(90deg)" : "rotate(0deg)", flexShrink: 0 }}
         />
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -691,7 +718,7 @@ function CollapsibleSectionCard({
         onClick={() => setOpen(o => !o)}
         style={{ padding: "20px 28px", borderBottom: open ? "1px solid #e2e8f0" : "none", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", background: "linear-gradient(135deg,#f8fafc 0%,#f1f5f9 100%)", userSelect: "none" }}
       >
-        <ChevronRight20Regular style={{ color: "#64748b", transition: "transform 0.2s", transform: open ? "rotate(90deg)" : "rotate(0deg)", flexShrink: 0 }} />
+        <ChevronRight style={{ color: "#64748b", transition: "transform 0.2s", transform: open ? "rotate(90deg)" : "rotate(0deg)", flexShrink: 0 }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: "17px", fontWeight: 700, color: "#0f172a" }}>{title}</div>
           <div style={{ fontSize: "13px", color: "#64748b", marginTop: "2px" }}>{subtitle}</div>
@@ -1423,7 +1450,7 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
         </Text>
         <div className={styles.paginationControls}>
           <Button
-            appearance="subtle"
+            variant="ghost"
             disabled={currentPage === 1}
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
           >
@@ -1433,7 +1460,7 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
             Page {currentPage} of {totalPages}
           </Text>
           <Button
-            appearance="subtle"
+            variant="ghost"
             disabled={currentPage === totalPages}
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
           >
@@ -1530,7 +1557,7 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                   opacity: 0.8
                 }}>
                   <Text size={100} weight="bold" style={{ color: metric.color || "#ca8a04", textTransform: "uppercase", letterSpacing: "0.5px" }}>Details</Text>
-                  <ChevronRight20Regular style={{ fontSize: "12px", color: metric.color || "#ca8a04" }} />
+                  <ChevronRight style={{ fontSize: "12px", color: metric.color || "#ca8a04" }} />
                 </div>
               )}
             </Card>
@@ -1547,26 +1574,26 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
           msOverflowStyle: "none",
           WebkitOverflowScrolling: "touch",
           marginBottom: "16px",
-          borderBottom: `1px solid ${tokens.colorNeutralStroke2}`
+          borderBottom: `1px solid var(--border)`
         }} className="vl-tablist-scroll-wrapper">
           <style>{`
             .vl-tablist-scroll-wrapper::-webkit-scrollbar {
               display: none;
             }
           `}</style>
-          <TabList
-            selectedValue={activeTab}
-            onTabSelect={(_, d) => {
-              setActiveTab(d.value as string);
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => {
+              setActiveTab(value);
               setCurrentPage(1);
             }}
-            className={styles.tabList}
-            style={{ minWidth: "max-content", borderBottom: "none" }}
           >
-            {TABS.map(tab => (
-              <Tab key={tab} value={tab}>{tab}</Tab>
-            ))}
-          </TabList>
+            <TabsList className={styles.tabList} style={{ minWidth: "max-content", borderBottom: "none" }}>
+              {TABS.map(tab => (
+                <TabsTrigger key={tab} value={tab}>{tab}</TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
         </div>
 
         {/* Tab Content Area */}
@@ -1588,7 +1615,6 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                       setSelectedTable(data.optionValue as string);
                     }}
                     style={{ minWidth: "240px", backgroundColor: "#ffffff" }}
-                    listbox={{ style: { backgroundColor: "#ffffff" } }}
                   >
                     {DATA_TABLES.map((t: any, index: number) => {
                       const innerTab = t?.payload || t?.data || t;
@@ -1615,7 +1641,7 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                         <div key={idx} style={{ padding: "14px 20px", borderRight: idx < 1 ? "1px solid #f1f5f9" : "none", display: "flex", flexDirection: "column", gap: "6px" }}>
                           <span style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>{m.label}</span>
                           {m.badge === "outline" ? (
-                            <Badge appearance="outline" color="brand" style={{ width: "fit-content", whiteSpace: "nowrap" }}>{m.value}</Badge>
+                            <Badge variant="default" style={{ width: "fit-content", whiteSpace: "nowrap" }}>{m.value}</Badge>
                           ) : (
                             <span style={{ fontSize: "13.5px", color: "#0f172a", fontWeight: 500 }}>{m.value}</span>
                           )}
@@ -1650,8 +1676,8 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                   })}
                   cols={[
                     { key: "colName", label: "Column Name", render: (r: any) => <span style={{ fontWeight: 600, color: "#0f172a", fontSize: "13.5px" }}>{r.colName}</span> },
-                    { key: "colType", label: "Tableau Data Type", render: (r: any) => <Badge appearance="outline" shape="rounded" color="subtle" style={{ color: "#475569", whiteSpace: "nowrap" }}>{r.colType}</Badge> },
-                    { key: "biType", label: "Power BI Target Type", render: (r: any) => <Badge appearance="tint" color="informative" shape="rounded" style={{ whiteSpace: "nowrap" }}>{r.biType}</Badge> },
+                    { key: "colType", label: "Tableau Data Type", render: (r: any) => <Badge variant="secondary" style={{ color: "#475569", whiteSpace: "nowrap" }}>{r.colType}</Badge> },
+                    { key: "biType", label: "Power BI Target Type", render: (r: any) => <Badge variant="secondary" style={{ whiteSpace: "nowrap" }}>{r.biType}</Badge> },
                   ]}
                 />
               </div>
@@ -1687,7 +1713,7 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                       {schemaSrc && (
                         <div style={{ padding: "18px 24px", display: "flex", flexDirection: "column", gap: "6px" }}>
                           <span style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Schema Source</span>
-                          <Badge appearance="tint" color="informative" style={{ width: "fit-content" }}>{schemaSrc}</Badge>
+                          <Badge variant="secondary" style={{ width: "fit-content" }}>{schemaSrc}</Badge>
                         </div>
                       )}
                     </div>
@@ -1773,7 +1799,7 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 <span style={{ fontSize: "11px", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", minWidth: "32px" }}>Type</span>
-                                <Badge appearance="tint" color="subtle" shape="rounded" style={{ fontSize: "12px", whiteSpace: "nowrap" }}>{r.tableauDataType}</Badge>
+                                <Badge variant="secondary" style={{ fontSize: "12px", whiteSpace: "nowrap" }}>{r.tableauDataType}</Badge>
                               </div>
                               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 <span style={{ fontSize: "11px", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", minWidth: "32px" }}>Kind</span>
@@ -1788,7 +1814,7 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 <span style={{ fontSize: "11px", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", minWidth: "32px" }}>Type</span>
-                                <Badge appearance="tint" color="brand" shape="rounded" style={{ fontSize: "12px", whiteSpace: "nowrap" }}>{r.powerbiDataType}</Badge>
+                                <Badge variant="default" style={{ fontSize: "12px", whiteSpace: "nowrap" }}>{r.powerbiDataType}</Badge>
                               </div>
                               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 <span style={{ fontSize: "11px", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", minWidth: "32px" }}>Kind</span>
@@ -1828,8 +1854,8 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                       rows={dynamicSets}
                       cols={[
                         { key: "name", label: "Set Name", render: (r: any) => <strong style={{ color: "#0f172a" }}>{r.name}</strong> },
-                        { key: "tableauType", label: "Tableau Type", render: (r: any) => <Badge appearance="tint" color="informative" style={{ whiteSpace: "nowrap" }}>{r.tableauType}</Badge> },
-                        { key: "powerbiType", label: "Power BI Approach", render: (r: any) => <Badge appearance="filled" color="brand" style={{ width: "fit-content", whiteSpace: "nowrap" }}>{r.powerbiType}</Badge> },
+                        { key: "tableauType", label: "Tableau Type", render: (r: any) => <Badge variant="secondary" style={{ whiteSpace: "nowrap" }}>{r.tableauType}</Badge> },
+                        { key: "powerbiType", label: "Power BI Approach", render: (r: any) => <Badge variant="default" style={{ width: "fit-content", whiteSpace: "nowrap" }}>{r.powerbiType}</Badge> },
                         {
                           key: "powerbiDax", label: "DAX Implementation",
                           render: (r: any) => {
@@ -1877,8 +1903,8 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                       rows={staticSets}
                       cols={[
                         { key: "name", label: "Set Name", render: (r: any) => <strong style={{ color: "#0f172a" }}>{r.name}</strong> },
-                        { key: "tableauType", label: "Tableau Type", render: (r: any) => <Badge appearance="tint" color="success" style={{ whiteSpace: "nowrap" }}>{r.tableauType || "static"}</Badge> },
-                        { key: "powerbiType", label: "Power BI Approach", render: (r: any) => <Badge appearance="filled" color="brand" style={{ width: "fit-content", whiteSpace: "nowrap" }}>{r.powerbiType}</Badge> },
+                        { key: "tableauType", label: "Tableau Type", render: (r: any) => <Badge variant="success" style={{ whiteSpace: "nowrap" }}>{r.tableauType || "static"}</Badge> },
+                        { key: "powerbiType", label: "Power BI Approach", render: (r: any) => <Badge variant="default" style={{ width: "fit-content", whiteSpace: "nowrap" }}>{r.powerbiType}</Badge> },
                         {
                           key: "powerbiDax", label: "DAX Implementation",
                           render: (r: any) => r.powerbiDax !== "-" ? (
@@ -1951,30 +1977,30 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                       Standard connection mapping and architecture fallback view
                     </Text>
                   </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHeaderCell className={styles.tableHeaderCell} style={{ width: "25%" }}>Source Connection</TableHeaderCell>
-                        <TableHeaderCell className={styles.tableHeaderCell} style={{ width: "15%" }}>Mode</TableHeaderCell>
-                        <TableHeaderCell className={styles.tableHeaderCell} style={{ width: "20%" }}>Target Strategy</TableHeaderCell>
-                        <TableHeaderCell className={styles.tableHeaderCell} style={{ width: "20%" }}>Fabric Lakehouse</TableHeaderCell>
-                        <TableHeaderCell className={styles.tableHeaderCell} style={{ width: "20%" }}>Implementation Notes</TableHeaderCell>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th className={styles.tableHeaderCell} style={{ width: "25%" }}>Source Connection</th>
+                        <th className={styles.tableHeaderCell} style={{ width: "15%" }}>Mode</th>
+                        <th className={styles.tableHeaderCell} style={{ width: "20%" }}>Target Strategy</th>
+                        <th className={styles.tableHeaderCell} style={{ width: "20%" }}>Fabric Lakehouse</th>
+                        <th className={styles.tableHeaderCell} style={{ width: "20%" }}>Implementation Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                       {pagedStrategyData.map((item: any, i: number) => (
-                        <TableRow key={i}>
-                          <TableCell className={styles.spaciousCell}>
+                        <tr key={i}>
+                          <td className={styles.spaciousCell}>
                             <div style={{ fontWeight: 600, color: '#0f172a' }}>{item.source}</div>
-                          </TableCell>
-                          <TableCell className={styles.spaciousCell}><Badge appearance="filled" color={item.mode.toLowerCase() === "live" ? "informative" : "brand"} shape="rounded">{item.mode}</Badge></TableCell>
-                          <TableCell className={styles.spaciousCell}><Badge appearance="tint" color="success" shape="rounded">{item.target}</Badge></TableCell>
-                          <TableCell className={styles.spaciousCell}>{item.lakehouse}</TableCell>
-                          <TableCell className={styles.spaciousCell}>{item.notes}</TableCell>
-                        </TableRow>
+                          </td>
+                          <td className={styles.spaciousCell}><Badge variant={item.mode.toLowerCase() === "live" ? "secondary" : "default"}>{item.mode}</Badge></td>
+                          <td className={styles.spaciousCell}><Badge variant="success">{item.target}</Badge></td>
+                          <td className={styles.spaciousCell}>{item.lakehouse}</td>
+                          <td className={styles.spaciousCell}>{item.notes}</td>
+                        </tr>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </tbody>
+                  </table>
                   {renderPagination(DATA_STRATEGY.length)}
                 </div>
               ) : (pagedStrategyData.length > 0 && !pagedStrategyData[0].isLegacy) ? (
@@ -1985,7 +2011,7 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                         <div>
                           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px", flexWrap: "wrap" }}>
                             <Title2 style={{ fontSize: "24px", color: "#0f172a", fontWeight: 700, margin: 0 }}>Custom SQL Transformation</Title2>
-                            <Badge appearance="tint" color="brand" shape="rounded" style={{ whiteSpace: "nowrap" }}>Relation: {item.relationType.replace(/_/g, ' ')}</Badge>
+                            <Badge variant="default" style={{ whiteSpace: "nowrap" }}>Relation: {item.relationType.replace(/_/g, ' ')}</Badge>
                           </div>
                           <Text style={{ color: "#64748b", fontSize: "14px" }}>Translating Tableau Custom SQL directly to Power Query M native queries</Text>
                         </div>
@@ -1993,15 +2019,15 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                       </div>
 
                       <div style={{ marginBottom: "24px" }}>
-                        <TabList
-                          selectedValue={activeSqlTabs[i] || "Tableau Custom SQL"}
-                          onTabSelect={(_, data) => setActiveSqlTabs(prev => ({ ...prev, [i]: data.value as string }))}
-                          appearance="transparent"
-                          style={{ borderBottom: "1px solid #e2e8f0" }}
+                        <Tabs
+                          value={activeSqlTabs[i] || "Tableau Custom SQL"}
+                          onValueChange={(value) => setActiveSqlTabs(prev => ({ ...prev, [i]: value }))}
                         >
-                          <Tab value="Tableau Custom SQL" style={{ fontWeight: 600, padding: "12px 24px", color: (activeSqlTabs[i] || "Tableau Custom SQL") === "Tableau Custom SQL" ? "#2563eb" : "#64748b" }}>Tableau Custom SQL</Tab>
-                          <Tab value="Power BI M Query" style={{ fontWeight: 600, padding: "12px 24px", color: (activeSqlTabs[i] || "Tableau Custom SQL") === "Power BI M Query" ? "#047857" : "#64748b" }}>Power BI M Query</Tab>
-                        </TabList>
+                          <TabsList style={{ borderBottom: "1px solid #e2e8f0" }}>
+                            <TabsTrigger value="Tableau Custom SQL" style={{ fontWeight: 600, padding: "12px 24px", color: (activeSqlTabs[i] || "Tableau Custom SQL") === "Tableau Custom SQL" ? "#2563eb" : "#64748b" }}>Tableau Custom SQL</TabsTrigger>
+                            <TabsTrigger value="Power BI M Query" style={{ fontWeight: 600, padding: "12px 24px", color: (activeSqlTabs[i] || "Tableau Custom SQL") === "Power BI M Query" ? "#047857" : "#64748b" }}>Power BI M Query</TabsTrigger>
+                          </TabsList>
+                        </Tabs>
                       </div>
 
                       <div style={{ padding: "8px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "#f8fafc" }}>
@@ -2027,23 +2053,23 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                                 {item.reviewNotes && (
                                   <Dialog>
                                     <DialogTrigger disableButtonEnhancement>
-                                      <Button appearance="subtle" size="small" style={{ fontSize: "12px", color: "#2563eb", padding: "0 6px", minWidth: "auto", cursor: "pointer" }}>Review</Button>
+                                      <Button variant="ghost" size="sm" style={{ fontSize: "12px", color: "#2563eb", padding: "0 6px", minWidth: "auto", cursor: "pointer" }}>Review</Button>
                                     </DialogTrigger>
-                                    <DialogSurface>
-                                      <DialogBody>
+                                    <DialogSurfaceContent>
+                                      <DialogHeader>
                                         <DialogTitle>Mapping Review Notes</DialogTitle>
-                                        <DialogContent>
-                                          <div style={{ fontSize: "14px", color: "#334155", lineHeight: "1.6", whiteSpace: "pre-wrap", textAlign: "left" }}>
-                                            {item.reviewNotes}
-                                          </div>
-                                        </DialogContent>
-                                        <DialogActions>
-                                          <DialogTrigger disableButtonEnhancement>
-                                            <Button appearance="secondary">Close</Button>
-                                          </DialogTrigger>
-                                        </DialogActions>
-                                      </DialogBody>
-                                    </DialogSurface>
+                                      </DialogHeader>
+                                      <DialogContent>
+                                        <div style={{ fontSize: "14px", color: "#334155", lineHeight: "1.6", whiteSpace: "pre-wrap", textAlign: "left" }}>
+                                          {item.reviewNotes}
+                                        </div>
+                                      </DialogContent>
+                                      <DialogFooter>
+                                        <DialogClose>
+                                          <Button variant="secondary">Close</Button>
+                                        </DialogClose>
+                                      </DialogFooter>
+                                    </DialogSurfaceContent>
                                   </Dialog>
                                 )}
                               </div>
@@ -2125,13 +2151,13 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                 },
                 {
                   key: "sourceVis", label: "Source Visual Type",
-                  render: (r: any) => <Badge appearance="tint" color="informative" style={{ textTransform: "capitalize" }}>{r.sourceVis}</Badge>
+                  render: (r: any) => <Badge variant="secondary" style={{ textTransform: "capitalize" }}>{r.sourceVis}</Badge>
                 },
                 {
                   key: "targetVis", label: "Power BI Visual",
                   render: (r: any) => {
                     if (!r.targetVis || r.targetVis === "-") return <span style={{ color: "#94a3b8" }}>—</span>;
-                    const badge = <Badge appearance="tint" color="brand" shape="rounded" style={{ height: "auto", whiteSpace: "normal", padding: "4px 8px", textAlign: "center", lineHeight: "1.2", cursor: r.importLink ? "pointer" : "default", textDecoration: r.importLink ? "underline" : "none" }}>{r.targetVis}</Badge>;
+                    const badge = <Badge variant="default" style={{ height: "auto", whiteSpace: "normal", padding: "4px 8px", textAlign: "center", lineHeight: "1.2", cursor: r.importLink ? "pointer" : "default", textDecoration: r.importLink ? "underline" : "none" }}>{r.targetVis}</Badge>;
                     if (r.importLink) {
                       return <Link href={r.importLink} target="_blank" style={{ textDecoration: 'none' }}>{badge}</Link>;
                     }
@@ -2140,11 +2166,11 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                 },
                 {
                   key: "filters", label: "Filters",
-                  render: (r: any) => <VisualsDetailPopover title="Applied Filters" data={r.filters} icon={<Filter20Regular />} styles={styles} type="filters" />
+                  render: (r: any) => <VisualsDetailPopover title="Applied Filters" data={r.filters} icon={<Filter />} styles={styles} type="filters" />
                 },
                 {
                   key: "formatting", label: "Formatting",
-                  render: (r: any) => <VisualsDetailPopover title="Formatting Details" data={r.formatting} icon={<Sparkle20Regular style={{ width: "16px", height: "16px" }} />} styles={styles} type="formatting" />
+                  render: (r: any) => <VisualsDetailPopover title="Formatting Details" data={r.formatting} icon={<Sparkles style={{ width: "16px", height: "16px" }} />} styles={styles} type="formatting" />
                 },
               ];
 
@@ -2155,13 +2181,13 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                 },
                 {
                   key: "sourceVis", label: "Source Visual Type",
-                  render: (r: any) => <Badge appearance="tint" color="informative" style={{ textTransform: "capitalize" }}>{r.sourceVis}</Badge>
+                  render: (r: any) => <Badge variant="secondary" style={{ textTransform: "capitalize" }}>{r.sourceVis}</Badge>
                 },
                 {
                   key: "targetVis", label: "Power BI Visual",
                   render: (r: any) => {
                     if (!r.targetVis || r.targetVis === "-") return <span style={{ color: "#94a3b8" }}>—</span>;
-                    const badge = <Badge appearance="tint" color="brand" shape="rounded" style={{ height: "auto", whiteSpace: "normal", padding: "4px 8px", textAlign: "center", lineHeight: "1.2", cursor: r.importLink ? "pointer" : "default", textDecoration: r.importLink ? "underline" : "none" }}>{r.targetVis}</Badge>;
+                    const badge = <Badge variant="default" style={{ height: "auto", whiteSpace: "normal", padding: "4px 8px", textAlign: "center", lineHeight: "1.2", cursor: r.importLink ? "pointer" : "default", textDecoration: r.importLink ? "underline" : "none" }}>{r.targetVis}</Badge>;
                     if (r.importLink) {
                       return <Link href={r.importLink} target="_blank" style={{ textDecoration: 'none' }}>{badge}</Link>;
                     }
@@ -2170,11 +2196,11 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                 },
                 {
                   key: "filters", label: "Filters",
-                  render: (r: any) => <VisualsDetailPopover title="Applied Filters" data={r.filters} icon={<Filter20Regular />} styles={styles} type="filters" />
+                  render: (r: any) => <VisualsDetailPopover title="Applied Filters" data={r.filters} icon={<Filter />} styles={styles} type="filters" />
                 },
                 {
                   key: "formatting", label: "Formatting",
-                  render: (r: any) => <VisualsDetailPopover title="Formatting Details" data={r.formatting} icon={<Sparkle20Regular style={{ width: "16px", height: "16px" }} />} styles={styles} type="formatting" />
+                  render: (r: any) => <VisualsDetailPopover title="Formatting Details" data={r.formatting} icon={<Sparkles style={{ width: "16px", height: "16px" }} />} styles={styles} type="formatting" />
                 },
               ];
 
@@ -2183,13 +2209,15 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                   <Text size={500} weight="bold" style={{ color: "#0f172a", fontFamily: "'DM Sans','Segoe UI',system-ui,sans-serif" }}>Visuals ({DATA_VISUALS.length})</Text>
 
                   <div style={{ borderBottom: "1px solid #e2e8f0", marginBottom: "0" }}>
-                    <TabList
-                      selectedValue={visualSubTab}
-                      onTabSelect={(_, data) => setVisualSubTab(data.value as string)}
+                    <Tabs
+                      value={visualSubTab}
+                      onValueChange={(value) => setVisualSubTab(value)}
                     >
-                      <Tab value="Sheets" className="vl-no-hover-tab" style={{ fontSize: "14px", fontWeight: 500 }}>Sheets ({sheetsData.length})</Tab>
-                      <Tab value="KPI & Summary" className="vl-no-hover-tab" style={{ fontSize: "14px", fontWeight: 500 }}>KPI & Summary ({kpiData.length})</Tab>
-                    </TabList>
+                      <TabsList>
+                        <TabsTrigger value="Sheets" className="vl-no-hover-tab" style={{ fontSize: "14px", fontWeight: 500 }}>Sheets ({sheetsData.length})</TabsTrigger>
+                        <TabsTrigger value="KPI & Summary" className="vl-no-hover-tab" style={{ fontSize: "14px", fontWeight: 500 }}>KPI & Summary ({kpiData.length})</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
                   </div>
 
                   {visualSubTab === "Sheets" && <MDataTable cols={sheetCols} rows={sheetsData} />}
@@ -2210,15 +2238,15 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                   </Text>
                 </div>
                 <div className={styles.tableContainer}>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHeaderCell className={styles.tableHeaderCell} style={{ width: "33%", fontWeight: "bold" }}>Source Table</TableHeaderCell>
-                        <TableHeaderCell className={styles.tableHeaderCell} style={{ width: "34%", fontWeight: "bold" }}>Relationship Type</TableHeaderCell>
-                        <TableHeaderCell className={styles.tableHeaderCell} style={{ width: "33%", fontWeight: "bold" }}>Target Table</TableHeaderCell>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th className={styles.tableHeaderCell} style={{ width: "33%", fontWeight: "bold" }}>Source Table</th>
+                        <th className={styles.tableHeaderCell} style={{ width: "34%", fontWeight: "bold" }}>Relationship Type</th>
+                        <th className={styles.tableHeaderCell} style={{ width: "33%", fontWeight: "bold" }}>Target Table</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                       {pagedRelationshipsData.length > 0 ? (
                         pagedRelationshipsData.map((item: any, i: number) => {
                           const fromColText = typeof item.fromColumn === 'object' ? JSON.stringify(item.fromColumn) : (item.fromColumn || "-");
@@ -2234,32 +2262,32 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                           }
 
                           return (
-                            <TableRow key={i}>
-                              <TableCell className={styles.spaciousCell} style={{ padding: "22px 16px" }}>
+                            <tr key={i}>
+                              <td className={styles.spaciousCell} style={{ padding: "22px 16px" }}>
                                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                                   <span style={{ fontWeight: 500, fontSize: "15px", color: "#0f172a" }}>{item.fromTable}</span>
                                   <span style={{ fontSize: "12px", color: "#64748b" }}>Field: {fromColText}</span>
                                 </div>
-                              </TableCell>
-                              <TableCell className={styles.spaciousCell} style={{ padding: "22px 16px" }}>
-                                <Badge appearance="tint" color="brand" shape="rounded" style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                              </td>
+                              <td className={styles.spaciousCell} style={{ padding: "22px 16px" }}>
+                                <Badge variant="default" style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
                                   {displayCardinality}
                                 </Badge>
-                              </TableCell>
-                              <TableCell className={styles.spaciousCell} style={{ padding: "22px 16px" }}>
+                              </td>
+                              <td className={styles.spaciousCell} style={{ padding: "22px 16px" }}>
                                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                                   <span style={{ fontWeight: 500, fontSize: "15px", color: "#0f172a" }}>{item.toTable}</span>
                                   <span style={{ fontSize: "12px", color: "#64748b" }}>Field: {toColText}</span>
                                 </div>
-                              </TableCell>
-                            </TableRow>
+                              </td>
+                            </tr>
                           );
                         })
                       ) : (
-                        <TableRow><TableCell colSpan={3} style={{ textAlign: "center", padding: "32px" }}><Text color="neutralSecondary">No relationship mapping data available yet.</Text></TableCell></TableRow>
+                        <tr><td colSpan={3} style={{ textAlign: "center", padding: "32px" }}><Text color="neutralSecondary">No relationship mapping data available yet.</Text></td></tr>
                       )}
-                    </TableBody>
-                  </Table>
+                    </tbody>
+                  </table>
                 </div>
                 {renderPagination(DATA_RELATIONSHIPS.length)}
               </Card>
@@ -2270,11 +2298,12 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
       </Card >
 
       {/* Low Confidence Review Dialog */}
-      <Dialog open={isReviewDialogOpen} onOpenChange={(_, d) => setIsReviewDialogOpen(d.open)}>
-        <DialogSurface style={{ maxWidth: "1000px", width: "90vw" }}>
-          <DialogBody>
+      <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
+        <DialogSurfaceContent style={{ maxWidth: "1000px", width: "90vw" }}>
+          <DialogHeader>
             <DialogTitle>Mapping Review - Low Confidence Items</DialogTitle>
-            <DialogContent>
+          </DialogHeader>
+          <DialogContent>
               <div style={{ marginBottom: "20px" }}>
                 <Text size={300} color="neutralSecondary">
                   The following items have a mapping confidence score below 90% and should be reviewed to ensure migration accuracy.
@@ -2285,7 +2314,7 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                   pageSize={8}
                   rows={lowConfidenceItems}
                   cols={[
-                    { key: "category", label: "Category", render: (r: any) => <Badge appearance="outline" color="brand" style={{ whiteSpace: "nowrap" }}>{r.category}</Badge> },
+                    { key: "category", label: "Category", render: (r: any) => <Badge variant="default" style={{ whiteSpace: "nowrap" }}>{r.category}</Badge> },
                     { key: "title", label: "Item Name", render: (r: any) => <Text weight="semibold" style={{ color: "#0f172a" }}>{r.title}</Text> },
                     { key: "confidenceScore", label: "Confidence", render: (r: any) => renderConfidenceReview(r.confidenceScore, null) },
                     { 
@@ -2306,11 +2335,10 @@ export default function MappingTab({ workbookId, projectId: propProjectId, runId
                 />
               </div>
             </DialogContent>
-            <DialogActions>
-              <Button appearance="secondary" onClick={() => setIsReviewDialogOpen(false)}>Close</Button>
-            </DialogActions>
-          </DialogBody>
-        </DialogSurface>
+            <DialogFooter>
+              <Button variant="secondary" onClick={() => setIsReviewDialogOpen(false)}>Close</Button>
+            </DialogFooter>
+        </DialogSurfaceContent>
       </Dialog>
     </div >
   );

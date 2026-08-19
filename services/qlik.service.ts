@@ -1,24 +1,18 @@
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
-import { QlikApp, AssessmentData, ParsedData, MappedData, ReportGenerationData } from "@/types/assessment";
+import {
+  AssessmentData,
+  MappedData,
+  ParsedData,
+  ReportGenerationData,
+} from "@/types/assessment";
 
 export class QlikService {
-  static async getQlikUrl(): Promise<{ server_url: string }> {
-    return fetchWithAuth<{ server_url: string }>("/api/qlik/qlik-url");
+  static async getSpaces(): Promise<any[]> {
+    return fetchWithAuth<any[]>("/api/qlik/spaces");
   }
 
-  static async saveQlikUrl(serverUrl: string): Promise<any> {
-    return fetchWithAuth<any>("/api/qlik/qlik-url", {
-      method: "POST",
-      body: JSON.stringify({ server_url: serverUrl }),
-    });
-  }
-
-  static async getSpaces(): Promise<{ id: string; name: string }[]> {
-    return fetchWithAuth<{ id: string; name: string }[]>("/api/qlik/spaces");
-  }
-
-  static async getApps(spaceId: string): Promise<QlikApp[]> {
-    return fetchWithAuth<QlikApp[]>(`/api/qlik/apps?spaceId=${encodeURIComponent(spaceId)}`);
+  static async getApps(spaceId: string): Promise<any[]> {
+    return fetchWithAuth<any[]>(`/api/qlik/apps?spaceId=${encodeURIComponent(spaceId)}`);
   }
 
   static async unbuild(appId: string, appName: string): Promise<any> {
@@ -28,38 +22,85 @@ export class QlikService {
     });
   }
 
-  static async runAssessment(folderName: string): Promise<AssessmentData> {
+  static async runAssessment(
+    appId: string,
+    runId: string,
+    workspaceId: string,
+    appName?: string,
+    engineData?: any
+  ): Promise<AssessmentData> {
     return fetchWithAuth<AssessmentData>("/api/qlik/assessment", {
       method: "POST",
-      body: JSON.stringify({ folder_name: folderName }),
+      body: JSON.stringify({
+        app_id: appId,
+        run_id: runId,
+        folder_name: runId,
+        workspace_id: workspaceId,
+        source_type: "qlik",
+        app_name: appName || "Qlik App",
+        engine_data: engineData,
+      }),
     });
   }
 
-  static async runParsing(folderName: string): Promise<ParsedData> {
+  static async runParsing(
+    appId: string,
+    runId: string,
+    workspaceId: string,
+    appName?: string,
+    engineData?: any
+  ): Promise<ParsedData> {
     return fetchWithAuth<ParsedData>("/api/qlik/parsing", {
       method: "POST",
-      body: JSON.stringify({ folder_name: folderName }),
+      body: JSON.stringify({
+        app_id: appId,
+        run_id: runId,
+        folder_name: runId,
+        workspace_id: workspaceId,
+        source_type: "qlik",
+        app_name: appName || "Qlik App",
+        engine_data: engineData,
+      }),
     });
   }
 
-  static async runMapping(appId: string, folderName: string): Promise<MappedData> {
+  static async runMapping(
+    appId: string,
+    folderName: string,
+    workspaceId?: string,
+    appName?: string,
+    engineData?: any
+  ): Promise<MappedData> {
     return fetchWithAuth<MappedData>("/api/qlik/mapping", {
       method: "POST",
-      body: JSON.stringify({ app_id: appId, folder_name: folderName }),
+      body: JSON.stringify({
+        app_id: appId,
+        folder_name: folderName,
+        run_id: folderName,
+        space_id: workspaceId || "personal",
+        app_name: appName || "Qlik App",
+        engine_data: engineData,
+      }),
     });
   }
 
   static async runReportGeneration(
     appId: string,
     folderName: string,
-    workspaceName: string
+    workspaceName: string,
+    appName?: string,
+    engineData?: any
   ): Promise<ReportGenerationData> {
     return fetchWithAuth<ReportGenerationData>("/api/qlik/report-generation", {
       method: "POST",
       body: JSON.stringify({
         app_id: appId,
         folder_name: folderName,
+        run_id: folderName,
         workspace_name: workspaceName,
+        space_id: "personal",
+        app_name: appName || "Qlik App",
+        engine_data: engineData,
       }),
     });
   }
@@ -76,9 +117,9 @@ export class QlikService {
     );
   }
 
-  static async getHistoryResults(type: string, folder: string): Promise<any> {
+  static async getHistoryByFolder(folderName: string): Promise<any> {
     return fetchWithAuth<any>(
-      `/api/qlik/history-results?type=${encodeURIComponent(type)}&folder=${encodeURIComponent(folder)}`
+      `/api/qlik/history-by-folder?folder=${encodeURIComponent(folderName)}`
     );
   }
 }

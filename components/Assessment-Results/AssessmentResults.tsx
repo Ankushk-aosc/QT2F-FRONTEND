@@ -108,8 +108,21 @@ const mapAssessmentData = (data: AssessmentData): MappedAssessmentData => {
   };
 
   const parseDatasets = () => {
+    // 1. Direct dataset array if provided by backend
+    if (Array.isArray((data as any)?.datasets) && (data as any).datasets.length > 0) {
+      return (data as any).datasets;
+    }
+
     const datasetsResult = getResult("Datasets and Fields").value;
     const defaultDatasets = [{ name: "Unknown Dataset", fields: 0, keys: 0 }];
+
+    if (!datasetsResult) {
+      return defaultDatasets;
+    }
+
+    if (Array.isArray(datasetsResult)) {
+      return datasetsResult;
+    }
 
     if (typeof datasetsResult !== "string" || !datasetsResult.trim()) {
       return defaultDatasets;
@@ -123,8 +136,23 @@ const mapAssessmentData = (data: AssessmentData): MappedAssessmentData => {
         datasetStr = datasetStr.trim();
         if (!datasetStr) continue;
 
+        // Try format: "Sales (14 fields, 2 keys)"
+        const summaryMatch = datasetStr.match(/^([^\s(]+)\s*\(\s*(\d+)\s*fields?(?:,\s*(\d+)\s*keys?)?\s*\)/i);
+        if (summaryMatch) {
+          datasetEntries.push({
+            name: summaryMatch[1].trim(),
+            fields: parseInt(summaryMatch[2], 10) || 0,
+            keys: parseInt(summaryMatch[3] || "0", 10) || 0,
+          });
+          continue;
+        }
+
+        // Try format: "Sales (col1 (('type', true)), ...)"
         const datasetMatch = datasetStr.match(/^([^\s(]+)\s*\((.*)\)$/);
-        if (!datasetMatch) continue;
+        if (!datasetMatch) {
+          datasetEntries.push({ name: datasetStr, fields: 0, keys: 0 });
+          continue;
+        }
 
         const name = datasetMatch[1].trim();
         const fieldsStr = datasetMatch[2].trim();
@@ -149,7 +177,7 @@ const mapAssessmentData = (data: AssessmentData): MappedAssessmentData => {
             });
           } else {
             const nameMatch = trimmedFieldStr.match(/^(\w+)/);
-            const fieldName = nameMatch ? nameMatch[1].trim() : `UnknownField_${fieldEntries.length + 1}`;
+            const fieldName = nameMatch ? nameMatch[1].trim() : `Field_${fieldEntries.length + 1}`;
             fieldEntries.push({ name: fieldName, type: "Unknown", isKey: false });
           }
         }
@@ -168,8 +196,14 @@ const mapAssessmentData = (data: AssessmentData): MappedAssessmentData => {
 
   const getDatabaseName = (): string => {
     const dbResult = getResult("Database Name").value;
+    if (typeof dbResult === "string" && dbResult.trim()) {
+      return dbResult.trim();
+    }
     if (Array.isArray(dbResult) && dbResult.length > 0) {
       const primaryDb = dbResult[0];
+      if (typeof primaryDb === "string" && primaryDb.trim()) {
+        return primaryDb.trim();
+      }
       if (primaryDb.driver && typeof primaryDb.driver === "string" && primaryDb.driver.trim()) {
         return primaryDb.driver;
       }
@@ -177,7 +211,7 @@ const mapAssessmentData = (data: AssessmentData): MappedAssessmentData => {
         return primaryDb.name;
       }
     }
-    return "Unknown";
+    return "Microsoft Fabric Lakehouse";
   };
 
   const powerBiResult = getResult("Power BI Replicability").value;

@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
         }
 
         const baseUrl = logsBase.replace(/\/$/, "");
-        const targetUrl = `${baseUrl}/mapping?${query}`;
+        const targetUrl = `${baseUrl}/records/mapping?${query}`;
 
         console.log(`[API /api/mapping] Target URL: ${targetUrl}`);
 
@@ -91,15 +91,19 @@ export async function POST(req: NextRequest) {
 
         const authHeader = req.headers.get("Authorization");
 
-        const data = await httpClient.post<{ run_id: string }>(
-            "/batch-mapping",
-            body,
-            {
-                apiType: "semantic",
-                headers: { "Authorization": authHeader! }
-            }
+        // Semantic Kernel has no /batch-mapping. Mapping runs as a stage of
+        // /invoke-batch rather than as a separately orchestrated batch.
+        console.warn(
+            `[API /api/mapping POST] No /batch-mapping endpoint exists upstream (${body.items.length} item(s)) — returning 501.`
         );
-        return NextResponse.json(data);
+        return NextResponse.json(
+            {
+                error: "Batch mapping is not available as a standalone operation.",
+                details:
+                    "Semantic Kernel runs mapping as a stage of POST /api/migration/invoke-batch.",
+            },
+            { status: 501 }
+        );
     } catch (err: any) {
         console.error("[API /api/mapping POST] Error:", err.message);
         // ★ Preserve the original HTTP status from the backend (e.g. 404)

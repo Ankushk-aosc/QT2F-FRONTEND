@@ -1,27 +1,19 @@
 "use client"
 
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { 
-  Spinner, 
-  Text, 
-  Button, 
-  tokens, 
-  makeStyles,
-  shorthands,
-  ProgressBar,
-  mergeClasses
-} from "@fluentui/react-components"
-import { 
-  DocumentPdf24Regular, 
-  CheckmarkCircle24Filled, 
-  Circle24Regular,
-  ErrorCircle24Filled,
-  Clock24Regular,
-  Warning24Regular,
-  Dismiss24Regular,
-  ChevronUp24Regular,
-  Subtract24Regular
-} from "@fluentui/react-icons"
+import { Spinner } from "@/components/ui/spinner"
+import { Button } from "@/components/ui/button"
+import { ProgressBar } from "@/components/ui/progress"
+import {
+  FileText,
+  CheckCircle2,
+  Circle,
+  XCircle,
+  Clock,
+  AlertTriangle,
+  ChevronUp,
+  Minus,
+} from "lucide-react"
 import { MigrationOverview } from './tabs/MigrationOverview'
 import { AssessmentTab } from './tabs/AssessmentTab'
 import { ParsingTab } from './tabs/ParsingTab'
@@ -31,154 +23,9 @@ import { captureElementToPdfBlob, CaptureProgress } from '@/lib/pdf/pdfCaptureUt
 import { ZipReportService } from '@/lib/pdf/zipService'
 import { useToast } from '@/hooks/use-toast'
 
-const useStyles = makeStyles({
-  overlay: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
-    backdropFilter: "blur(4px)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 9999,
-  },
-  modal: {
-    backgroundColor: tokens.colorNeutralBackground1,
-    ...shorthands.padding("32px"),
-    ...shorthands.borderRadius("16px"),
-    boxShadow: tokens.shadow64,
-    width: "600px",
-    maxHeight: "90vh",
-    display: "flex",
-    flexDirection: "column",
-    gap: "20px",
-    alignItems: "stretch",
-    textAlign: "left",
-  },
-  header: {
-    display: "flex",
-    alignItems: "center",
-    gap: "16px",
-    paddingBottom: "16px",
-    ...shorthands.borderBottom("1px", "solid", tokens.colorNeutralStroke2),
-  },
-  hiddenContainer: {
-    position: "absolute",
-    top: "-10000px",
-    left: "-10000px",
-    width: "1200px",
-    backgroundColor: "#ffffff",
-  },
-  stepList: {
-    width: "100%",
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-    ...shorthands.overflow("hidden", "auto"),
-    maxHeight: "180px",
-    paddingRight: "8px",
-  },
-  stepItem: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    textAlign: "left",
-    padding: "8px 12px",
-    backgroundColor: tokens.colorNeutralBackground2,
-    ...shorthands.borderRadius("8px"),
-  },
-  activeStep: {
-    backgroundColor: tokens.colorBrandBackground2,
-    ...shorthands.outline("1px", "solid", tokens.colorBrandStroke1),
-  },
-  stepInfo: {
-    flexGrow: 1,
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-  },
-  progress: {
-    width: "100%",
-    marginTop: "4px",
-  },
-  logContainer: {
-    backgroundColor: "#1e1e1e",
-    color: "#d4d4d4",
-    fontFamily: "Consolas, monospace",
-    fontSize: "11px",
-    ...shorthands.padding("12px"),
-    ...shorthands.borderRadius("8px"),
-    height: "120px",
-    ...shorthands.overflow("hidden", "auto"),
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-  },
-  statusBar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: tokens.colorNeutralBackground2,
-    ...shorthands.padding("10px", "16px"),
-    ...shorthands.borderRadius("8px"),
-    fontSize: "12px",
-  },
-  debugPanel: {
-    backgroundColor: tokens.colorNeutralBackground3,
-    ...shorthands.padding("12px"),
-    ...shorthands.borderRadius("8px"),
-    fontSize: "11px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
-    fontFamily: "Consolas, monospace",
-  },
-  summaryPanel: {
-    backgroundColor: tokens.colorBrandBackground2,
-    ...shorthands.padding("20px"),
-    ...shorthands.borderRadius("8px"),
-    ...shorthands.outline("1px", "solid", tokens.colorBrandStroke1),
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-    alignItems: "center",
-    textAlign: "center",
-  },
-  minimizedWidget: {
-    position: "fixed",
-    bottom: "24px",
-    right: "24px",
-    backgroundColor: tokens.colorNeutralBackground1,
-    ...shorthands.padding("12px", "16px"),
-    ...shorthands.borderRadius("12px"),
-    boxShadow: tokens.shadow28,
-    border: `1px solid ${tokens.colorBrandStroke1}`,
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    cursor: "pointer",
-    zIndex: 10000,
-    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-    ":hover": {
-      transform: "translateY(-4px)",
-      boxShadow: tokens.shadow64,
-    },
-  },
-  minimizeButton: {
-    position: "absolute",
-    top: "16px",
-    right: "16px",
-  },
-  heartbeat: {
-    width: "8px",
-    height: "8px",
-    borderRadius: "50%",
-    backgroundColor: tokens.colorPaletteGreenForeground1,
-  }
-})
+function cx(...parts: Array<string | undefined | false>) {
+  return parts.filter(Boolean).join(" ")
+}
 
 interface GenerationStep {
   id: string;
@@ -195,7 +42,6 @@ interface PdfReportRendererProps {
 }
 
 export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
-  const styles = useStyles()
   const { currentWorkbookIds, currentRunId } = useAgentStore()
   const assessmentData = useAgentStore(state => state.assessmentData)
   const parsingData = useParsingStore(state => state.parsingData)
@@ -219,13 +65,13 @@ export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
   const [isStalled, setIsStalled] = useState(false)
   const [heartbeatFlip, setHeartbeatFlip] = useState(false)
   const [overallProgress, setOverallProgress] = useState(0)
-  
+
   const [summaryStats, setSummaryStats] = useState<{
     totalPdfs: number;
     failedCount: number;
     totalTime: string;
   } | null>(null)
-  
+
   const [isMinimized, setIsMinimized] = useState(false)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const logScrollPosRef = useRef<number>(0)
@@ -273,7 +119,7 @@ export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
   // Timers & Heartbeat & Stall Detection
   useEffect(() => {
     if (status !== 'processing') return;
-    
+
     const interval = setInterval(() => {
       const now = Date.now();
       setTimers({
@@ -281,12 +127,12 @@ export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
         workbook: Math.floor((now - workbookStartTimeRef.current) / 1000)
       });
       setHeartbeatFlip(f => !f);
-      
+
       if (now - lastLogTimeRef.current > 25000) {
         setIsStalled(true);
       }
     }, 1000);
-    
+
     return () => clearInterval(interval);
   }, [status]);
 
@@ -653,11 +499,11 @@ export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
       setActiveWorkbookId(null);
       setActiveStepId('zip');
       updateStep('zip', { status: 'loading', percentage: 50, message: 'Bundling reports...' });
-      
+
       await zipService.downloadZip(`Migration_Reports_${timestamp}.zip`);
       addLog("ZIP bundle created and browser download triggered.");
       updateStep('zip', { status: 'success', percentage: 100, message: 'Archive downloaded' });
-      
+
       setOverallProgress(100);
 
       // Extract success stats before destroying zipService
@@ -676,7 +522,7 @@ export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
       // Cleanup
       zipService = null;
       addLog("Generation pipeline completely successfully.");
-      
+
       toast({
         title: "PDF Export Complete",
         description: "All reports have been successfully generated and bundled.",
@@ -693,7 +539,7 @@ export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
       }
       addLog(`CRITICAL ERROR: ${err.message}`);
       setErrorMessage(err.message || "A critical error occurred during the zipping process.");
-      
+
       toast({
         title: "Export Failed",
         description: err.message || "A critical error occurred.",
@@ -712,7 +558,7 @@ export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
       if (isDataReady) {
         processGeneration();
       }
-    }, 3000); 
+    }, 3000);
 
     return () => {
       clearTimeout(timer);
@@ -724,7 +570,7 @@ export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
       setShowCancelConfirm(true);
       return;
     }
-    
+
     addLog("Close/Cancel requested. Triggering safe abort...");
     isCancelled.current = true;
     onClose();
@@ -732,7 +578,7 @@ export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
 
   const handleMinimize = () => {
     if (status === 'done' || status === 'error' || showCancelConfirm) return;
-    
+
     // Capture scroll position before hiding
     if (logsEndRef.current?.parentElement) {
       logScrollPosRef.current = logsEndRef.current.parentElement.scrollTop;
@@ -760,21 +606,21 @@ export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
     <>
       {/* Floating Minimized Widget */}
       {isMinimized && (
-        <div className={styles.minimizedWidget} onClick={handleRestore}>
+        <div className="pdf-minimized-widget" onClick={handleRestore}>
           <Spinner size="tiny" />
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <Text weight="semibold" size={200}>Generating Reports...</Text>
-            <Text size={100} style={{ color: tokens.colorNeutralForeground4 }}>
+            <span style={{ fontWeight: 600, fontSize: "12px" }}>Generating Reports...</span>
+            <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
               {overallProgress}% • {activeWorkbookId ? getWorkbookName(activeWorkbookId) : 'Overview'}
-            </Text>
+            </span>
           </div>
-          <ChevronUp24Regular fontSize={16} style={{ marginLeft: '8px' }} />
+          <ChevronUp size={16} style={{ marginLeft: '8px' }} />
         </div>
       )}
 
       {/* Main Modal Dialog */}
-      <div 
-        className={mergeClasses(styles.overlay, isMinimized && "vl-hidden")} 
+      <div
+        className={cx("pdf-overlay", isMinimized && "vl-hidden")}
         style={isMinimized ? { display: 'none' } : {}}
         onClick={(e) => {
           if (e.target === e.currentTarget) {
@@ -782,69 +628,71 @@ export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
           }
         }}
       >
-        <div className={styles.modal} style={{ position: 'relative' }}>
+        <div className="pdf-modal" style={{ position: 'relative' }}>
           {/* Minimize Button */}
-          <div className={styles.minimizeButton}>
+          <div className="pdf-minimize-button">
             {!showCancelConfirm && status !== 'done' && (
-              <Button 
-                appearance="subtle" 
-                icon={<Subtract24Regular />} 
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={handleMinimize}
                 title="Minimize to background"
-              />
+              >
+                <Minus size={24} />
+              </Button>
             )}
           </div>
 
-        
+
         {/* Header */}
-        <div className={styles.header}>
-          <div style={{ color: tokens.colorBrandForeground1 }}>
-            <DocumentPdf24Regular fontSize={40} />
+        <div className="pdf-header">
+          <div style={{ color: "var(--primary)" }}>
+            <FileText size={40} />
           </div>
           <div>
-            <Text weight="semibold" size={500} style={{ display: 'block' }}>Migration Reports Export</Text>
-            <Text size={200} style={{ color: tokens.colorNeutralForeground4 }}>
+            <span style={{ fontWeight: 600, fontSize: "18px", display: 'block' }}>Migration Reports Export</span>
+            <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>
               {status === 'done' ? 'Reports successfully bundled.' : 'Safely generating paginated PDF reports in the background.'}
-            </Text>
+            </span>
           </div>
         </div>
 
         {status === 'done' && summaryStats ? (
-          <div className={styles.summaryPanel}>
-            <CheckmarkCircle24Filled fontSize={48} style={{ color: tokens.colorPaletteGreenForeground1 }} />
-            <Text weight="semibold" size={400}>Generation Complete</Text>
+          <div className="pdf-summary-panel">
+            <CheckCircle2 size={48} style={{ color: "var(--success)" }} />
+            <span style={{ fontWeight: 600, fontSize: "16px" }}>Generation Complete</span>
             <div style={{ display: 'flex', gap: '24px', marginTop: '12px' }}>
               <div>
-                <Text size={200} style={{ color: tokens.colorNeutralForeground4, display: 'block' }}>Total PDFs</Text>
-                <Text size={400} weight="bold">{summaryStats.totalPdfs}</Text>
+                <span style={{ fontSize: "13px", color: "var(--text-muted)", display: 'block' }}>Total PDFs</span>
+                <span style={{ fontSize: "16px", fontWeight: 700 }}>{summaryStats.totalPdfs}</span>
               </div>
               <div>
-                <Text size={200} style={{ color: tokens.colorNeutralForeground4, display: 'block' }}>Total Time</Text>
-                <Text size={400} weight="bold">{summaryStats.totalTime}</Text>
+                <span style={{ fontSize: "13px", color: "var(--text-muted)", display: 'block' }}>Total Time</span>
+                <span style={{ fontSize: "16px", fontWeight: 700 }}>{summaryStats.totalTime}</span>
               </div>
               <div>
-                <Text size={200} style={{ color: tokens.colorNeutralForeground4, display: 'block' }}>Failed</Text>
-                <Text size={400} weight="bold" style={{ color: summaryStats.failedCount > 0 ? tokens.colorPaletteRedForeground1 : 'inherit' }}>
+                <span style={{ fontSize: "13px", color: "var(--text-muted)", display: 'block' }}>Failed</span>
+                <span style={{ fontSize: "16px", fontWeight: 700, color: summaryStats.failedCount > 0 ? "var(--danger)" : 'inherit' }}>
                   {summaryStats.failedCount}
-                </Text>
+                </span>
               </div>
             </div>
           </div>
         ) : (
           <>
             {/* Status Bar */}
-            <div className={styles.statusBar}>
+            <div className="pdf-status-bar">
               <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Clock24Regular fontSize={16} />
-                  <Text weight="semibold">Total Time: {formatTime(timers.total)}</Text>
+                  <Clock size={16} />
+                  <span style={{ fontWeight: 600 }}>Total Time: {formatTime(timers.total)}</span>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Text weight="bold" size={400} style={{ color: tokens.colorBrandForeground1 }}>{overallProgress}%</Text>
-                <Text weight="semibold" style={{ color: tokens.colorNeutralForeground3 }}>Processing</Text>
+                <span style={{ fontWeight: 700, fontSize: "16px", color: "var(--primary)" }}>{overallProgress}%</span>
+                <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>Processing</span>
                 {status === 'processing' && (
-                  <div className={styles.heartbeat} style={{ opacity: heartbeatFlip ? 1 : 0.3, transition: 'opacity 0.2s' }} />
+                  <div className="pdf-heartbeat" style={{ opacity: heartbeatFlip ? 1 : 0.3, transition: 'opacity 0.2s' }} />
                 )}
               </div>
             </div>
@@ -852,61 +700,56 @@ export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
             {/* Overall Workbook Progress Bar */}
             <div style={{ padding: '4px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text size={100} weight="bold" style={{ color: tokens.colorNeutralForeground4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-muted)", textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Workbook Completion
-                </Text>
-                <Text size={200} weight="semibold" style={{ color: tokens.colorNeutralForeground2 }}>
+                </span>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>
                   {completedWorkbooks} of {totalWorkbooks} workbooks processed
-                </Text>
+                </span>
               </div>
-              <ProgressBar 
-                value={totalWorkbooks > 0 ? (completedWorkbooks / totalWorkbooks) : 0} 
-                color="brand" 
-                thickness="large" 
-                style={{ height: '10px', borderRadius: '5px' }}
-              />
+              <ProgressBar value={totalWorkbooks > 0 ? (completedWorkbooks / totalWorkbooks) : 0} />
             </div>
 
             {/* Stalled Warning */}
             {isStalled && status === 'processing' && (
-              <div style={{ backgroundColor: tokens.colorStatusWarningBackground1, padding: '8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Warning24Regular style={{ color: tokens.colorStatusWarningForeground1 }} />
-                <Text size={200} style={{ color: tokens.colorStatusWarningForeground1 }}>Generation is taking longer than expected. Please wait...</Text>
+              <div style={{ backgroundColor: "var(--warning-subtle)", padding: '8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertTriangle size={20} style={{ color: "var(--warning)" }} />
+                <span style={{ fontSize: "13px", color: "var(--warning)" }}>Generation is taking longer than expected. Please wait...</span>
               </div>
             )}
 
             {/* Step List */}
-            <div className={styles.stepList}>
+            <div className="pdf-step-list">
               {steps.map((step) => (
-                <div 
-                  key={step.id} 
-                  className={`${styles.stepItem} ${activeStepId === step.id ? styles.activeStep : ''}`}
+                <div
+                  key={step.id}
+                  className={cx("pdf-step-item", activeStepId === step.id && "pdf-active-step")}
                 >
                   <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                    {step.status === 'pending' && <Circle24Regular style={{ color: tokens.colorNeutralForeground4 }} />}
+                    {step.status === 'pending' && <Circle size={24} style={{ color: "var(--text-muted)" }} />}
                     {step.status === 'loading' && <Spinner size="tiny" />}
-                    {step.status === 'success' && <CheckmarkCircle24Filled style={{ color: tokens.colorPaletteGreenForeground1 }} />}
-                    {step.status === 'error' && <ErrorCircle24Filled style={{ color: tokens.colorPaletteRedForeground1 }} />}
+                    {step.status === 'success' && <CheckCircle2 size={24} style={{ color: "var(--success)" }} />}
+                    {step.status === 'error' && <XCircle size={24} style={{ color: "var(--danger)" }} />}
                   </div>
-                  <div className={styles.stepInfo}>
+                  <div className="pdf-step-info">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text size={200} weight={activeStepId === step.id ? 'semibold' : 'regular'}>
+                      <span style={{ fontSize: "13px", fontWeight: activeStepId === step.id ? 600 : 400 }}>
                         {step.label}
-                      </Text>
+                      </span>
                       {step.status === 'loading' && step.percentage !== undefined && (
-                        <Text size={100} style={{ fontVariantNumeric: 'tabular-nums' }}>{step.percentage}%</Text>
+                        <span style={{ fontSize: "11px", fontVariantNumeric: 'tabular-nums' }}>{step.percentage}%</span>
                       )}
                     </div>
                     {step.status === 'loading' && (
-                      <div className={styles.progress}>
-                        <ProgressBar value={(step.percentage || 0) / 100} color="brand" thickness="medium" />
-                        <Text size={100} style={{ marginTop: '2px', display: 'block', color: tokens.colorNeutralForeground4 }}>
+                      <div className="pdf-progress">
+                        <ProgressBar value={(step.percentage || 0) / 100} />
+                        <span style={{ fontSize: "11px", marginTop: '2px', display: 'block', color: "var(--text-muted)" }}>
                           {step.message}
-                        </Text>
+                        </span>
                       </div>
                     )}
                     {step.status === 'error' && (
-                      <Text size={100} style={{ color: tokens.colorPaletteRedForeground1 }}>{step.message}</Text>
+                      <span style={{ fontSize: "11px", color: "var(--danger)" }}>{step.message}</span>
                     )}
                   </div>
                 </div>
@@ -920,32 +763,32 @@ export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
         {/* Footer Actions - Strict Priority Order: COMPLETED > ERROR > ACTIVE > CANCEL */}
         {isExportFinished ? (
           <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '12px' }}>
-            <Button appearance="primary" onClick={handleClose}>Complete & Close</Button>
+            <Button onClick={handleClose}>Complete & Close</Button>
           </div>
         ) : status === 'error' ? (
           <div style={{ marginTop: '12px' }}>
-            <Text size={200} style={{ color: tokens.colorPaletteRedForeground1 }}>{errorMessage}</Text>
+            <span style={{ fontSize: "13px", color: "var(--danger)" }}>{errorMessage}</span>
             <div style={{ marginTop: '12px' }}>
-              <Button appearance="primary" onClick={handleClose}>Close</Button>
+              <Button onClick={handleClose}>Close</Button>
             </div>
           </div>
         ) : showCancelConfirm ? (
-          <div style={{ marginTop: '24px', padding: '20px', backgroundColor: tokens.colorNeutralBackground3, borderRadius: '12px', textAlign: 'center' }}>
-            <Warning24Regular fontSize={32} style={{ color: tokens.colorPaletteRedForeground1, marginBottom: '12px' }} />
-            <Text weight="semibold" size={400} style={{ display: 'block', marginBottom: '8px' }}>Cancel Export?</Text>
-            <Text size={200} style={{ display: 'block', marginBottom: '20px', color: tokens.colorNeutralForeground2 }}>
+          <div style={{ marginTop: '24px', padding: '20px', backgroundColor: "var(--muted)", borderRadius: '12px', textAlign: 'center' }}>
+            <AlertTriangle size={32} style={{ color: "var(--danger)", marginBottom: '12px' }} />
+            <span style={{ fontWeight: 600, fontSize: "16px", display: 'block', marginBottom: '8px' }}>Cancel Export?</span>
+            <span style={{ fontSize: "13px", display: 'block', marginBottom: '20px', color: "var(--text-secondary)" }}>
               This will abort the entire generation process. All progress will be lost.
-            </Text>
+            </span>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              <Button appearance="primary" onClick={() => setShowCancelConfirm(false)}>No, Keep Exporting</Button>
-              <Button appearance="subtle" style={{ color: tokens.colorPaletteRedForeground1 }} onClick={handleClose}>Yes, Stop Export</Button>
+              <Button onClick={() => setShowCancelConfirm(false)}>No, Keep Exporting</Button>
+              <Button variant="ghost" style={{ color: "var(--danger)" }} onClick={handleClose}>Yes, Stop Export</Button>
             </div>
           </div>
         ) : (
           <>
             {status === 'processing' && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '12px' }}>
-                <Button appearance="outline" onClick={handleClose}>Cancel Generation</Button>
+                <Button variant="outline" onClick={handleClose}>Cancel Generation</Button>
               </div>
             )}
           </>
@@ -954,7 +797,7 @@ export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
     </div>
 
       {/* Hidden container for rendering the full UI state */}
-      <div ref={captureRef} className={mergeClasses(styles.hiddenContainer, "pdf-render-mode")}>
+      <div ref={captureRef} className={cx("pdf-hidden-container", "pdf-render-mode")}>
         {/* Render Overview ONLY when activeStepId is 'overview' */}
         {activeStepId === 'overview' && (
           <div data-pdf-section style={{ padding: "40px" }}>

@@ -1,5 +1,4 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
-import { httpClient } from "@/lib/api/httpClient";
 
 export const dynamic = 'force-dynamic';
 
@@ -20,18 +19,18 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "run_id required" }, { status: 400 });
         }
 
-        const authHeader = req.headers.get("Authorization");
-
-        const data = await httpClient.post<{ success: boolean; message: string }>(
-            `/mapping/cancel/${targetRunId}`,
-            null,
-            {
-                apiType: "semantic",
-                headers: { "Authorization": authHeader! }
-            }
+        // See /api/assessment/cancel: no per-stage cancel exists upstream.
+        console.warn(
+            `[API /api/mapping/cancel] No per-stage cancel exists for run ${targetRunId} — returning 501.`
         );
-
-        return NextResponse.json(data);
+        return NextResponse.json(
+            {
+                error: "Cancelling the mapping stage on its own is not supported.",
+                details:
+                    "Semantic Kernel exposes only a whole-run stop. Use POST /api/migration/cancel/{runId} to cancel the entire run.",
+            },
+            { status: 501 }
+        );
     } catch (err: any) {
         console.error("[API /api/mapping/cancel POST] Error:", err.message);
         return NextResponse.json({ error: err.message }, { status: 500 });

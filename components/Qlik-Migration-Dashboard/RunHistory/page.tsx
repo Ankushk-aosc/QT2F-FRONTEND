@@ -6,12 +6,13 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectItem } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle, AlertCircle, Clock, Search, ChevronDown, ChevronRight, RefreshCw, ChevronLeft, X } from "lucide-react";
 import { isToday, isYesterday, isThisWeek, format, parseISO } from "date-fns";
+import { getSqlBaseUrl, warnSqlBaseUrlMissing } from "@/lib/publicConfig";
 import { useQlikToast } from "@/hooks/useQlikToast";
 import AssessmentResults from "@/components/Assessment-Results/AssessmentResultsHistory";
 import ParsingResults from "@/components/Parsing-Results/ParsingResultsHistory";
@@ -238,9 +239,7 @@ export const RunHistory: React.FC<{ backendToken: string }> = ({ backendToken })
   const fetchingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const baseUrl =
-    process.env.NEXT_PUBLIC_SQL_BASE_URL ||
-    "https://az-wa-sql-db-vl-deg0f6htd6bud2f3.australiaeast-01.azurewebsites.net";
+  const baseUrl = getSqlBaseUrl();
 
   const calculateDuration = (startTime?: string, endTime?: string): string | undefined => {
     if (!startTime || !endTime) return undefined;
@@ -334,7 +333,6 @@ export const RunHistory: React.FC<{ backendToken: string }> = ({ backendToken })
         return;
       }
 
-      fetchingRef.current = true;
       abortControllerRef.current = new AbortController();
       setIsLoading(true);
 
@@ -347,14 +345,14 @@ export const RunHistory: React.FC<{ backendToken: string }> = ({ backendToken })
         queryParams.append("page", page.toString());
         queryParams.append("page_size", pageSize.toString());
 
-        const apiUrl = `${baseUrl}/run-history/by-email/${encodeURIComponent(userEmail)}?${queryParams}`;
+        const apiUrl = `/api/qlik/history?email=${encodeURIComponent(userEmail)}&${queryParams}`;
         const response = await fetch(apiUrl, {
-  signal: abortControllerRef.current.signal,
-  headers: {
-    'Authorization': `Bearer ${backendToken}`,
-    'Content-Type': 'application/json',
-  },
-});
+          signal: abortControllerRef.current.signal,
+          headers: {
+            Authorization: `Bearer ${backendToken}`,
+            "Content-Type": "application/json",
+          },
+        });
 
         if (!response.ok) throw new Error(`API request failed: ${response.status}`);
 
@@ -375,16 +373,16 @@ export const RunHistory: React.FC<{ backendToken: string }> = ({ backendToken })
 
         const formattedDataPromises = data.map(async (item: any) => {
           try {
-           const folderResponse = await fetch(
-  `${baseUrl}/run-history/by-folder/${encodeURIComponent(item.folder_name)}`,
-  {
-    signal: abortControllerRef.current?.signal,
-    headers: {
-      'Authorization': `Bearer ${backendToken}`,
-      'Content-Type': 'application/json',
-    },
-  }
-); 
+            const folderResponse = await fetch(
+              `/api/qlik/history-by-folder?folder=${encodeURIComponent(item.folder_name)}`,
+              {
+                signal: abortControllerRef.current?.signal,
+                headers: {
+                  Authorization: `Bearer ${backendToken}`,
+                  "Content-Type": "application/json",
+                },
+              }
+            ); 
 
             let status: "success" | "failed" | "in_progress" = "in_progress";
             let statusDetails: any = {};
@@ -627,16 +625,12 @@ export const RunHistory: React.FC<{ backendToken: string }> = ({ backendToken })
                 setPageSize(Number(v));
                 setPage(1);
               }}
+              style={{ width: "140px" }}
             >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10">10 per page</SelectItem>
-                <SelectItem value="20">20 per page</SelectItem>
-                <SelectItem value="50">50 per page</SelectItem>
-                <SelectItem value="100">100 per page</SelectItem>
-              </SelectContent>
+              <SelectItem value="10">10 per page</SelectItem>
+              <SelectItem value="20">20 per page</SelectItem>
+              <SelectItem value="50">50 per page</SelectItem>
+              <SelectItem value="100">100 per page</SelectItem>
             </Select>
           </div>
         </Card>

@@ -23,7 +23,8 @@ export async function POST(req: NextRequest) {
         }
 
         const baseUrl = semanticBase.replace(/\/$/, "");
-        const targetUrl = `${baseUrl}/resume-run`;
+        // Semantic Kernel namespaces this under /qlik; a bare /resume-run 404s.
+        const targetUrl = `${baseUrl}/qlik/resume-run`;
 
         console.log(`[API /api/migration/resume] Resuming run: ${run_id}`);
         

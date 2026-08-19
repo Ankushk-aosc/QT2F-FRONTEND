@@ -27,10 +27,6 @@ interface QlikStore {
   isProcessCompleted: boolean;
   isFetchingApps: boolean;
   apiResults: ApiResult[];
-  qlikUrl: string;
-  originalQlikUrl: string;
-  isEditingUrl: boolean;
-  isSavingUrl: boolean;
   activities: Record<string, Record<string, any[]>>; // appId -> agentName -> logs
 
   setSpaces: (spaces: QlikSpace[]) => void;
@@ -45,10 +41,6 @@ interface QlikStore {
   setIsProcessCompleted: (completed: boolean) => void;
   setIsFetchingApps: (fetching: boolean) => void;
   setApiResults: (results: ApiResult[]) => void;
-  setQlikUrl: (url: string) => void;
-  setOriginalQlikUrl: (url: string) => void;
-  setIsEditingUrl: (editing: boolean) => void;
-  setIsSavingUrl: (saving: boolean) => void;
   setActivities: (appId: string, agentName: string, logs: any[]) => void;
   fetchAgentActions: (appId: string, folderName: string, agentName: string) => Promise<void>;
   resetMigrationState: () => void;
@@ -64,10 +56,6 @@ export const useQlikStore = create<QlikStore>((set, get) => ({
   isProcessCompleted: false,
   isFetchingApps: false,
   apiResults: [],
-  qlikUrl: "",
-  originalQlikUrl: "",
-  isEditingUrl: false,
-  isSavingUrl: false,
   activities: {},
 
   setSpaces: (spaces) => set({ spaces }),
@@ -111,10 +99,6 @@ export const useQlikStore = create<QlikStore>((set, get) => ({
   setIsProcessCompleted: (isProcessCompleted) => set({ isProcessCompleted }),
   setIsFetchingApps: (isFetchingApps) => set({ isFetchingApps }),
   setApiResults: (apiResults) => set({ apiResults }),
-  setQlikUrl: (qlikUrl) => set({ qlikUrl }),
-  setOriginalQlikUrl: (originalQlikUrl) => set({ originalQlikUrl }),
-  setIsEditingUrl: (isEditingUrl) => set({ isEditingUrl }),
-  setIsSavingUrl: (isSavingUrl) => set({ isSavingUrl }),
   setActivities: (appId, agentName, logs) => set((state) => ({
     activities: {
       ...state.activities,

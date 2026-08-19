@@ -1,17 +1,9 @@
 import React from "react";
-import { Input as FluentInput } from "@fluentui/react-components";
 
-export const Input = React.forwardRef<any, any>(({ className, ...props }, ref) => {
-  return (
-    <FluentInput
-      ref={ref}
-      style={{
-        width: "100%",
-        boxSizing: "border-box",
-      }}
-      {...props as any}
-    />
-  );
-});
+export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
+  ({ className, ...props }, ref) => {
+    return <input ref={ref} className={["ui-input", className].filter(Boolean).join(" ")} {...props} />;
+  }
+);
 
 Input.displayName = "Input";

@@ -1,6 +1,5 @@
 // app/api/migration/process-site/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { httpClient } from "@/lib/api/httpClient";
 import { RT_COOKIE } from "@/lib/auth/serverAuth";
 
 export const dynamic = 'force-dynamic';
@@ -129,13 +128,21 @@ export async function POST(req: NextRequest) {
 
     console.log("[API /api/migration/process-site] Forwarding (rt seeded:", Boolean(seededRt), ")");
 
-    const backendResponse = await httpClient.post<ProcessSiteResponse>(
-      "/tableau/process-site",
-      forwardBody,
-      { apiType: "semantic" }
+    // Semantic Kernel exposes /qlik/process-space but has no Tableau
+    // counterpart — /tableau/process-site does not exist. Whole-site Tableau
+    // migration goes through /invoke-batch with the site's workbooks as items.
+    console.warn(
+      "[API /api/migration/process-site] No /tableau/process-site endpoint exists upstream — returning 501."
     );
-
-    return NextResponse.json(backendResponse, { status: 200 });
+    return NextResponse.json(
+      {
+        error: "Whole-site Tableau migration is not available as a single call.",
+        details:
+          "Semantic Kernel has no /tableau/process-site endpoint. Use POST /api/migration/invoke-batch " +
+          "with the site's workbooks as items.",
+      },
+      { status: 501 }
+    );
   } catch (err: any) {
     console.error("[API /api/migration/process-site] Error:", err);
     const status = err?.status || 500;

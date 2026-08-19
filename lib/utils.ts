@@ -166,3 +166,52 @@ export function getTimeframeBoundaries(timeframe: string, timeZone: string): { s
   return { start: new Date(0), end: new Date(8640000000000000) };
 }
 
+/**
+ * Sanitizes and cleans up raw API errors (JSON strings, HTML error dumps, stack traces)
+ * into friendly human-readable error messages.
+ */
+export function formatApiErrorMessage(rawError?: string | null): string {
+  if (!rawError) return "An unexpected error occurred.";
+  
+  let msg = String(rawError).trim();
+  
+  // Try to parse if it's JSON
+  try {
+    if (msg.startsWith("{") && msg.endsWith("}")) {
+      const parsed = JSON.parse(msg);
+      if (parsed.error) msg = String(parsed.error);
+      else if (parsed.message) msg = String(parsed.message);
+      else if (parsed.detail) msg = String(parsed.detail);
+    }
+  } catch {
+    // Not pure JSON
+  }
+
+  // If there is embedded JSON like `{"error":"..."}`
+  const jsonMatch = msg.match(/\{.*"error"\s*:\s*"([^"]+)".*\}/);
+  if (jsonMatch && jsonMatch[1]) {
+    msg = jsonMatch[1];
+  }
+
+  // Remove HTML tags / boilerplate
+  msg = msg.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+  
+  // Clean up common prefixes
+  msg = msg.replace(/^Request failed \[\d+ [^\]]+\]:\s*/i, '');
+  msg = msg.replace(/^Error:\s*/i, '');
+
+  if (msg.includes("Cannot POST /unbuildApp") || msg.includes("404")) {
+    return "The requested backend service endpoint was not found or is currently initializing.";
+  }
+
+  if (msg.includes("500") || msg.includes("Internal Server Error")) {
+    return "The migration backend encountered an internal error. Please check your service connection and retry.";
+  }
+
+  if (msg.length > 300) {
+    msg = msg.substring(0, 297) + "…";
+  }
+
+  return msg || "An unexpected error occurred.";
+}
+

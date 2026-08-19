@@ -867,23 +867,19 @@ export const useParsingStore = create<ParsingStore>((set, get) => ({
 
     triggerParsing: async (projectId, workbookIds, userEmail, runId) => {
         try {
-            // Build the items array matching what the API route expects
-            const items = workbookIds.map(id => ({
-                project_id: projectId,
-                workbook_id: id,
-            }));
-
-            const response = await fetchWithAuth('/api/parsing', {
+            const promises = workbookIds.map(id => fetchWithAuth('/api/parsing', {
                 method: 'POST',
                 body: JSON.stringify({
-                    user_email: userEmail,
                     run_id: runId,
-                    items,
+                    project_id: projectId,
+                    workbook_id: id,
+                    source_type: "tableau"
                 })
-            });
+            }));
 
+            const responses = await Promise.all(promises);
             console.log("[ParsingStore] Parsing job triggered successfully for", workbookIds.length, "workbook(s).");
-            return response;
+            return responses[0];
         } catch (err: any) {
             // ★ Silently handle 404 (backend endpoint not available yet) and other non-critical errors
             if (err.message?.includes("404") || err.message?.toLowerCase().includes("not found")) {

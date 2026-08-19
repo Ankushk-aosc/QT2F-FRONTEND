@@ -8,6 +8,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Integrations** — one section where every external platform is configured,
+  replacing the four planned per-vendor sections. Qlik Sense, Tableau and
+  Microsoft Fabric are configurable; Power BI, Snowflake, Databricks, Oracle,
+  SQL Server, SAP, Looker, PostgreSQL, MySQL and BigQuery are listed as coming
+  soon and say so plainly rather than offering a form that cannot connect.
+- **Registry-driven connector framework.** `lib/connectors/registry.ts` declares
+  each connector's fields, authentication methods and metadata categories; the
+  card, the form, the validation and the metadata viewer are all generated from
+  it. Adding a connector is a registry entry plus a discovery adapter — no new
+  UI.
+- **Automatic discovery on save.** One server-side sequence validates, stores
+  the credential, authenticates, reads every reachable metadata category and
+  caches it. Administrators never press "load spaces" or "refresh projects".
+- **Metadata cache** with a freshness window and conditional background refresh
+  (`POST …/sync?ifStale=true`), so a warm cache costs nothing and a broken
+  connector is not silently retried.
+- **Migration wizard reuse**: `ConnectorRequired` gates a step on a ready
+  connector and deep-links to that exact connector in Settings when it is not;
+  `useConnectorReadiness` serves cached metadata to pickers.
+- Reusable connector components: card, schema-driven form, health and status
+  badges, metadata viewer, activity log, result banner, loading skeleton and
+  empty state.
+- 45 unit tests covering connector field coercion, conditional visibility,
+  required-field rules, secret separation and readiness.
+
+### Security
+
+- **Connector credentials never enter the settings document.**
+  `lib/connectors/secrets.ts` is a write-only store in its own file with
+  owner-only permissions; no API route returns a secret, and a connection
+  records only which secret fields have a value. Submitting a secret in the
+  `values` bag still routes it to the secret store, so the separation does not
+  depend on client cooperation.
+- Connector URL fields accept `http(s)` only — these values are fetched
+  server-side, so permitting other schemes would turn a configuration field into
+  a request vector.
+- `.gitignore` note made explicit that `.data/` holds credentials.
+
+### Changed
+
+- The `qlik`, `tableau` and `fabric` navigation sections were replaced by a
+  single `integrations` section. Vendor names remain search keywords, so
+  searching "tableau" still lands in the right place.
+
 - **Enterprise Administration Center** replacing the settings drawer. A
   navigable admin surface with a searchable section rail covering all 25
   planned sections.

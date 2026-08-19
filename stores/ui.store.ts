@@ -1,7 +1,6 @@
 "use client"
 
 import { create } from "zustand"
-import type { TableauConfig } from "./store.types"
 import React from "react"
 import { isLiteMode } from "@/lib/config"
 import { MIGRATION_MODE, MigrationMode } from "@/lib/constants"
@@ -11,12 +10,13 @@ interface UIStore {
   setWorkspace: (workspace: "qlik" | "tableau") => void
   activeTab: "Migration" | "Monitoring" | "Result" | "History"
   setActiveTab: (tab: "Migration" | "Monitoring" | "Result" | "History") => void
-  isSettingsOpen: boolean
-  setSettingsOpen: (open: boolean) => void
+  /** The contextual agent/run panel shown beside migration screens. */
   isSidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
-  tableauConfig: TableauConfig
-  updateTableauConfig: (config: Partial<TableauConfig>) => void
+  /** The primary navigation rail. Collapsed to icons when false. */
+  isNavOpen: boolean
+  setNavOpen: (open: boolean) => void
+  toggleNav: () => void
   migrationMode: MigrationMode
   setMigrationMode: (mode: MigrationMode) => void
 // ... (Assessment Continuation Flow remains below)
@@ -65,10 +65,11 @@ export const useUIStore = create<UIStore>((set, get) => ({
   setWorkspace: (workspace) => set({ workspace }),
   activeTab: "Migration",
   setActiveTab: (tab) => set({ activeTab: tab }),
-  isSettingsOpen: false,
-  setSettingsOpen: (open) => set({ isSettingsOpen: open }),
   isSidebarOpen: true, // Default to true for desktop
   setSidebarOpen: (open) => set({ isSidebarOpen: open }),
+  isNavOpen: true,
+  setNavOpen: (open) => set({ isNavOpen: open }),
+  toggleNav: () => set((state) => ({ isNavOpen: !state.isNavOpen })),
   theme: typeof window !== "undefined" ? (localStorage.getItem("theme") as "light" | "dark") || "light" : "light",
   setTheme: (theme) => {
     set({ theme });
@@ -76,17 +77,6 @@ export const useUIStore = create<UIStore>((set, get) => ({
       localStorage.setItem("theme", theme);
     }
   },
-  tableauConfig: {
-    serverUrl: "",
-    siteId: "",
-    authType: "PAT",
-    tokenName: "",
-    tokenValue: "",
-  },
-  updateTableauConfig: (config) =>
-    set((state) => ({
-      tableauConfig: { ...state.tableauConfig, ...config },
-    })),
   migrationMode: MIGRATION_MODE.STANDARD,
   setMigrationMode: (migrationMode) => set({ migrationMode }),
 
@@ -165,10 +155,8 @@ export const useUIStore = create<UIStore>((set, get) => ({
   fetchTimezone: async (force = false) => {
     if (get().timezoneLoaded && !force) return get().timezone
     try {
-      const { recordsService } = await import("@/services/records.service")
-      // We still fetch settings in case we need other properties, but for timezone we prioritize browser.
-      const data = await recordsService.getSettings()
-      
+      // Detect the browser timezone first — this is the primary source of truth
+      // and does not depend on any backend service.
       let detectedTz = "UTC"
       try {
         detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
@@ -177,21 +165,27 @@ export const useUIStore = create<UIStore>((set, get) => ({
         console.warn("[UIStore] Could not detect browser timezone, falling back to UTC")
       }
 
-      // Always use the browser detected timezone upon load/refresh as the source of truth for the user's current physical location.
       const activeTz = detectedTz;
-      
       set({ timezone: activeTz, timezoneLoaded: true })
       console.log("[UIStore] Timezone initialized to detected region:", activeTz)
 
-      // Silently sync the detected timezone back to the backend if it differs from what was stored
-      let backendTz = data?.settings?.timezone || data?.timezone
-      if (backendTz !== activeTz) {
-        try {
-          await recordsService.updateTimezone(activeTz)
-          console.log("[UIStore] Synced detected timezone to backend:", activeTz)
-        } catch (e) {
-          console.warn("[UIStore] Failed to sync detected timezone to backend", e)
+      // Best-effort: fetch backend settings and sync timezone if it differs.
+      // A backend outage should never block the UI from loading.
+      try {
+        const { recordsService } = await import("@/services/records.service")
+        const data = await recordsService.getSettings()
+
+        let backendTz = data?.settings?.timezone || data?.timezone
+        if (backendTz !== activeTz) {
+          try {
+            await recordsService.updateTimezone(activeTz)
+            console.log("[UIStore] Synced detected timezone to backend:", activeTz)
+          } catch (e) {
+            console.warn("[UIStore] Failed to sync detected timezone to backend", e)
+          }
         }
+      } catch (backendErr) {
+        console.warn("[UIStore] Backend unavailable for timezone sync, using browser timezone:", activeTz)
       }
 
       return activeTz

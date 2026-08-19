@@ -1,573 +1,64 @@
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Spinner } from "@/components/ui/spinner";
 import {
-    Badge,
-    Button,
-    Card,
-    Dialog,
-    DialogBody,
-    DialogContent,
-    DialogSurface,
-    DialogTitle,
-    DialogActions,
-    makeStyles,
-    shorthands,
-    Tab,
-    TabList,
-    Table,
-    TableBody,
-    TableCell,
-    TableHeader,
-    TableHeaderCell,
-    TableRow,
-    Text,
-    tokens,
-    Accordion,
-    AccordionItem,
-    AccordionHeader,
-    AccordionPanel,
-    Spinner
-} from "@fluentui/react-components";
-import {
-    DeviceEq24Regular,
-    ChevronRight20Regular,
-    Dismiss24Regular,
-    CheckmarkCircle24Regular,
-    Lightbulb24Regular,
-    BrainCircuit24Regular,
-    ChevronDown20Regular,
-    ChevronUp20Regular,
-    LockClosed24Regular,
-    Table24Regular,
-    ClipboardTaskListLtr24Regular,
-    Info16Regular,
-    Database24Regular,
-    Link24Regular,
-    Calculator24Regular,
-    ShieldCheckmark24Regular,
-    CursorClick24Regular,
-    Code24Regular,
-    Filter24Regular,
-    Settings24Regular,
-    PlugConnected24Regular,
-    Shapes24Regular,
-    DataPie24Regular,
-    ArrowRight24Regular,
-    ArrowClockwise24Regular,
-    ChevronLeft20Filled,
-    ChevronRight20Filled
-} from "@fluentui/react-icons";
+    ChevronRight,
+    X,
+    CheckCircle2,
+    BrainCircuit,
+    ChevronDown,
+    ChevronUp,
+    Table as TableIcon,
+    ClipboardList,
+    Info,
+    Database,
+    Link as LinkIcon,
+    Calculator,
+    ShieldCheck,
+    MousePointerClick,
+    Code,
+    Filter,
+    Settings,
+    PlugZap,
+    Shapes,
+    PieChart,
+    RefreshCw,
+    ChevronLeft,
+} from "lucide-react";
 import { useValidationStore } from "@/stores/validation.store";
 import { useAuthStore } from "@/stores/auth.store";
 import { ENABLE_RERUN_VALIDATION } from "@/lib/featureFlags";
 import { useState, useRef } from "react";
 
-/* •••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-   DESIGN TOKENS & TYPOGRAPHY
-   Aligned with Analysis, Parsing, and Mapping agents for UI consistency.
- ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••• */
-const T = {
-    font: "'DM Sans','Segoe UI',system-ui,sans-serif",
-    mono: "'Cascadia Code','Fira Code','Consolas',monospace"
-} as const;
+import { T, useGlobalStyles, useFluentStyles } from "./migration-validation/styles";
+import { TechnicalContent } from "./migration-validation/TechnicalContent";
+import { NameReconciliationTable } from "./migration-validation/NameReconciliationTable";
 
-/* •••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-   STYLES  –  – 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 极 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 極 极 global vl-* classes (same system as AssessmentTab / ParsingTab)
-   These provide a unified, premium look across all AI agent tabs.
- ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••• */
-const useGlobalStyles = () => ({
-    container: "vl-container",
-    header: "vl-header",
-    title: "vl-title",
-    subtitle: "vl-subtitle",
-    metricsGrid: "vl-metrics-grid",
-    metricCard: "vl-metric-card",
-    metricValue: "vl-metric-value",
-    metricLabel: "vl-metric-label",
-    sectionCard: "vl-section-card",
-    sectionHeader: "vl-section-header",
-    tableContainer: "vl-table-container",
-    wrapCell: "vl-wrap-cell",
-    emptyState: "vl-empty-state",
-    infoItem: "vl-info-item",
-    infoLabel: "vl-info-label",
-    infoValue: "vl-info-value",
-    grid2: "vl-grid-2",
-    grid3: "vl-grid-3",
-    grid4: "vl-grid-4",
-    sectionIndicator: "vl-section-indicator",
-    sectionTitleText: "vl-section-title-text",
-    categoryList: "vl-category-list",
-});
+const WEIGHT_MAP: Record<string, number> = { regular: 400, medium: 500, semibold: 600, bold: 700 };
+const SIZE_MAP: Record<number, number> = { 100: 10, 200: 12, 300: 14, 400: 16, 500: 20, 600: 24, 700: 28, 800: 32, 900: 40, 1000: 68 };
 
-const useFluentStyles = makeStyles({
-    categoryItem: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "20px 24px",
-        backgroundColor: tokens.colorNeutralBackground1,
-        borderRadius: "16px",
-        ...shorthands.border("1px", "solid", tokens.colorNeutralStroke2),
-        boxShadow: tokens.shadow4,
-        marginBottom: "16px",
-        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-        cursor: "pointer",
-        fontFamily: T.font,
-        ":hover": {
-            boxShadow: tokens.shadow16,
-            transform: "scale(1.005)",
-            ...shorthands.borderColor(tokens.colorBrandStroke1),
-            backgroundColor: tokens.colorNeutralBackground1Hover,
-        },
-    },
-    tabsCard: {
-        backgroundColor: "transparent",
-        boxShadow: "none",
-        ...shorthands.border("none"),
-    },
-    tabContent: {
-        marginTop: "16px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "24px"
-    },
-    categoryInfo: {
-        display: "flex",
-        alignItems: "center",
-        ...shorthands.gap("20px"),
-    },
-    categoryText: {
-        display: "flex",
-        flexDirection: "column",
-        ...shorthands.gap("3px"),
-        fontFamily: T.font,
-    },
-    categoryName: {
-        fontSize: "15px",
-        fontWeight: tokens.fontWeightSemibold,
-        color: tokens.colorNeutralForeground1,
-        fontFamily: T.font,
-        lineHeight: "1.3",
-    },
-    categoryParity: {
-        fontSize: "12px",
-        fontWeight: tokens.fontWeightRegular,
-        color: tokens.colorNeutralForeground3,
-        fontFamily: T.font,
-    },
-    categoryActions: {
-        display: "flex",
-        alignItems: "center",
-        ...shorthands.gap("16px"),
-    },
-    detailCard: {
-        background: tokens.colorNeutralBackground1,
-        borderRadius: "12px",
-        ...shorthands.border("1px", "solid", tokens.colorNeutralStroke2),
-        ...shorthands.overflow("hidden"),
-        boxShadow: tokens.shadow2,
-        fontFamily: T.font,
-    },
-    detailHeader: {
-        ...shorthands.padding("12px", "20px"),
-        background: tokens.colorNeutralBackground2,
-        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center"
-    },
-    codeBlock: {
-        color: tokens.colorNeutralForeground1,
-        fontFamily: T.mono,
-        fontSize: "12px",
-        padding: "16px",
-        background: tokens.colorNeutralBackground3,
-        borderRadius: "8px",
-        ...shorthands.border("1px", "solid", tokens.colorNeutralStroke2),
-        whiteSpace: "pre-wrap",
-        wordBreak: "break-all",
-        overflowWrap: "anywhere",
-        lineHeight: "1.6",
-        overflowX: "auto",
-        maxHeight: "400px",
-        ...shorthands.overflow("auto")
-    },
-    sectionLabel: {
-        fontWeight: tokens.fontWeightSemibold,
-        textTransform: "uppercase",
-        fontSize: "10px",
-        color: tokens.colorNeutralForeground4,
-        letterSpacing: "0.05em",
-        marginBottom: "8px",
-        display: "flex",
-        alignItems: "center",
-        fontFamily: T.font,
-        ...shorthands.gap("6px")
-    },
-    remediationItem: {
-        display: "flex",
-        alignItems: "flex-start",
-        gap: "12px",
-        padding: "14px 18px",
-        backgroundColor: tokens.colorNeutralBackground1,
-        ...shorthands.border("1px", "solid", tokens.colorNeutralStroke2),
-        borderLeft: `5px solid ${tokens.colorPalettePeachBorderActive}`,
-        borderRadius: "8px",
-        boxShadow: tokens.shadow2,
-        transition: "all 0.2s ease-in-out",
-        fontFamily: T.font,
-        ":hover": {
-            boxShadow: tokens.shadow8,
-            transform: "translateY(-2px)",
-            backgroundColor: tokens.colorNeutralBackground1Hover,
-        },
-    },
-    remediationHeader: {
-        fontSize: "13px",
-        fontWeight: tokens.fontWeightSemibold,
-        color: tokens.colorNeutralForeground1,
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-        fontFamily: T.font,
-    },
-    remediationReason: {
-        fontSize: "12px",
-        color: tokens.colorNeutralForeground3,
-        marginTop: "2px",
-        fontFamily: T.font,
-    },
-    aiSummaryCard: {
-        background: `linear-gradient(135deg, ${tokens.colorNeutralBackground1} 0%, ${tokens.colorNeutralBackground2} 100%)`,
-        ...shorthands.border("1px", "solid", tokens.colorNeutralStroke2),
-        borderLeft: `6px solid ${tokens.colorPaletteGreenForeground1}`,
-        borderRadius: "12px",
-        padding: "24px",
-        boxShadow: tokens.shadow4,
-        position: "relative",
-        ...shorthands.overflow("hidden"),
-        marginBottom: "32px",
-        fontFamily: T.font,
-    },
-    sectionLabelUpper: {
-        fontSize: "11px",
-        fontWeight: tokens.fontWeightBold,
-        textTransform: "uppercase",
-        letterSpacing: "0.1em",
-        color: tokens.colorPalettePeachBorderActive,
-        marginBottom: "16px",
-        display: "block",
-    },
-    reconciliationCard: {
-        marginTop: "16px",
-        background: tokens.colorNeutralBackground2,
-        padding: "16px",
-        borderRadius: "12px",
-        ...shorthands.border("1px", "solid", tokens.colorNeutralStroke2),
-    },
-    insightBox: {
-        background: tokens.colorPaletteGreenBackground1,
-        padding: "12px 16px",
-        borderRadius: "8px",
-        ...shorthands.border("1px", "solid", tokens.colorPaletteGreenBorder1),
-        marginTop: "12px",
-    },
-    insightText: {
-        lineHeight: "1.6",
-        color: tokens.colorNeutralForeground2,
-        fontFamily: T.font,
-    },
-    emptyState: {
-        padding: "40px",
-        textAlign: "center",
-        background: tokens.colorNeutralBackground3,
-        borderRadius: "12px",
-        ...shorthands.border("1px", "dashed", tokens.colorNeutralStroke1),
-        fontFamily: T.font,
-    },
-    // New styles for Fluent migration
-    dialogContent: {
-        padding: "8px 24px 24px 24px",
-        display: "flex",
-        flexDirection: "column",
-        ...shorthands.gap("16px"),
-    },
-    comparisonGroup: {
-        display: "flex",
-        flexDirection: "column",
-        ...shorthands.gap("24px"),
-    },
-    comparisonTitle: {
-        color: tokens.colorNeutralForeground2,
-        letterSpacing: "-0.01em",
-        display: "flex",
-        alignItems: "center",
-        ...shorthands.gap("10px"),
-        marginBottom: "8px",
-    },
-    cardActionGroup: {
-        display: "flex",
-        ...shorthands.gap("8px"),
-        alignItems: "center",
-    },
-    cardContent: {
-        padding: "12px 20px 16px 20px",
-        display: "flex",
-        flexDirection: "column",
-        ...shorthands.gap("16px"),
-    },
-    scrollableContent: {
-        flex: 1,
-        overflowY: "auto",
-        scrollBehavior: "smooth",
-        "&::-webkit-scrollbar": {
-            width: "8px",
-        },
-        "&::-webkit-scrollbar-track": {
-            backgroundColor: "transparent",
-        },
-        "&::-webkit-scrollbar-thumb": {
-            backgroundColor: tokens.colorNeutralStroke1,
-            borderRadius: "20px",
-            border: `2px solid ${tokens.colorNeutralBackground1}`,
-        },
-        "&::-webkit-scrollbar-thumb:hover": {
-            backgroundColor: tokens.colorNeutralStroke1Hover,
-        },
-    },
-    sourceBorder: {
-        paddingLeft: "10px",
-        borderLeft: `2px solid ${tokens.colorBrandStroke1}33`,
-    },
-    targetBorder: {
-        paddingLeft: "10px",
-        borderLeft: `2px solid ${tokens.colorPalettePeachBorderActive}33`,
-    },
-    aiSummaryText: {
-        color: tokens.colorNeutralForeground2,
-        lineHeight: "1.7",
-        fontSize: "15px",
-        background: tokens.colorNeutralBackgroundAlpha,
-        padding: "20px",
-        borderRadius: "12px",
-        borderLeft: `3px solid ${tokens.colorNeutralStroke2}`,
-        position: "relative",
-        backgroundImage: `radial-gradient(${tokens.colorNeutralStroke1} 1px, transparent 1px)`,
-        backgroundSize: "20px 20px",
-        fontFamily: T.font,
-    },
-    summaryGrid: {
-        display: "grid",
-        gridTemplateColumns: "repeat(4, 1fr)",
-        gap: "16px",
-    },
-    summaryCard: {
-        background: tokens.colorNeutralBackground1,
-        ...shorthands.border("1px", "solid", tokens.colorNeutralStroke2),
-        borderRadius: "12px",
-        padding: "18px 16px",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        ...shorthands.gap("6px"),
-        boxShadow: tokens.shadow2,
-        fontFamily: T.font,
-        textAlign: "center",
-    },
-    summaryCardLabel: {
-        fontSize: "10px",
-        fontWeight: tokens.fontWeightSemibold,
-        color: tokens.colorNeutralForeground4,
-        textTransform: "uppercase",
-        letterSpacing: "0.08em",
-        fontFamily: T.font,
-    },
-    summaryCardValue: {
-        fontSize: "28px",
-        fontWeight: tokens.fontWeightBold,
-        color: tokens.colorNeutralForeground1,
-        lineHeight: "1.1",
-        fontFamily: T.font,
-    },
-    remediationGrid: {
-        display: "grid",
-        gridTemplateColumns: "1fr",
-        ...shorthands.gap("12px"),
-    },
-    remediationSeverityHeader: {
-        display: "flex",
-        alignItems: "center",
-        ...shorthands.gap("8px"),
-        marginBottom: "4px",
-        fontFamily: T.font,
-    },
-    remediationRecommendationText: {
-        fontSize: "14px",
-        lineHeight: "1.5",
-        fontFamily: T.font,
-    },
-    remediationIssueLabel: {
-        color: tokens.colorNeutralForeground2,
-        fontSize: "11px",
-        fontWeight: tokens.fontWeightSemibold,
-        textTransform: "uppercase",
-        letterSpacing: "0.08em",
-        marginBottom: "12px",
-        display: "block",
-        fontFamily: T.font,
-    },
-    flexColumn: {
-        display: "flex",
-        flexDirection: "column",
-        ...shorthands.gap("8px"),
-    },
-    statusTextMatched: {
-        color: tokens.colorNeutralForeground2,
-        fontWeight: tokens.fontWeightMedium,
-        fontFamily: T.font,
-    },
-    statusTextMissing: {
-        color: tokens.colorPaletteRedForeground1,
-        fontWeight: tokens.fontWeightBold,
-        fontFamily: T.font,
-    },
-    statusTextExtra: {
-        color: tokens.colorPaletteYellowForeground1,
-        fontWeight: tokens.fontWeightBold,
-        fontFamily: T.font,
-    },
-    statusTextPlaceholder: {
-        color: tokens.colorNeutralForeground4,
-        fontFamily: T.font,
-    },
-    // Missing additions for full conversion
-    dialogSurface: {
-        maxWidth: "800px",
-        borderRadius: "12px",
-        fontFamily: T.font,
-    },
-    labelCell: {
-        width: "160px",
-        fontFamily: T.font,
-    },
-    badgeSmall: {
-        fontSize: "13px",
-        padding: "2px 8px",
-    },
-    accuracyMetricValue: {
-        color: tokens.colorNeutralForeground1,
-    },
-    aiSummaryHeader: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        marginBottom: "20px",
-    },
-    headerGroup: {
-        display: "flex",
-        alignItems: "center",
-        ...shorthands.gap("12px"),
-    },
-    iconBox: {
-        background: tokens.colorBrandBackground2,
-        padding: "8px",
-        borderRadius: "8px",
-        display: "flex",
-    },
-    textBlock: {
-        display: "block",
-    },
-    remediationSection: {
-        marginTop: "28px",
-        animationName: {
-            from: { opacity: 0 },
-            to: { opacity: 1 },
-        },
-        animationDuration: "0.3s",
-        animationTimingFunction: "ease-out",
-    },
-    iconInline: {
-        fontSize: "16px",
-        verticalAlign: "middle",
-        marginRight: "6px",
-    },
-    remediationIconContainer: {
-        marginTop: "4px",
-    },
-    remediationStepBadge: {
-        opacity: 0.6,
-    },
-    categorySection: {
-        marginTop: "32px",
-        marginBottom: "40px",
-    },
-    sectionHeader: {
-        display: "flex",
-        alignItems: "center",
-        ...shorthands.gap("12px"),
-        marginBottom: "20px",
-    },
-    sectionIndicator: {
-        height: "24px",
-        width: "4px",
-        background: tokens.colorBrandStroke1,
-        borderRadius: "2px",
-    },
-    sectionTitleText: {
-        color: tokens.colorNeutralForeground1,
-        letterSpacing: "-0.01em",
-        fontFamily: T.font,
-        fontWeight: 600,
-    },
-    categoryList: {
-        display: "flex",
-        flexDirection: "column",
-        ...shorthands.gap("16px"),
-    },
-    headerCell: {
-        fontWeight: 800,
-    },
-    statusHeaderCell: {
-        fontWeight: 800,
-        width: "120px",
-    },
-    groupHeader: {
-        display: "flex",
-        alignItems: "center",
-        ...shorthands.gap("12px"),
-        ...shorthands.padding("12px", "16px"),
-        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-        marginBottom: "16px",
-        marginTop: "24px",
-        cursor: "pointer",
-        borderRadius: "8px",
-        transition: "all 0.2s ease",
-        "&:hover": {
-            background: tokens.colorNeutralBackground1Hover,
-            boxShadow: tokens.shadow2,
-        },
-        "&:first-child": {
-            marginTop: "0px",
-        }
-    },
-    groupTitle: {
-        textTransform: "uppercase",
-        letterSpacing: "0.05em",
-        color: tokens.colorNeutralForeground3,
-        fontSize: "12px",
-        fontWeight: 600,
-    },
-    hoverCard: {
-        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-        boxShadow: tokens.shadow2,
-        ":hover": {
-            transform: "translateY(-3px)",
-            boxShadow: tokens.shadow16,
-            backgroundColor: tokens.colorNeutralBackground1Hover,
-            ...shorthands.borderColor(tokens.colorBrandStroke1),
-        }
-    }
-});
+function Text({
+    weight,
+    size,
+    italic,
+    style,
+    ...props
+}: { weight?: "regular" | "medium" | "semibold" | "bold"; size?: number; italic?: boolean } & React.HTMLAttributes<HTMLSpanElement>) {
+    return (
+        <span
+            style={{
+                fontWeight: weight ? WEIGHT_MAP[weight] : undefined,
+                fontSize: size ? `${SIZE_MAP[size]}px` : undefined,
+                fontStyle: italic ? "italic" : undefined,
+                ...style,
+            }}
+            {...props}
+        />
+    );
+}
+
 
 
 interface MigrationValidationViewProps {
@@ -769,21 +260,21 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
     const getCategoryIcon = (cat: string) => {
         const lowCat = cat.toLowerCase();
         // High priority matches
-        if (lowCat.includes("visual")) return <DataPie24Regular style={{ color: tokens.colorBrandForeground2 }} />;
-        if (lowCat.includes("calculated field") || lowCat.includes("calculation") || lowCat.includes("measure")) return <Calculator24Regular style={{ color: tokens.colorBrandForeground2 }} />;
-        if (lowCat.includes("relationship")) return <Link24Regular style={{ color: tokens.colorBrandForeground2 }} />;
-        if (lowCat.includes("datasource")) return <Database24Regular style={{ color: tokens.colorBrandForeground2 }} />;
-        if (lowCat.includes("connection")) return <PlugConnected24Regular style={{ color: tokens.colorBrandForeground2 }} />;
-        if (lowCat.includes("table")) return <Table24Regular style={{ color: tokens.colorBrandForeground2 }} />;
-        if (lowCat.includes("data validation") || lowCat.includes("fabric")) return <ShieldCheckmark24Regular style={{ color: tokens.colorBrandForeground2 }} />;
-        if (lowCat.includes("action")) return <CursorClick24Regular style={{ color: tokens.colorBrandForeground2 }} />;
-        if (lowCat.includes("sql")) return <Code24Regular style={{ color: tokens.colorBrandForeground2 }} />;
-        if (lowCat.includes("filter")) return <Filter24Regular style={{ color: tokens.colorBrandForeground2 }} />;
-        if (lowCat.includes("parameter")) return <Settings24Regular style={{ color: tokens.colorBrandForeground2 }} />;
-        if (lowCat.includes("set")) return <Shapes24Regular style={{ color: tokens.colorBrandForeground2 }} />;
+        if (lowCat.includes("visual")) return <PieChart style={{ color: "var(--primary)" }} />;
+        if (lowCat.includes("calculated field") || lowCat.includes("calculation") || lowCat.includes("measure")) return <Calculator style={{ color: "var(--primary)" }} />;
+        if (lowCat.includes("relationship")) return <LinkIcon style={{ color: "var(--primary)" }} />;
+        if (lowCat.includes("datasource")) return <Database style={{ color: "var(--primary)" }} />;
+        if (lowCat.includes("connection")) return <PlugZap style={{ color: "var(--primary)" }} />;
+        if (lowCat.includes("table")) return <TableIcon style={{ color: "var(--primary)" }} />;
+        if (lowCat.includes("data validation") || lowCat.includes("fabric")) return <ShieldCheck style={{ color: "var(--primary)" }} />;
+        if (lowCat.includes("action")) return <MousePointerClick style={{ color: "var(--primary)" }} />;
+        if (lowCat.includes("sql")) return <Code style={{ color: "var(--primary)" }} />;
+        if (lowCat.includes("filter")) return <Filter style={{ color: "var(--primary)" }} />;
+        if (lowCat.includes("parameter")) return <Settings style={{ color: "var(--primary)" }} />;
+        if (lowCat.includes("set")) return <Shapes style={{ color: "var(--primary)" }} />;
 
         // Fallback
-        return <BrainCircuit24Regular style={{ color: tokens.colorBrandForeground2 }} />;
+        return <BrainCircuit style={{ color: "var(--primary)" }} />;
     };
 
     /**
@@ -1303,13 +794,13 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
      */
     const getStatusColor = (category: string, statusText?: string) => {
         const text = statusText || getDisplayStatus(category);
-        if (!text) return "subtle";
+        if (!text) return "secondary";
 
         const s = String(text).toLowerCase();
         if (s === "success" || s === "pass" || s === "passed" || s === "fully accurate") return "success";
-        if (s === "failed" || s === "fail" || s === "danger") return "danger";
+        if (s === "failed" || s === "fail" || s === "danger") return "destructive";
         if (s === "partial" || s === "warning") return "warning";
-        return "subtle";
+        return "secondary";
     };
 
     /**
@@ -1528,67 +1019,16 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
     const passedRules = displayedCategories.filter(([cat, status]) => getStatusColor(cat, String(status)) === "success").length;
 
 
-    /**
-     * Technical content formatter and highlighter for SQL/M/DAX expressions
-     */
-    const renderTechnicalContent = (content: string, label: string) => {
-        if (!content) return null;
-        const text = String(content);
-        const lowerLabel = label.toLowerCase();
-        const isSql = lowerLabel.includes('sql');
-        const isMQuery = lowerLabel.includes('m query');
-        const isFormula = lowerLabel.includes('formula') || lowerLabel.includes('expression');
-        const isJoin = lowerLabel.includes('join');
-
-        // 1. Better Formatting for dense blocks (only if they seem unformatted)
-        let formatted = text;
-        if (text.length > 50 && !text.includes('\n')) {
-            if (isSql) {
-                formatted = text
-                    .replace(/SELECT /gi, 'SELECT\n  ')
-                    .replace(/FROM /gi, '\nFROM ')
-                    .replace(/JOIN /gi, '\nJOIN ')
-                    .replace(/WHERE /gi, '\nWHERE ')
-                    .replace(/,/g, ',\n ');
-            } else if (isMQuery) {
-                formatted = text
-                    .replace(/let /g, 'let\n  ')
-                    .replace(/in /g, '\nin ')
-                    .replace(/, /g, ',\n  ');
-            } else if (isFormula) {
-                formatted = text.replace(/ THEN /gi, ' THEN\n  ').replace(/ ELSE /gi, '\nELSE\n  ').replace(/ END/gi, '\nEND');
-            }
-        }
-
-        // 2. Keyword Color Highlighting
-        const sqlKeywords = ['SELECT', 'FROM', 'WHERE', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'ON', 'GROUP BY', 'ORDER BY', 'AND', 'OR', 'AS', 'NOT', 'NULL', 'IS', 'IN'];
-        const mKeywords = ['let', 'in', 'if', 'then', 'else', 'try', 'otherwise', 'error', 'each', 'type', 'true', 'false', 'source', 'import'];
-        const formulaKeywords = ['FIXED', 'INCLUDE', 'EXCLUDE', 'SUM', 'AVG', 'COUNT', 'MIN', 'MAX', 'IF', 'THEN', 'ELSE', 'END', 'CASE', 'WHEN', 'FLOAT', 'INT', 'STRING'];
-
-        let highlighted = formatted;
-        const keywords = isSql ? sqlKeywords : isMQuery ? mKeywords : (isFormula || isJoin) ? formulaKeywords : [];
-
-        // Basic HTML escape to prevent accidental tag injection
-        highlighted = highlighted.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-        keywords.forEach(kw => {
-            const regex = new RegExp(`\\b${kw}\\b`, 'g' + (isSql || isFormula || isJoin ? 'i' : ''));
-            highlighted = highlighted.replace(regex, `<span style="color: ${tokens.colorBrandForeground1}; font-weight: 700;">$&</span>`);
-        });
-
-        return (
-            <div
-                className={fluentStyles.codeBlock}
-                dangerouslySetInnerHTML={{ __html: highlighted }}
-            />
-        );
-    };
+    /** Technical content formatter for SQL/M/formula text. See ./migration-validation. */
+    const renderTechnicalContent = (content: string, label: string) => (
+        <TechnicalContent content={content} label={label} />
+    );
 
     /**
      * Recursive renderer for object properties in detail view
      */
     const renderComplexValue = (v: any, type?: "source" | "target") => {
-        if (v === null || v === undefined) return <Text size={200} style={{ color: tokens.colorNeutralForeground4, fontFamily: T.font }}>-</Text>;
+        if (v === null || v === undefined) return <Text size={200} style={{ color: "var(--text-muted)", fontFamily: T.font }}>-</Text>;
 
         if (typeof v === 'object') {
             // Handle specialized schema_validation or visual_type structures
@@ -1598,7 +1038,7 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                 if (type === "source") {
                     return (
                         <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "4px 0" }}>
-                            <Text size={200} weight="semibold" style={{ color: tokens.colorNeutralForeground1, fontFamily: T.font }}>{String(data.parsing || "N/A")}</Text>
+                            <Text size={200} weight="semibold" style={{ color: "var(--text)", fontFamily: T.font }}>{String(data.parsing || "N/A")}</Text>
                         </div>
                     );
                 }
@@ -1614,7 +1054,7 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                 return (
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "4px 0" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                            <Text size={200} weight="semibold" style={{ color: tokens.colorNeutralForeground1, fontFamily: T.font }}>{String(data.parsing || "N/A")}</Text>
+                            <Text size={200} weight="semibold" style={{ color: "var(--text)", fontFamily: T.font }}>{String(data.parsing || "N/A")}</Text>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                             <Text size={200} weight="semibold" style={{ color: "#0369a1", fontFamily: T.font }}>{String(data.generation || "N/A")}</Text>
@@ -1627,9 +1067,9 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
             if (v.left !== undefined && v.operator !== undefined && v.right !== undefined) {
                 return (
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <Text size={200} weight="medium" style={{ color: tokens.colorNeutralForeground2, fontFamily: T.font }}>{v.left}</Text>
-                        <Badge appearance="outline" size="small" color="subtle" style={{ fontFamily: T.font }}>{v.operator}</Badge>
-                        <Text size={200} weight="medium" style={{ color: tokens.colorNeutralForeground2, fontFamily: T.font }}>{v.right}</Text>
+                        <Text size={200} weight="medium" style={{ color: "var(--text-secondary)", fontFamily: T.font }}>{v.left}</Text>
+                        <Badge variant="secondary" style={{ fontFamily: T.font }}>{v.operator}</Badge>
+                        <Text size={200} weight="medium" style={{ color: "var(--text-secondary)", fontFamily: T.font }}>{v.right}</Text>
                     </div>
                 );
             }
@@ -1654,7 +1094,7 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                     <div className="vl-info-label" style={{ fontSize: "9px", marginBottom: "4px" }}>{ek.replace(/_/g, ' ')}</div>
                                     <div className="vl-info-value" style={{ fontSize: "14px" }}>
                                         {isBoolean ? (
-                                            <Badge appearance="tint" color={boolVal ? "success" : "danger"} size="small">
+                                            <Badge variant={boolVal ? "success" : "destructive"}>
                                                 {boolVal ? "PASS" : "FAIL"}
                                             </Badge>
                                         ) : (
@@ -1673,8 +1113,8 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                         {entries.map(([ek, ev]) => (
                             <div key={ek} style={{ display: "flex", gap: "10px", alignItems: "baseline" }}>
-                                <Text size={100} weight="bold" style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", width: "100px", flexShrink: 0 }}>{ek.replace(/_/g, ' ')}:</Text>
-                                <Text size={200} weight="medium" style={{ color: tokens.colorNeutralForeground1 }}>{String(ev)}</Text>
+                                <Text size={100} weight="bold" style={{ color: "var(--text-muted)", textTransform: "uppercase", width: "100px", flexShrink: 0 }}>{ek.replace(/_/g, ' ')}:</Text>
+                                <Text size={200} weight="medium" style={{ color: "var(--text)" }}>{String(ev)}</Text>
                             </div>
                         ))}
                     </div>
@@ -1683,11 +1123,11 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
 
             // Nested object fallback (Recursive call or simplified label)
             return <div style={{ padding: "8px", border: "1px solid #f1f5f9", borderRadius: "4px", backgroundColor: "#f8fafc" }}>
-                <Text size={200} italic style={{ color: tokens.colorNeutralForeground4 }}>Complex Component Data</Text>
+                <Text size={200} italic style={{ color: "var(--text-muted)" }}>Complex Component Data</Text>
             </div>;
         }
 
-        return <Text size={200} weight="medium" style={{ color: tokens.colorNeutralForeground1, fontFamily: T.font }}>{String(v)}</Text>;
+        return <Text size={200} weight="medium" style={{ color: "var(--text)", fontFamily: T.font }}>{String(v)}</Text>;
     };
 
     const renderObjectProperties = (title: string, objRaw: any, type: "source" | "target", mode: "all" | "properties" | "lists" = "all") => {
@@ -1826,22 +1266,22 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                 <div className={fluentStyles.flexColumn} style={{ gap: "16px" }}>
                     {/* Key-Value Table */}
                     {(mode === "all" || mode === "properties") && tableEntries.length > 0 && (
-                        <Table size="extra-small" className={styles.tableContainer} style={{ margin: 0, width: "100%" }}>
-                            <TableBody>
+                        <table className={styles.tableContainer} style={{ margin: 0, width: "100%", fontSize: "12px" }}>
+                            <tbody>
                                 {tableEntries.map(([label, v], idx) => {
                                     return (
-                                        <TableRow key={idx}>
-                                            <TableCell className={fluentStyles.labelCell}>
-                                                <Text weight="bold" size={200} className={fluentStyles.remediationIssueLabel} style={{ marginBottom: 0 }}>{label}</Text>
-                                            </TableCell>
-                                            <TableCell>
+                                        <tr key={idx}>
+                                            <td className={fluentStyles.labelCell}>
+                                                <span style={{ fontWeight: 700, fontSize: "12px" }} className={fluentStyles.remediationIssueLabel}>{label}</span>
+                                            </td>
+                                            <td>
                                                 {renderComplexValue(v, type)}
-                                            </TableCell>
-                                        </TableRow>
+                                            </td>
+                                        </tr>
                                     );
                                 })}
-                            </TableBody>
-                        </Table>
+                            </tbody>
+                        </table>
                     )}
 
                     {/* Formula/Code blocks (Horizontal layout for Joins, Vertical for others) */}
@@ -1900,14 +1340,14 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                         return (
                             <div key={k} style={{ marginTop: "12px" }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
-                                    <div style={{ backgroundColor: tokens.colorBrandBackground2, padding: "6px", borderRadius: "6px", display: "flex" }}>
+                                    <div style={{ backgroundColor: "var(--primary)", padding: "6px", borderRadius: "6px", display: "flex" }}>
                                         {(() => {
                                             const lowK = k.toLowerCase();
-                                            if (lowK.includes('column')) return <Table24Regular style={{ color: tokens.colorBrandForeground2, fontSize: "16px" }} />;
-                                            if (lowK.includes('calc') || lowK.includes('formula')) return <Calculator24Regular style={{ color: tokens.colorBrandForeground2, fontSize: "16px" }} />;
-                                            if (lowK.includes('matched')) return <CheckmarkCircle24Regular style={{ color: tokens.colorBrandForeground2, fontSize: "16px" }} />;
-                                            if (lowK.includes('missing')) return <Info16Regular style={{ color: tokens.colorBrandForeground2, fontSize: "16px" }} />;
-                                            return <ClipboardTaskListLtr24Regular style={{ color: tokens.colorBrandForeground2, fontSize: "16px" }} />;
+                                            if (lowK.includes('column')) return <TableIcon style={{ color: "var(--primary)", fontSize: "16px" }} />;
+                                            if (lowK.includes('calc') || lowK.includes('formula')) return <Calculator style={{ color: "var(--primary)", fontSize: "16px" }} />;
+                                            if (lowK.includes('matched')) return <CheckCircle2 style={{ color: "var(--primary)", fontSize: "16px" }} />;
+                                            if (lowK.includes('missing')) return <Info style={{ color: "var(--primary)", fontSize: "16px" }} />;
+                                            return <ClipboardList style={{ color: "var(--primary)", fontSize: "16px" }} />;
                                         })()}
                                     </div>
                                     <Text weight="bold" size={200} className={fluentStyles.remediationIssueLabel} style={{ marginBottom: 0 }}>
@@ -1933,12 +1373,12 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                             display: "flex",
                                             alignItems: "center",
                                             gap: "8px",
-                                            color: tokens.colorNeutralForeground4,
+                                            color: "var(--text-muted)",
                                             fontStyle: "italic",
                                             fontSize: "12px",
                                             width: "100%"
                                         }}>
-                                            <Info16Regular /> No data points available for this visual
+                                            <Info /> No data points available for this visual
                                         </div>
                                     ) : list.map((item, nIdx) => {
                                         if (isColumnList) {
@@ -1955,8 +1395,8 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                                     className={fluentStyles.hoverCard}
                                                     style={{
                                                         padding: "16px 20px",
-                                                        backgroundColor: tokens.colorNeutralBackground1,
-                                                        border: `1px solid ${tokens.colorNeutralStroke2}`,
+                                                        backgroundColor: "var(--surface)",
+                                                        border: `1px solid var(--border)`,
                                                         borderRadius: "12px",
                                                         display: "flex",
                                                         alignItems: "center",
@@ -1965,28 +1405,28 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                                     }}
                                                 >
                                                     <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "12px" }}>
-                                                        <Badge appearance="tint" color="informative" size="small">{nIdx + 1}</Badge>
+                                                        <Badge variant="secondary">{nIdx + 1}</Badge>
                                                         <div style={{ display: "flex", flexDirection: "column" }}>
-                                                            <Text weight="bold" size={200} style={{ color: tokens.colorNeutralForeground4, fontSize: "10px" }}>SOURCE</Text>
+                                                            <Text weight="bold" size={200} style={{ color: "var(--text-muted)", fontSize: "10px" }}>SOURCE</Text>
                                                             <Text weight="semibold" size={200}>{sName}</Text>
-                                                            <Text size={100} style={{ color: tokens.colorNeutralForeground3 }}>{sType}</Text>
+                                                            <Text size={100} style={{ color: "var(--text-muted)" }}>{sType}</Text>
                                                         </div>
                                                     </div>
 
-                                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", color: tokens.colorNeutralForeground4 }}>
-                                                        <div style={{ width: "1px", height: "15px", backgroundColor: tokens.colorNeutralStroke1 }}></div>
+                                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", color: "var(--text-muted)" }}>
+                                                        <div style={{ width: "1px", height: "15px", backgroundColor: "var(--border)" }}></div>
                                                         <Text size={100} weight="bold" style={{ margin: "4px 0", fontSize: "9px" }}>VS</Text>
-                                                        <div style={{ width: "1px", height: "15px", backgroundColor: tokens.colorNeutralStroke1 }}></div>
+                                                        <div style={{ width: "1px", height: "15px", backgroundColor: "var(--border)" }}></div>
                                                     </div>
 
                                                     <div style={{ flex: 1, display: "flex", flexDirection: "column", textAlign: "right" }}>
-                                                        <Text weight="bold" size={200} style={{ color: tokens.colorPaletteYellowForeground2, fontSize: "10px" }}>TARGET</Text>
+                                                        <Text weight="bold" size={200} style={{ color: "var(--warning)", fontSize: "10px" }}>TARGET</Text>
                                                         <Text weight="semibold" size={200}>{tName}</Text>
-                                                        <Text size={100} style={{ color: tokens.colorNeutralForeground3 }}>{tType}</Text>
+                                                        <Text size={100} style={{ color: "var(--text-muted)" }}>{tType}</Text>
                                                     </div>
 
                                                     <div style={{ paddingLeft: "12px" }}>
-                                                        <Badge appearance="tint" color={isMatch ? "success" : "warning"} size="small">
+                                                        <Badge variant={isMatch ? "success" : "warning"}>
                                                             {isMatch ? "MATCH" : "DIFF"}
                                                         </Badge>
                                                     </div>
@@ -2024,7 +1464,7 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                                         fontSize: "11px",
                                                         whiteSpace: "pre-wrap",
                                                         wordBreak: "break-all",
-                                                        color: tokens.colorNeutralForeground2,
+                                                        color: "var(--text-secondary)",
                                                         lineHeight: "1.5"
                                                     }}
                                                 >
@@ -2036,8 +1476,7 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                         return (
                                             <Badge
                                                 key={nIdx}
-                                                appearance="tint"
-                                                color={isMatched ? "success" : isMissing ? "danger" : "informative"}
+                                                variant={isMatched ? "success" : isMissing ? "destructive" : "secondary"}
                                                 className={fluentStyles.badgeSmall}
                                                 style={{ height: "auto", minHeight: "22px", padding: "4px 10px" }}
                                             >
@@ -2075,59 +1514,10 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
     };
 
 
-    /**
-     * Name reconciliation table for metrics summary
-     */
-    const renderNameReconciliation = (catMetrics: any) => {
-        if (!catMetrics) return null;
-
-        const originalNames = catMetrics.original_names || [];
-        const matchedNames = catMetrics.matched_names || catMetrics.mapped_names || catMetrics.names || [];
-        const missingNames = catMetrics.missing_names || [];
-        const extraNames = catMetrics.extra_names || []; // If target has something not in source
-
-        if (originalNames.length === 0 && matchedNames.length === 0 && missingNames.length === 0 && extraNames.length === 0) return null;
-
-        return (
-            <div className={fluentStyles.reconciliationCard}>
-                <div className={fluentStyles.sectionLabel}>
-                    <span style={{ fontSize: "16px" }}>ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹</span> Name Reconciliation
-                </div>
-                <Table size="extra-small" aria-label="Name reconciliation table">
-                    <TableHeader>
-                        <TableRow>
-                            <TableHeaderCell className={fluentStyles.statusHeaderCell}>Status</TableHeaderCell>
-                            <TableHeaderCell className={fluentStyles.headerCell}>Tableau Name (Source)</TableHeaderCell>
-                            <TableHeaderCell className={fluentStyles.headerCell}>Power BI Name (Target)</TableHeaderCell>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {matchedNames.map((name: string, i: number) => (
-                            <TableRow key={`matched-${i}`}>
-                                <TableCell><Badge appearance="tint" color="success">PASS</Badge></TableCell>
-                                <TableCell className={fluentStyles.statusTextMatched}>{name}</TableCell>
-                                <TableCell className={fluentStyles.statusTextMatched}>{name}</TableCell>
-                            </TableRow>
-                        ))}
-                        {missingNames.map((name: string, i: number) => (
-                            <TableRow key={`missing-${i}`}>
-                                <TableCell><Badge appearance="tint" color="danger">Missing</Badge></TableCell>
-                                <TableCell className={fluentStyles.statusTextMissing}>{name}</TableCell>
-                                <TableCell className={fluentStyles.statusTextPlaceholder}>-</TableCell>
-                            </TableRow>
-                        ))}
-                        {extraNames.map((name: string, i: number) => (
-                            <TableRow key={`extra-${i}`}>
-                                <TableCell><Badge appearance="tint" color="warning">Extra</Badge></TableCell>
-                                <TableCell className={fluentStyles.statusTextPlaceholder}>-</TableCell>
-                                <TableCell className={fluentStyles.statusTextExtra}>{name}</TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </div>
-        );
-    };
+    /** Name reconciliation table for metrics summary. See ./migration-validation. */
+    const renderNameReconciliation = (catMetrics: any) => (
+        <NameReconciliationTable categoryMetrics={catMetrics} />
+    );
 
     /**
      * Renders the Technical Logs tab content
@@ -2384,11 +1774,11 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                 if (value === undefined || value === null || value === "" || value === "N/A" || value === "Missing in Generation") return null;
                 return (
                     <div style={{ marginBottom: "12px", display: isCode ? "block" : "flex", alignItems: "baseline", gap: "10px" }}>
-                        <Text size={200} weight="bold" style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", width: isCode ? "100%" : "85px", flexShrink: 0, marginBottom: isCode ? "6px" : 0, display: "block" }}>{label}</Text>
+                        <Text size={200} weight="bold" style={{ color: "var(--text-muted)", textTransform: "uppercase", width: isCode ? "100%" : "85px", flexShrink: 0, marginBottom: isCode ? "6px" : 0, display: "block" }}>{label}</Text>
                         {isCode ? (
                             renderTechnicalContent(String(value), label)
                         ) : (
-                            <Text size={200} weight="medium" style={{ color: tokens.colorNeutralForeground1 }}>{String(value)}</Text>
+                            <Text size={200} weight="medium" style={{ color: "var(--text)" }}>{String(value)}</Text>
                         )}
                     </div>
                 );
@@ -2409,8 +1799,8 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                         {/* Tableau Side */}
                         <div className={fluentStyles.sourceBorder} style={{ padding: "12px" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                                <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: tokens.colorBrandBackground }}></div>
-                                <Text weight="bold" size={200} style={{ color: tokens.colorBrandForeground1, textTransform: "uppercase", letterSpacing: "0.05em" }}>TABLEAU EXPRESSION</Text>
+                                <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--primary)" }}></div>
+                                <Text weight="bold" size={200} style={{ color: "var(--primary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>TABLEAU EXPRESSION</Text>
                             </div>
                             {renderField("Formula", item.parsing_formula || item.tableau_formula || item.source_formula || item.formula, true)}
                         </div>
@@ -2418,8 +1808,8 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                         {/* Power BI Side */}
                         <div className={fluentStyles.targetBorder} style={{ padding: "12px" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                                <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: tokens.colorPaletteYellowBackground3 }}></div>
-                                <Text weight="bold" size={200} style={{ color: tokens.colorPaletteYellowForeground2, textTransform: "uppercase", letterSpacing: "0.05em" }}>POWER BI DAX</Text>
+                                <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--warning-subtle)" }}></div>
+                                <Text weight="bold" size={200} style={{ color: "var(--warning)", textTransform: "uppercase", letterSpacing: "0.05em" }}>POWER BI DAX</Text>
                             </div>
                             {renderField("Formula", item.generation_formula || item.powerbi_formula || item.target_formula || item.formula, true)}
                             {/* DAX Query removed as per user request */}
@@ -2462,22 +1852,21 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                 <div key={groupName ? `${groupName}-${idx}` : idx} className={fluentStyles.detailCard}>
                     <div className={fluentStyles.detailHeader}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                            <Text weight="bold" size={400} style={{ color: tokens.colorNeutralForeground1 }}>
+                            <Text weight="bold" size={400} style={{ color: "var(--text)" }}>
                                 {idx + 1}. {itemName}
                             </Text>
-                            {item.table && <Badge appearance="tint" color="subtle" size="medium">{item.table}</Badge>}
+                            {item.table && <Badge variant="secondary">{item.table}</Badge>}
                         </div>
                         <div className={fluentStyles.cardActionGroup}>
                             {(accuracy !== undefined && accuracy !== null) && (
                                 <Badge
-                                    appearance="tint"
-                                    color={parseFloat(String(accuracy)) >= 100 ? "success" : "warning"}
+                                    variant={parseFloat(String(accuracy)) >= 100 ? "success" : "warning"}
                                     style={{ fontWeight: 700 }}
                                 >
                                     {String(accuracy).includes('%') ? accuracy : `${accuracy}%`}
                                 </Badge>
                             )}
-                            <Badge appearance="outline" color={getStatusColor("", status)}>
+                            <Badge variant={getStatusColor("", status)}>
                                 {status || "PARTIAL"}
                             </Badge>
                         </div>
@@ -2493,26 +1882,26 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px" }}>
                                     {/* Col 1: Tableau Source */}
                                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                                        <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.02em" }}>Source Data in Tableau</Text>
-                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", display: "flex", flexDirection: "column", gap: "8px", border: `1px solid ${tokens.colorNeutralStroke2}`, background: tokens.colorNeutralBackground2 }}>
-                                            <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Row Count</Text>
-                                            <Text weight="bold" size={600} style={{ color: tokens.colorNeutralForeground1 }}>{item.parsing_row_count ?? item.source_row_count ?? "N/A"}</Text>
+                                        <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>Source Data in Tableau</Text>
+                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", display: "flex", flexDirection: "column", gap: "8px", border: `1px solid var(--border)`, background: "var(--surface-subtle)" }}>
+                                            <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Row Count</Text>
+                                            <Text weight="bold" size={600} style={{ color: "var(--text)" }}>{item.parsing_row_count ?? item.source_row_count ?? "N/A"}</Text>
                                         </div>
                                     </div>
 
                                     {/* Col 2: Power BI Target */}
                                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                                        <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.02em" }}>Target Data in Power BI</Text>
-                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", display: "flex", flexDirection: "column", gap: "8px", border: `1px solid ${tokens.colorNeutralStroke2}`, background: tokens.colorNeutralBackground2 }}>
-                                            <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Row Count</Text>
-                                            <Text weight="bold" size={600} style={{ color: tokens.colorNeutralForeground1 }}>{item.fabric_row_count ?? item.target_row_count ?? "N/A"}</Text>
+                                        <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>Target Data in Power BI</Text>
+                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", display: "flex", flexDirection: "column", gap: "8px", border: `1px solid var(--border)`, background: "var(--surface-subtle)" }}>
+                                            <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Row Count</Text>
+                                            <Text weight="bold" size={600} style={{ color: "var(--text)" }}>{item.fabric_row_count ?? item.target_row_count ?? "N/A"}</Text>
                                         </div>
                                     </div>
 
                                     {/* Col 3: Deviation */}
                                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                                        <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.02em" }}>Deviation</Text>
-                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px 20px", display: "flex", justifyContent: "center", alignItems: "center", border: `1px solid ${tokens.colorNeutralStroke2}`, background: tokens.colorNeutralBackground2 }}>
+                                        <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>Deviation</Text>
+                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px 20px", display: "flex", justifyContent: "center", alignItems: "center", border: `1px solid var(--border)`, background: "var(--surface-subtle)" }}>
                                             <div className={parseFloat(item.deviation_percentage || "0") === 0 ? "vl-match-badge" : "vl-diff-badge"} style={{ padding: "6px 24px", fontSize: "14px" }}>
                                                 {item.deviation_percentage || "0%"}
                                             </div>
@@ -2536,36 +1925,34 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px" }}>
                                                     {/* Col 1: Tableau Source */}
                                                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                                                        <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.02em" }}>Source Data in Tableau</Text>
-                                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", display: "flex", flexDirection: "column", gap: "8px", border: `1px solid ${tokens.colorNeutralStroke2}` }}>
-                                                            <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Column Count</Text>
-                                                            <Text weight="bold" size={600} style={{ color: tokens.colorNeutralForeground1 }}>{schemaParity.parsing_column_count ?? "0"}</Text>
+                                                        <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>Source Data in Tableau</Text>
+                                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", display: "flex", flexDirection: "column", gap: "8px", border: `1px solid var(--border)` }}>
+                                                            <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Column Count</Text>
+                                                            <Text weight="bold" size={600} style={{ color: "var(--text)" }}>{schemaParity.parsing_column_count ?? "0"}</Text>
                                                         </div>
                                                     </div>
 
                                                     {/* Col 2: Power BI Target */}
                                                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                                                        <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.02em" }}>Target Data in Power BI</Text>
-                                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", display: "flex", flexDirection: "column", gap: "8px", border: `1px solid ${tokens.colorNeutralStroke2}` }}>
-                                                            <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Column Count</Text>
-                                                            <Text weight="bold" size={600} style={{ color: tokens.colorNeutralForeground1 }}>{schemaParity.generation_column_count ?? "0"}</Text>
+                                                        <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>Target Data in Power BI</Text>
+                                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", display: "flex", flexDirection: "column", gap: "8px", border: `1px solid var(--border)` }}>
+                                                            <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Column Count</Text>
+                                                            <Text weight="bold" size={600} style={{ color: "var(--text)" }}>{schemaParity.generation_column_count ?? "0"}</Text>
                                                         </div>
                                                     </div>
 
                                                     {/* Col 3: Status */}
                                                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                                                        <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.02em" }}>Status</Text>
-                                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px 20px", display: "flex", justifyContent: "center", alignItems: "center", border: `1px solid ${tokens.colorNeutralStroke2}` }}>
+                                                        <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>Status</Text>
+                                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px 20px", display: "flex", justifyContent: "center", alignItems: "center", border: `1px solid var(--border)` }}>
                                                             <Badge
-                                                                appearance="tint"
-                                                                color={(schemaParity.column_count_match === true || String(schemaParity.column_count_match).toLowerCase() === "true" || schemaParity.column_count_match === "MATCHED" || schemaParity.column_count_match === "PASS") ? "success" : "warning"}
-                                                                size="large"
+                                                                variant={(schemaParity.column_count_match === true || String(schemaParity.column_count_match).toLowerCase() === "true" || schemaParity.column_count_match === "MATCHED" || schemaParity.column_count_match === "PASS") ? "success" : "warning"}
                                                                 style={{ 
                                                                     padding: "6px 24px", 
                                                                     borderRadius: "20px", 
                                                                     fontWeight: "bold",
-                                                                    border: `1px solid ${tokens.colorPaletteGreenForeground1}`,
-                                                                    color: tokens.colorPaletteGreenForeground1,
+                                                                    border: `1px solid var(--success)`,
+                                                                    color: "var(--success)",
                                                                     fontSize: "14px"
                                                                 }}
                                                             >
@@ -2578,24 +1965,24 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                                 {/* BOTTOM: DATATYPE AUDIT STRIP WITH SUB-CARDS */}
                                                 <div style={{ 
                                                     padding: "20px", 
-                                                    background: tokens.colorNeutralBackground2, 
+                                                    background: "var(--surface-subtle)", 
                                                     borderRadius: "12px", 
-                                                    border: `1px solid ${tokens.colorNeutralStroke2}`,
+                                                    border: `1px solid var(--border)`,
                                                     marginTop: "10px"
                                                 }}>
                                                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px" }}>
-                                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", background: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}` }}>
-                                                            <Text size={100} weight="bold" style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "8px" }}>Datatype Matched</Text>
-                                                            <Text weight="bold" size={600} style={{ color: tokens.colorPaletteGreenForeground1 }}>{schemaParity.datatype_matches ?? "0"}</Text>
+                                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", background: "var(--surface)", border: `1px solid var(--border)` }}>
+                                                            <Text size={100} weight="bold" style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "8px" }}>Datatype Matched</Text>
+                                                            <Text weight="bold" size={600} style={{ color: "var(--success)" }}>{schemaParity.datatype_matches ?? "0"}</Text>
                                                         </div>
-                                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", background: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}` }}>
-                                                            <Text size={100} weight="bold" style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "8px" }}>Datatype Mismatched</Text>
-                                                            <Text weight="bold" size={600} style={{ color: tokens.colorPalettePeachBorderActive }}>{schemaParity.datatype_mismatches ?? "0"}</Text>
+                                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", background: "var(--surface)", border: `1px solid var(--border)` }}>
+                                                            <Text size={100} weight="bold" style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "8px" }}>Datatype Mismatched</Text>
+                                                            <Text weight="bold" size={600} style={{ color: "var(--warning)" }}>{schemaParity.datatype_mismatches ?? "0"}</Text>
                                                         </div>
-                                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", background: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}` }}>
-                                                            <Text size={100} weight="bold" style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "8px" }}>Datatype Accuracy</Text>
+                                                        <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", background: "var(--surface)", border: `1px solid var(--border)` }}>
+                                                            <Text size={100} weight="bold" style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "8px" }}>Datatype Accuracy</Text>
                                                             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                                                <Text weight="bold" size={600} style={{ color: tokens.colorNeutralForeground1 }}>{schemaParity.column_datatype_accuracy ?? item.accuracy_percentage ?? "100%"}</Text>
+                                                                <Text weight="bold" size={600} style={{ color: "var(--text)" }}>{schemaParity.column_datatype_accuracy ?? item.accuracy_percentage ?? "100%"}</Text>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -2618,15 +2005,15 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px" }}>
                                         {/* Col 1: Tableau Source */}
                                         <div style={{ display: "flex", flexDirection: "column", gap: "12px", minWidth: 0 }}>
-                                            <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.02em" }}>Source Visual in Tableau</Text>
-                                            <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", display: "flex", flexDirection: "column", gap: "8px", border: `1px solid ${tokens.colorNeutralStroke2}`, background: tokens.colorNeutralBackground2 }}>
-                                                <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Visual Type</Text>
-                                                <Text weight="bold" size={400} style={{ color: tokens.colorNeutralForeground1 }}>{item.schema_validation?.visual_type?.parsing ?? item.parsing_visual_type ?? item.source_visual_type ?? "N/A"}</Text>
-                                                {item.sheet_name && <Text size={100} style={{ color: tokens.colorNeutralForeground3, wordBreak: "break-word" }}>Sheet: {item.sheet_name}</Text>}
+                                            <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>Source Visual in Tableau</Text>
+                                            <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", display: "flex", flexDirection: "column", gap: "8px", border: `1px solid var(--border)`, background: "var(--surface-subtle)" }}>
+                                                <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Visual Type</Text>
+                                                <Text weight="bold" size={400} style={{ color: "var(--text)" }}>{item.schema_validation?.visual_type?.parsing ?? item.parsing_visual_type ?? item.source_visual_type ?? "N/A"}</Text>
+                                                {item.sheet_name && <Text size={100} style={{ color: "var(--text-muted)", wordBreak: "break-word" }}>Sheet: {item.sheet_name}</Text>}
                                                 {item.schema_validation?.visual_type?.sub_visual_types && (
                                                     <div style={{ marginTop: "4px", display: "flex", flexDirection: "column", gap: "2px" }}>
                                                         {item.schema_validation.visual_type.sub_visual_types.map((sub: any, sIdx: number) => (
-                                                            <Text key={sIdx} size={100} style={{ color: tokens.colorNeutralForeground4 }}>• {sub.field}: {sub.type}</Text>
+                                                            <Text key={sIdx} size={100} style={{ color: "var(--text-muted)" }}>• {sub.field}: {sub.type}</Text>
                                                         ))}
                                                     </div>
                                                 )}
@@ -2635,11 +2022,11 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
 
                                         {/* Col 2: Power BI Target */}
                                         <div style={{ display: "flex", flexDirection: "column", gap: "12px", minWidth: 0 }}>
-                                            <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.02em" }}>Target Visual in Power BI</Text>
-                                            <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", display: "flex", flexDirection: "column", gap: "8px", border: `1px solid ${tokens.colorNeutralStroke2}`, background: tokens.colorNeutralBackground2 }}>
-                                                <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Visual Type</Text>
-                                                <Text weight="bold" size={400} style={{ color: tokens.colorNeutralForeground1 }}>{item.schema_validation?.visual_type?.generation ?? item.generation_visual_type ?? item.target_visual_type ?? "N/A"}</Text>
-                                                {item.generation_visual_name && <Text size={100} style={{ color: tokens.colorNeutralForeground3, wordBreak: "break-word" }}>{item.generation_visual_name}</Text>}
+                                            <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>Target Visual in Power BI</Text>
+                                            <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", display: "flex", flexDirection: "column", gap: "8px", border: `1px solid var(--border)`, background: "var(--surface-subtle)" }}>
+                                                <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Visual Type</Text>
+                                                <Text weight="bold" size={400} style={{ color: "var(--text)" }}>{item.schema_validation?.visual_type?.generation ?? item.generation_visual_type ?? item.target_visual_type ?? "N/A"}</Text>
+                                                {item.generation_visual_name && <Text size={100} style={{ color: "var(--text-muted)", wordBreak: "break-word" }}>{item.generation_visual_name}</Text>}
                                             </div>
                                         </div>
 
@@ -2650,8 +2037,8 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                             const accStr = itemAcc ? (String(itemAcc).includes('%') ? String(itemAcc) : `${itemAcc}%`) : "0%";
                                             return (
                                                 <div style={{ display: "flex", flexDirection: "column", gap: "12px", minWidth: 0 }}>
-                                                    <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.02em" }}>Accuracy</Text>
-                                                    <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px 20px", display: "flex", justifyContent: "center", alignItems: "center", border: `1px solid ${tokens.colorNeutralStroke2}`, background: tokens.colorNeutralBackground2 }}>
+                                                    <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>Accuracy</Text>
+                                                    <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px 20px", display: "flex", justifyContent: "center", alignItems: "center", border: `1px solid var(--border)`, background: "var(--surface-subtle)" }}>
                                                         <div className={accNum >= 100 ? "vl-match-badge" : "vl-diff-badge"} style={{ padding: "6px 24px", fontSize: "14px" }}>
                                                             {accStr}
                                                         </div>
@@ -2681,12 +2068,12 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
 
                                         return (
                                             <div style={{ marginTop: "4px" }}>
-                                                <Text weight="bold" size={200} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "16px" }}>
+                                                <Text weight="bold" size={200} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "16px" }}>
                                                     Data Comparison — Tableau vs Power BI
                                                 </Text>
 
                                                 {/* ONE TABLE for the whole visual, grouped by fields */}
-                                                <div style={{ backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: "12px", overflow: "hidden", boxShadow: tokens.shadow2 }}>
+                                                <div style={{ backgroundColor: "var(--surface)", border: `1px solid var(--border)`, borderRadius: "12px", overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
                                                     {(() => {
                                                         const srcRow0 = sourceRows[0] ?? null;
                                                         const actRow0 = actualRows[0] ?? null;
@@ -2795,41 +2182,40 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                                         if (alignedFields.length === 0) {
                                                             return (
                                                                 <div style={{ padding: "16px", textAlign: "center" }}>
-                                                                    <Text size={200} style={{ color: tokens.colorNeutralForeground4 }}>No field data available</Text>
+                                                                    <Text size={200} style={{ color: "var(--text-muted)" }}>No field data available</Text>
                                                                 </div>
                                                             );
                                                         }
 
                                                         return (
                                                             <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "12px" }}>
-                                                                <div style={{ display: "flex", border: `1px solid ${tokens.colorNeutralStroke1}`, borderRadius: "12px", overflow: "hidden", boxShadow: tokens.shadow2, backgroundColor: tokens.colorNeutralBackground1 }}>
+                                                                <div style={{ display: "flex", border: `1px solid var(--border)`, borderRadius: "12px", overflow: "hidden", boxShadow: "var(--shadow-sm)", backgroundColor: "var(--surface)" }}>
                                                                     
                                                                     {/* ── TABLEAU SECTION ── */}
-                                                                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", borderRight: `1px solid ${tokens.colorNeutralStroke1}`, position: "relative" }}>
-                                                                        <div style={{ padding: "14px", textAlign: "center", backgroundColor: tokens.colorNeutralBackground2, borderBottom: `2px solid ${tokens.colorNeutralStroke1}`, height: "48px", boxSizing: "border-box" }}>
+                                                                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", borderRight: `1px solid var(--border)`, position: "relative" }}>
+                                                                        <div style={{ padding: "14px", textAlign: "center", backgroundColor: "var(--surface-subtle)", borderBottom: `2px solid var(--border)`, height: "48px", boxSizing: "border-box" }}>
                                                                             <Text size={300} weight="bold" style={{ color: "#0f6cbd", textTransform: "uppercase", letterSpacing: "0.08em" }}>Tableau</Text>
                                                                         </div>
                                                                         
                                                                         <div style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column" }}>
                                                                             {/* Left Navigation Zone */}
                                                                             {alignedFields.length > 2 && (
-                                                                                <div style={{ position: "absolute", left: 0, top: "1px", height: "40px", width: "40px", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "flex-start", paddingLeft: "4px", background: `linear-gradient(to right, ${tokens.colorNeutralBackground2} 60%, transparent)` }}>
-                                                                                    <Button 
-                                                                                        appearance="subtle"
-                                                                                        icon={<ChevronLeft20Filled style={{ fontSize: "18px", color: "#0f6cbd" }} />}
+                                                                                <div style={{ position: "absolute", left: 0, top: "1px", height: "40px", width: "40px", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "flex-start", paddingLeft: "4px", background: `linear-gradient(to right, var(--surface-subtle) 60%, transparent)` }}>
+                                                                                    <Button
+                                                                                        variant="ghost"
                                                                                         style={{ minWidth: "24px", height: "32px", padding: 0 }}
                                                                                         onClick={() => document.getElementById(`scroll-t-${idx}`)?.scrollBy({ left: -250, behavior: "smooth" })}
-                                                                                    />
+                                                                                    ><ChevronLeft style={{ fontSize: "18px", color: "#0f6cbd" }} /></Button>
                                                                                 </div>
                                                                             )}
-                                                                            
+
                                                                             <div id={`scroll-t-${idx}`} style={{ overflowX: "auto", paddingBottom: "4px", scrollBehavior: "smooth" }}>
                                                                                 <div style={{ width: "max-content", minWidth: "100%" }}>
                                                                                     {/* Field Headers */}
-                                                                                    <div style={{ display: "grid", gridTemplateColumns: alignedFields.length > 2 ? `repeat(${alignedFields.length}, 50%)` : `repeat(${alignedFields.length}, 1fr)`, borderBottom: `1px solid ${tokens.colorNeutralStroke1}`, borderTop: `1px solid ${tokens.colorNeutralStroke1}`, height: "42px", boxSizing: "border-box" }}>
+                                                                                    <div style={{ display: "grid", gridTemplateColumns: alignedFields.length > 2 ? `repeat(${alignedFields.length}, 50%)` : `repeat(${alignedFields.length}, 1fr)`, borderBottom: `1px solid var(--border)`, borderTop: `1px solid var(--border)`, height: "42px", boxSizing: "border-box" }}>
                                                                                         {alignedFields.map((field, fIdx) => (
-                                                                                            <div key={`th-t-${fIdx}`} style={{ padding: "10px 16px", borderRight: fIdx < alignedFields.length - 1 ? `1px solid ${tokens.colorNeutralStroke1}` : "none", backgroundColor: tokens.colorNeutralBackground2, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                                                                                <Text size={100} weight="bold" style={{ color: tokens.colorNeutralForeground1, textTransform: "uppercase", fontSize: "10px", textAlign: "center" }}>{field.srcKey ? cleanKey(field.srcKey) : "—"}</Text>
+                                                                                            <div key={`th-t-${fIdx}`} style={{ padding: "10px 16px", borderRight: fIdx < alignedFields.length - 1 ? `1px solid var(--border)` : "none", backgroundColor: "var(--surface-subtle)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                                                                <Text size={100} weight="bold" style={{ color: "var(--text)", textTransform: "uppercase", fontSize: "10px", textAlign: "center" }}>{field.srcKey ? cleanKey(field.srcKey) : "—"}</Text>
                                                                                             </div>
                                                                                         ))}
                                                                                     </div>
@@ -2837,12 +2223,12 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                                                                     {Array.from({ length: numRows }, (_, rowIdx) => {
                                                                                         const srcRow = sourceRows[rowIdx] ?? null;
                                                                                         return (
-                                                                                            <div key={`tr-t-${rowIdx}`} style={{ display: "grid", gridTemplateColumns: alignedFields.length > 2 ? `repeat(${alignedFields.length}, 50%)` : `repeat(${alignedFields.length}, 1fr)`, borderBottom: `1px solid ${tokens.colorNeutralStroke1}`, height: "52px", boxSizing: "border-box" }}>
+                                                                                            <div key={`tr-t-${rowIdx}`} style={{ display: "grid", gridTemplateColumns: alignedFields.length > 2 ? `repeat(${alignedFields.length}, 50%)` : `repeat(${alignedFields.length}, 1fr)`, borderBottom: `1px solid var(--border)`, height: "52px", boxSizing: "border-box" }}>
                                                                                                 {alignedFields.map((field, fIdx) => {
                                                                                                     const val = srcRow && field.srcKey ? srcRow[field.srcKey] : undefined;
                                                                                                     return (
-                                                                                                        <div key={`td-t-${fIdx}`} style={{ padding: "8px 16px", borderRight: fIdx < alignedFields.length - 1 ? `1px solid ${tokens.colorNeutralStroke1}` : "none", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: rowIdx % 2 === 0 ? "#ffffff" : "#fafafa" }}>
-                                                                                                            <Text size={200} style={{ color: tokens.colorNeutralForeground1, fontWeight: 500, display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: "1.2", textAlign: "center" }}>{val === undefined || field.srcKey === null ? "—" : tryFormatNumber(val)}</Text>
+                                                                                                        <div key={`td-t-${fIdx}`} style={{ padding: "8px 16px", borderRight: fIdx < alignedFields.length - 1 ? `1px solid var(--border)` : "none", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: rowIdx % 2 === 0 ? "#ffffff" : "#fafafa" }}>
+                                                                                                            <Text size={200} style={{ color: "var(--text)", fontWeight: 500, display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: "1.2", textAlign: "center" }}>{val === undefined || field.srcKey === null ? "—" : tryFormatNumber(val)}</Text>
                                                                                                         </div>
                                                                                                     );
                                                                                                 })}
@@ -2854,44 +2240,42 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
 
                                                                             {/* Right Navigation Zone */}
                                                                             {alignedFields.length > 2 && (
-                                                                                <div style={{ position: "absolute", right: 0, top: "1px", height: "40px", width: "40px", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: "4px", background: `linear-gradient(to left, ${tokens.colorNeutralBackground2} 60%, transparent)` }}>
-                                                                                    <Button 
-                                                                                        appearance="subtle"
-                                                                                        icon={<ChevronRight20Filled style={{ fontSize: "18px", color: "#0f6cbd" }} />}
+                                                                                <div style={{ position: "absolute", right: 0, top: "1px", height: "40px", width: "40px", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: "4px", background: `linear-gradient(to left, var(--surface-subtle) 60%, transparent)` }}>
+                                                                                    <Button
+                                                                                        variant="ghost"
                                                                                         style={{ minWidth: "24px", height: "32px", padding: 0 }}
                                                                                         onClick={() => document.getElementById(`scroll-t-${idx}`)?.scrollBy({ left: 250, behavior: "smooth" })}
-                                                                                    />
+                                                                                    ><ChevronRight style={{ fontSize: "18px", color: "#0f6cbd" }} /></Button>
                                                                                 </div>
                                                                             )}
                                                                         </div>
                                                                     </div>
 
                                                                     {/* ── POWER BI SECTION ── */}
-                                                                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", borderRight: `1px solid ${tokens.colorNeutralStroke1}`, position: "relative" }}>
-                                                                        <div style={{ padding: "14px", textAlign: "center", backgroundColor: tokens.colorNeutralBackground2, borderBottom: `2px solid ${tokens.colorNeutralStroke1}`, height: "48px", boxSizing: "border-box" }}>
+                                                                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", borderRight: `1px solid var(--border)`, position: "relative" }}>
+                                                                        <div style={{ padding: "14px", textAlign: "center", backgroundColor: "var(--surface-subtle)", borderBottom: `2px solid var(--border)`, height: "48px", boxSizing: "border-box" }}>
                                                                             <Text size={300} weight="bold" style={{ color: "#f59e0b", textTransform: "uppercase", letterSpacing: "0.08em" }}>Power BI</Text>
                                                                         </div>
                                                                         
                                                                         <div style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column" }}>
                                                                             {/* Left Navigation Zone */}
                                                                             {alignedFields.length > 2 && (
-                                                                                <div style={{ position: "absolute", left: 0, top: "1px", height: "40px", width: "40px", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "flex-start", paddingLeft: "4px", background: `linear-gradient(to right, ${tokens.colorNeutralBackground2} 60%, transparent)` }}>
-                                                                                    <Button 
-                                                                                        appearance="subtle"
-                                                                                        icon={<ChevronLeft20Filled style={{ fontSize: "18px", color: "#f59e0b" }} />}
+                                                                                <div style={{ position: "absolute", left: 0, top: "1px", height: "40px", width: "40px", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "flex-start", paddingLeft: "4px", background: `linear-gradient(to right, var(--surface-subtle) 60%, transparent)` }}>
+                                                                                    <Button
+                                                                                        variant="ghost"
                                                                                         style={{ minWidth: "24px", height: "32px", padding: 0 }}
                                                                                         onClick={() => document.getElementById(`scroll-p-${idx}`)?.scrollBy({ left: -250, behavior: "smooth" })}
-                                                                                    />
+                                                                                    ><ChevronLeft style={{ fontSize: "18px", color: "#f59e0b" }} /></Button>
                                                                                 </div>
                                                                             )}
 
                                                                             <div id={`scroll-p-${idx}`} style={{ overflowX: "auto", paddingBottom: "4px", scrollBehavior: "smooth" }}>
                                                                                 <div style={{ width: "max-content", minWidth: "100%" }}>
                                                                                     {/* Field Headers */}
-                                                                                    <div style={{ display: "grid", gridTemplateColumns: alignedFields.length > 2 ? `repeat(${alignedFields.length}, 50%)` : `repeat(${alignedFields.length}, 1fr)`, borderBottom: `1px solid ${tokens.colorNeutralStroke1}`, borderTop: `1px solid ${tokens.colorNeutralStroke1}`, height: "42px", boxSizing: "border-box" }}>
+                                                                                    <div style={{ display: "grid", gridTemplateColumns: alignedFields.length > 2 ? `repeat(${alignedFields.length}, 50%)` : `repeat(${alignedFields.length}, 1fr)`, borderBottom: `1px solid var(--border)`, borderTop: `1px solid var(--border)`, height: "42px", boxSizing: "border-box" }}>
                                                                                         {alignedFields.map((field, fIdx) => (
-                                                                                            <div key={`th-p-${fIdx}`} style={{ padding: "10px 16px", borderRight: fIdx < alignedFields.length - 1 ? `1px solid ${tokens.colorNeutralStroke1}` : "none", backgroundColor: tokens.colorNeutralBackground2, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                                                                                <Text size={100} weight="bold" style={{ color: tokens.colorNeutralForeground1, textTransform: "uppercase", fontSize: "10px", textAlign: "center" }}>{field.actKey ? cleanKey(field.actKey) : "—"}</Text>
+                                                                                            <div key={`th-p-${fIdx}`} style={{ padding: "10px 16px", borderRight: fIdx < alignedFields.length - 1 ? `1px solid var(--border)` : "none", backgroundColor: "var(--surface-subtle)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                                                                <Text size={100} weight="bold" style={{ color: "var(--text)", textTransform: "uppercase", fontSize: "10px", textAlign: "center" }}>{field.actKey ? cleanKey(field.actKey) : "—"}</Text>
                                                                                             </div>
                                                                                         ))}
                                                                                     </div>
@@ -2899,12 +2283,12 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                                                                     {Array.from({ length: numRows }, (_, rowIdx) => {
                                                                                         const actRow = actualRows[rowIdx] ?? null;
                                                                                         return (
-                                                                                            <div key={`tr-p-${rowIdx}`} style={{ display: "grid", gridTemplateColumns: alignedFields.length > 2 ? `repeat(${alignedFields.length}, 50%)` : `repeat(${alignedFields.length}, 1fr)`, borderBottom: `1px solid ${tokens.colorNeutralStroke1}`, height: "52px", boxSizing: "border-box" }}>
+                                                                                            <div key={`tr-p-${rowIdx}`} style={{ display: "grid", gridTemplateColumns: alignedFields.length > 2 ? `repeat(${alignedFields.length}, 50%)` : `repeat(${alignedFields.length}, 1fr)`, borderBottom: `1px solid var(--border)`, height: "52px", boxSizing: "border-box" }}>
                                                                                                 {alignedFields.map((field, fIdx) => {
                                                                                                     const val = actRow && field.actKey ? actRow[field.actKey] : undefined;
                                                                                                     return (
-                                                                                                        <div key={`td-p-${fIdx}`} style={{ padding: "8px 16px", borderRight: fIdx < alignedFields.length - 1 ? `1px solid ${tokens.colorNeutralStroke1}` : "none", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: rowIdx % 2 === 0 ? "#ffffff" : "#fafafa" }}>
-                                                                                                            <Text size={200} style={{ color: tokens.colorNeutralForeground1, fontWeight: 500, display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: "1.2", textAlign: "center" }}>{val === undefined || field.actKey === null ? "—" : tryFormatNumber(val)}</Text>
+                                                                                                        <div key={`td-p-${fIdx}`} style={{ padding: "8px 16px", borderRight: fIdx < alignedFields.length - 1 ? `1px solid var(--border)` : "none", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: rowIdx % 2 === 0 ? "#ffffff" : "#fafafa" }}>
+                                                                                                            <Text size={200} style={{ color: "var(--text)", fontWeight: 500, display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: "1.2", textAlign: "center" }}>{val === undefined || field.actKey === null ? "—" : tryFormatNumber(val)}</Text>
                                                                                                         </div>
                                                                                                     );
                                                                                                 })}
@@ -2916,13 +2300,12 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
 
                                                                             {/* Right Navigation Zone */}
                                                                             {alignedFields.length > 2 && (
-                                                                                <div style={{ position: "absolute", right: 0, top: "1px", height: "40px", width: "40px", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: "4px", background: `linear-gradient(to left, ${tokens.colorNeutralBackground2} 60%, transparent)` }}>
-                                                                                    <Button 
-                                                                                        appearance="subtle"
-                                                                                        icon={<ChevronRight20Filled style={{ fontSize: "18px", color: "#f59e0b" }} />}
+                                                                                <div style={{ position: "absolute", right: 0, top: "1px", height: "40px", width: "40px", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: "4px", background: `linear-gradient(to left, var(--surface-subtle) 60%, transparent)` }}>
+                                                                                    <Button
+                                                                                        variant="ghost"
                                                                                         style={{ minWidth: "24px", height: "32px", padding: 0 }}
                                                                                         onClick={() => document.getElementById(`scroll-p-${idx}`)?.scrollBy({ left: 250, behavior: "smooth" })}
-                                                                                    />
+                                                                                    ><ChevronRight style={{ fontSize: "18px", color: "#f59e0b" }} /></Button>
                                                                                 </div>
                                                                             )}
                                                                         </div>
@@ -2930,14 +2313,14 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
 
                                                                     {/* ── STATUS SECTION ── */}
                                                                     <div style={{ width: "100px", display: "flex", flexDirection: "column" }}>
-                                                                        <div style={{ padding: "14px", textAlign: "center", backgroundColor: tokens.colorNeutralBackground2, borderBottom: `2px solid ${tokens.colorNeutralStroke1}`, height: "48px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                                                            <Text size={200} weight="bold" style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Status</Text>
+                                                                        <div style={{ padding: "14px", textAlign: "center", backgroundColor: "var(--surface-subtle)", borderBottom: `2px solid var(--border)`, height: "48px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                                            <Text size={200} weight="bold" style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Status</Text>
                                                                         </div>
-                                                                        <div style={{ height: "42px", backgroundColor: tokens.colorNeutralBackground2, borderBottom: `1px solid ${tokens.colorNeutralStroke1}`, borderTop: `1px solid ${tokens.colorNeutralStroke1}` }}></div>
+                                                                        <div style={{ height: "42px", backgroundColor: "var(--surface-subtle)", borderBottom: `1px solid var(--border)`, borderTop: `1px solid var(--border)` }}></div>
                                                                         {Array.from({ length: numRows }, (_, rowIdx) => {
                                                                             const srcRow = sourceRows[rowIdx] ?? null;
                                                                             const actRow = actualRows[rowIdx] ?? null;
-                                                                            if (!srcRow && !actRow) return <div key={`st-${rowIdx}`} style={{ height: "52px", backgroundColor: rowIdx % 2 === 0 ? "#ffffff" : "#fafafa", borderBottom: rowIdx < numRows - 1 ? `1px solid ${tokens.colorNeutralStroke3}` : "none" }}></div>;
+                                                                            if (!srcRow && !actRow) return <div key={`st-${rowIdx}`} style={{ height: "52px", backgroundColor: rowIdx % 2 === 0 ? "#ffffff" : "#fafafa", borderBottom: rowIdx < numRows - 1 ? `1px solid var(--border)` : "none" }}></div>;
 
                                                                             const rowMatchRaw = actRow && (actRow.match || actRow.status);
                                                                             let isPass = true;
@@ -2952,7 +2335,7 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                                                             }
 
                                                                             return (
-                                                                                <div key={`st-${rowIdx}`} style={{ padding: "8px 16px", display: "flex", alignItems: "center", justifyContent: "center", height: "52px", boxSizing: "border-box", borderBottom: `1px solid ${tokens.colorNeutralStroke1}`, backgroundColor: rowIdx % 2 === 0 ? "#ffffff" : "#fafafa" }}>
+                                                                                <div key={`st-${rowIdx}`} style={{ padding: "8px 16px", display: "flex", alignItems: "center", justifyContent: "center", height: "52px", boxSizing: "border-box", borderBottom: `1px solid var(--border)`, backgroundColor: rowIdx % 2 === 0 ? "#ffffff" : "#fafafa" }}>
                                                                                     <div className={isPass ? "vl-match-badge" : "vl-diff-badge"} style={{ fontSize: "11px", padding: "4px 12px", borderRadius: "100px", fontWeight: "bold" }}>
                                                                                         {isPass ? "PASS" : "FAIL"}
                                                                                     </div>
@@ -2967,7 +2350,7 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                                 </div>
 
                                                 {Math.max(sourceRows.length, actualRows.length) > 10 && (
-                                                    <Text size={100} style={{ color: tokens.colorNeutralForeground4, fontStyle: "italic", textAlign: "center", display: "block", marginTop: "10px" }}>
+                                                    <Text size={100} style={{ color: "var(--text-muted)", fontStyle: "italic", textAlign: "center", display: "block", marginTop: "10px" }}>
                                                         + {Math.max(sourceRows.length, actualRows.length) - 10} more rows not shown
                                                     </Text>
                                                 )}
@@ -2978,21 +2361,21 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                     {/* Sub-properties list (details array in visuals) */}
                                     {item.details && Array.isArray(item.details) && item.details.length > 0 && (
                                         <div style={{ marginTop: "10px" }}>
-                                            <Text weight="bold" size={200} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "12px" }}>Visual Property Audit ({item.details.length})</Text>
+                                            <Text weight="bold" size={200} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "12px" }}>Visual Property Audit ({item.details.length})</Text>
                                             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                                                 {item.details.map((prop: any, pIdx: number) => (
-                                                    <div key={pIdx} style={{ padding: "12px 16px", backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                                    <div key={pIdx} style={{ padding: "12px 16px", backgroundColor: "var(--surface)", border: `1px solid var(--border)`, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                                                         <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1 }}>
-                                                            <Badge appearance="tint" color="informative" size="small">{pIdx + 1}</Badge>
+                                                            <Badge variant="secondary">{pIdx + 1}</Badge>
                                                             <div style={{ display: "flex", flexDirection: "column" }}>
                                                                 <Text weight="bold" size={200}>{prop.property || "Property"}</Text>
                                                                 <div style={{ display: "flex", gap: "12px", marginTop: "2px" }}>
-                                                                    <Text size={100} style={{ color: tokens.colorNeutralForeground3 }}>S: {String(prop.parsing_value || prop.source_value || "N/A")}</Text>
-                                                                    <Text size={100} style={{ color: tokens.colorNeutralForeground3 }}>T: {String(prop.generation_value || prop.target_value || "N/A")}</Text>
+                                                                    <Text size={100} style={{ color: "var(--text-muted)" }}>S: {String(prop.parsing_value || prop.source_value || "N/A")}</Text>
+                                                                    <Text size={100} style={{ color: "var(--text-muted)" }}>T: {String(prop.generation_value || prop.target_value || "N/A")}</Text>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        <Badge appearance="tint" color={parseFloat(String(prop.accuracy_percentage || "0")) >= 100 ? "success" : "warning"} size="small">
+                                                        <Badge variant={parseFloat(String(prop.accuracy_percentage || "0")) >= 100 ? "success" : "warning"}>
                                                             {prop.accuracy_percentage || "0%"}
                                                         </Badge>
                                                     </div>
@@ -3006,44 +2389,42 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px" }}>
                                         {/* Col 1: Tableau Source */}
                                         <div style={{ display: "flex", flexDirection: "column", gap: "12px", minWidth: 0 }}>
-                                            <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.02em" }}>Source Connection in Tableau</Text>
-                                            <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", display: "flex", flexDirection: "column", gap: "8px", border: `1px solid ${tokens.colorNeutralStroke2}`, background: tokens.colorNeutralBackground2 }}>
-                                                <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Type / Mode</Text>
-                                                <Text weight="bold" size={400} style={{ color: tokens.colorNeutralForeground1 }}>{item.parsing_datasource?.connection_type ?? "N/A"} ({item.parsing_datasource?.mode ?? "N/A"})</Text>
+                                            <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>Source Connection in Tableau</Text>
+                                            <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", display: "flex", flexDirection: "column", gap: "8px", border: `1px solid var(--border)`, background: "var(--surface-subtle)" }}>
+                                                <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Type / Mode</Text>
+                                                <Text weight="bold" size={400} style={{ color: "var(--text)" }}>{item.parsing_datasource?.connection_type ?? "N/A"} ({item.parsing_datasource?.mode ?? "N/A"})</Text>
                                                 <div style={{ marginTop: "4px", display: "flex", flexDirection: "column", gap: "2px" }}>
-                                                    <Text size={100} style={{ color: tokens.colorNeutralForeground3, wordBreak: "break-all" }}>Srv: {item.parsing_datasource?.server ?? "N/A"}</Text>
-                                                    <Text size={100} style={{ color: tokens.colorNeutralForeground3, wordBreak: "break-all" }}>DB: {item.parsing_datasource?.database ?? "N/A"}</Text>
+                                                    <Text size={100} style={{ color: "var(--text-muted)", wordBreak: "break-all" }}>Srv: {item.parsing_datasource?.server ?? "N/A"}</Text>
+                                                    <Text size={100} style={{ color: "var(--text-muted)", wordBreak: "break-all" }}>DB: {item.parsing_datasource?.database ?? "N/A"}</Text>
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Col 2: Power BI Target */}
                                         <div style={{ display: "flex", flexDirection: "column", gap: "12px", minWidth: 0 }}>
-                                            <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.02em" }}>Target Connection in Power BI</Text>
-                                            <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", display: "flex", flexDirection: "column", gap: "8px", border: `1px solid ${tokens.colorNeutralStroke2}`, background: tokens.colorNeutralBackground2 }}>
-                                                <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Type / Mode</Text>
-                                                <Text weight="bold" size={400} style={{ color: tokens.colorNeutralForeground1 }}>{item.generation_datasource?.connection_type ?? "N/A"} ({item.generation_datasource?.mode ?? "N/A"})</Text>
+                                            <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>Target Connection in Power BI</Text>
+                                            <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px", display: "flex", flexDirection: "column", gap: "8px", border: `1px solid var(--border)`, background: "var(--surface-subtle)" }}>
+                                                <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Type / Mode</Text>
+                                                <Text weight="bold" size={400} style={{ color: "var(--text)" }}>{item.generation_datasource?.connection_type ?? "N/A"} ({item.generation_datasource?.mode ?? "N/A"})</Text>
                                                 <div style={{ marginTop: "4px", display: "flex", flexDirection: "column", gap: "2px" }}>
-                                                    <Text size={100} style={{ color: tokens.colorNeutralForeground3, wordBreak: "break-all" }}>Srv: {item.generation_datasource?.server ?? "N/A"}</Text>
-                                                    <Text size={100} style={{ color: tokens.colorNeutralForeground3, wordBreak: "break-all" }}>DB: {item.generation_datasource?.database ?? "N/A"}</Text>
+                                                    <Text size={100} style={{ color: "var(--text-muted)", wordBreak: "break-all" }}>Srv: {item.generation_datasource?.server ?? "N/A"}</Text>
+                                                    <Text size={100} style={{ color: "var(--text-muted)", wordBreak: "break-all" }}>DB: {item.generation_datasource?.database ?? "N/A"}</Text>
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Col 3: Accuracy */}
                                         <div style={{ display: "flex", flexDirection: "column", gap: "12px", minWidth: 0 }}>
-                                            <Text weight="bold" size={100} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.02em" }}>Accuracy</Text>
-                                            <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px 20px", display: "flex", justifyContent: "center", alignItems: "center", border: `1px solid ${tokens.colorNeutralStroke2}`, background: tokens.colorNeutralBackground2 }}>
+                                            <Text weight="bold" size={100} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>Accuracy</Text>
+                                            <div className={fluentStyles.detailCard} style={{ flex: 1, padding: "16px 20px", display: "flex", justifyContent: "center", alignItems: "center", border: `1px solid var(--border)`, background: "var(--surface-subtle)" }}>
                                                 <Badge
-                                                    appearance="tint"
-                                                    color={parseFloat(String(accuracy || "0")) >= 100 ? "success" : "warning"}
-                                                    size="large"
-                                                    style={{ 
+                                                    variant={parseFloat(String(accuracy || "0")) >= 100 ? "success" : "warning"}
+                                                    style={{
                                                         padding: "6px 24px", 
                                                         borderRadius: "20px", 
                                                         fontWeight: "bold",
-                                                        border: parseFloat(String(accuracy || "0")) >= 100 ? `1px solid ${tokens.colorPaletteGreenForeground1}` : `1px solid ${tokens.colorPaletteYellowForeground2}`,
-                                                        color: parseFloat(String(accuracy || "0")) >= 100 ? tokens.colorPaletteGreenForeground1 : tokens.colorPaletteYellowForeground2,
+                                                        border: parseFloat(String(accuracy || "0")) >= 100 ? `1px solid var(--success)` : `1px solid var(--warning)`,
+                                                        color: parseFloat(String(accuracy || "0")) >= 100 ? "var(--success)" : "var(--warning)",
                                                         fontSize: "14px"
                                                     }}
                                                 >
@@ -3056,13 +2437,13 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                     {/* Parameter Tables / Components Audit */}
                                     {item.validation_result?.parameter_tables && Array.isArray(item.validation_result.parameter_tables) && item.validation_result.parameter_tables.length > 0 && (
                                         <div style={{ marginTop: "10px" }}>
-                                            <Text weight="bold" size={200} style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "12px" }}>Component & Parameter Audit ({item.validation_result.parameter_tables.length})</Text>
+                                            <Text weight="bold" size={200} style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "12px" }}>Component & Parameter Audit ({item.validation_result.parameter_tables.length})</Text>
                                             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                                                 {item.validation_result.parameter_tables.map((param: any, pIdx: number) => (
                                                     <div key={pIdx} style={{ 
                                                         padding: "12px 16px", 
-                                                        backgroundColor: tokens.colorNeutralBackground1, 
-                                                        border: `1px solid ${tokens.colorNeutralStroke2}`, 
+                                                        backgroundColor: "var(--surface)", 
+                                                        border: `1px solid var(--border)`, 
                                                         borderRadius: "8px",
                                                         display: "flex",
                                                         flexDirection: "column",
@@ -3070,13 +2451,13 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                                     }}>
                                                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                                                             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                                                                <Badge appearance="tint" color="informative" size="small">{pIdx + 1}</Badge>
+                                                                <Badge variant="secondary">{pIdx + 1}</Badge>
                                                                 <Text weight="bold" size={200}>{param.table_name || param.source_parameter_name || "Component"}</Text>
                                                             </div>
-                                                            <Badge appearance="outline" color="subtle" size="small">{param.datatype ?? "N/A"}</Badge>
+                                                            <Badge variant="secondary">{param.datatype ?? "N/A"}</Badge>
                                                         </div>
-                                                        <div style={{ paddingLeft: "32px", borderLeft: `2px solid ${tokens.colorNeutralStroke2}`, marginLeft: "8px" }}>
-                                                            <Text size={100} italic style={{ color: tokens.colorNeutralForeground3, display: "block", marginBottom: "4px" }}>&quot;{param.reasoning || "Component mapping confirmed."}&quot;</Text>
+                                                        <div style={{ paddingLeft: "32px", borderLeft: `2px solid var(--border)`, marginLeft: "8px" }}>
+                                                            <Text size={100} italic style={{ color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>&quot;{param.reasoning || "Component mapping confirmed."}&quot;</Text>
                                                             <div style={{ display: "flex", gap: "12px" }}>
                                                                 <Text size={100} weight="semibold">Value: {String(param.current_value || "N/A")}</Text>
                                                             </div>
@@ -3094,10 +2475,10 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                         gridTemplateColumns: "1fr 1fr", 
                                         gap: "24px" 
                                     }}>
-                                        <div className={fluentStyles.sourceBorder} style={{ padding: "16px", background: tokens.colorNeutralBackground2, borderRadius: "12px" }}>
+                                        <div className={fluentStyles.sourceBorder} style={{ padding: "16px", background: "var(--surface-subtle)", borderRadius: "12px" }}>
                                             {renderObjectProperties("", item.parsing_datasource, "source", "lists")}
                                         </div>
-                                        <div className={fluentStyles.targetBorder} style={{ padding: "16px", background: tokens.colorNeutralBackground2, borderRadius: "12px" }}>
+                                        <div className={fluentStyles.targetBorder} style={{ padding: "16px", background: "var(--surface-subtle)", borderRadius: "12px" }}>
                                             {renderObjectProperties("", item.generation_datasource, "target", "lists")}
                                         </div>
                                     </div>
@@ -3106,9 +2487,9 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                 <>
                                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
                                         {/* SOURCE CARD */}
-                                        <div className={fluentStyles.sourceBorder} style={{ padding: "16px", background: tokens.colorNeutralBackground2, borderRadius: "12px", border: `1px solid ${tokens.colorNeutralStroke2}` }}>
+                                        <div className={fluentStyles.sourceBorder} style={{ padding: "16px", background: "var(--surface-subtle)", borderRadius: "12px", border: `1px solid var(--border)` }}>
                                             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-                                                <Text weight="bold" size={200} style={{ color: tokens.colorBrandForeground1 }}>SOURCE DATA IN TABLEAU</Text>
+                                                <Text weight="bold" size={200} style={{ color: "var(--primary)" }}>SOURCE DATA IN TABLEAU</Text>
                                             </div>
                                             {isCustomSql ? (
                                                 (() => {
@@ -3124,9 +2505,9 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                         </div>
 
                                         {/* TARGET CARD */}
-                                        <div className={fluentStyles.targetBorder} style={{ padding: "16px", background: tokens.colorNeutralBackground2, borderRadius: "12px", border: `1px solid ${tokens.colorNeutralStroke2}` }}>
+                                        <div className={fluentStyles.targetBorder} style={{ padding: "16px", background: "var(--surface-subtle)", borderRadius: "12px", border: `1px solid var(--border)` }}>
                                             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-                                                <Text weight="bold" size={200} style={{ color: tokens.colorPaletteYellowForeground2 }}>TARGET DATA IN POWER BI</Text>
+                                                <Text weight="bold" size={200} style={{ color: "var(--warning)" }}>TARGET DATA IN POWER BI</Text>
                                             </div>
                                             {isCustomSql ? (
                                                 (() => {
@@ -3167,7 +2548,7 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                             gap: "24px"
                                         }}>
                                             {/* Source Lists */}
-                                            <div className={isDatasources ? fluentStyles.sourceBorder : ""} style={isDatasources ? { padding: "16px", background: tokens.colorNeutralBackground2, borderRadius: "12px" } : {}}>
+                                            <div className={isDatasources ? fluentStyles.sourceBorder : ""} style={isDatasources ? { padding: "16px", background: "var(--surface-subtle)", borderRadius: "12px" } : {}}>
                                                 {!isCustomSql && renderObjectProperties("", {
                                                     ...(item.parsing_datasource || item.tableau_relationship || item.parsing_data || item.tableau_calc || item.source || item),
                                                     parsing_join_keys: item.parsing_join_keys
@@ -3175,7 +2556,7 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                             </div>
 
                                             {/* Target Lists */}
-                                            <div className={isDatasources ? fluentStyles.targetBorder : ""} style={isDatasources ? { padding: "16px", background: tokens.colorNeutralBackground2, borderRadius: "12px" } : {}}>
+                                            <div className={isDatasources ? fluentStyles.targetBorder : ""} style={isDatasources ? { padding: "16px", background: "var(--surface-subtle)", borderRadius: "12px" } : {}}>
                                                 {!isCustomSql && renderObjectProperties("", {
                                                     ...(item.generation_datasource || item.fabric_relationship || item.migration_data || item.powerbi_calc || item.target || item),
                                                     generation_join_keys: item.generation_join_keys
@@ -3189,11 +2570,11 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                     )}
 
                     {reasoning && (
-                        <div className={fluentStyles.insightBox} style={{ marginTop: "16px", borderLeft: `4px solid ${tokens.colorPaletteGreenForeground1}` }}>
-                            <div className={fluentStyles.sectionLabel} style={{ color: tokens.colorPaletteGreenForeground1 }}>
-                                <BrainCircuit24Regular style={{ fontSize: "14px", marginRight: "4px" }} /> Validation Status
+                        <div className={fluentStyles.insightBox} style={{ marginTop: "16px", borderLeft: `4px solid var(--success)` }}>
+                            <div className={fluentStyles.sectionLabel} style={{ color: "var(--success)" }}>
+                                <BrainCircuit style={{ fontSize: "14px", marginRight: "4px" }} /> Validation Status
                             </div>
-                            <Text size={200} className={fluentStyles.insightText} style={{ lineHeight: "1.6", color: tokens.colorNeutralForeground2, fontWeight: tokens.fontWeightMedium }}>
+                            <Text size={200} className={fluentStyles.insightText} style={{ lineHeight: "1.6", color: "var(--text-secondary)", fontWeight: 500 }}>
                                 {reasoning}
                             </Text>
                         </div>
@@ -3216,7 +2597,7 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                         </div>
                         <div className="vl-metric-card">
                             <div className="vl-metric-value" style={{ 
-                                color: (catSummary.overall_accuracy === "N/A") ? tokens.colorNeutralForeground4 : tokens.colorPaletteGreenForeground1 
+                                color: (catSummary.overall_accuracy === "N/A") ? "var(--text-muted)" : "var(--success)" 
                             }}>
                                 {(() => {
                                     const acc = catSummary.overall_accuracy;
@@ -3290,9 +2671,9 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                                         >
                                                             <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1 }}>
                                                                 <Text className={fluentStyles.groupTitle}>{cat.label}</Text>
-                                                                <Badge appearance="tint" color="subtle" size="medium">{groupItems.length}</Badge>
+                                                                <Badge variant="secondary">{groupItems.length}</Badge>
                                                             </div>
-                                                            {isCollapsed ? <ChevronDown20Regular /> : <ChevronUp20Regular />}
+                                                            {isCollapsed ? <ChevronDown /> : <ChevronUp />}
                                                         </div>
 
                                                         {!isCollapsed && (
@@ -3300,8 +2681,8 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                                                 {groupItems.length > 0 ? (
                                                                     groupItems.map((item: any, idx: number) => renderDetailItem(item, idx, cat.label))
                                                                 ) : (
-                                                                    <div style={{ padding: "16px", textAlign: "center", background: tokens.colorNeutralBackground3, borderRadius: "8px" }}>
-                                                                        <Text size={200} style={{ color: tokens.colorNeutralForeground4, fontStyle: "italic" }}>No items found in this category</Text>
+                                                                    <div style={{ padding: "16px", textAlign: "center", background: "var(--muted)", borderRadius: "8px" }}>
+                                                                        <Text size={200} style={{ color: "var(--text-muted)", fontStyle: "italic" }}>No items found in this category</Text>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -3329,9 +2710,9 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                                     >
                                                         <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1 }}>
                                                             <Text className={fluentStyles.groupTitle}>{groupName.replace(/_/g, " ")}</Text>
-                                                            <Badge appearance="tint" color="subtle" size="medium">{groupItems.length}</Badge>
+                                                            <Badge variant="secondary">{groupItems.length}</Badge>
                                                         </div>
-                                                        {isCollapsed ? <ChevronDown20Regular /> : <ChevronUp20Regular />}
+                                                        {isCollapsed ? <ChevronDown /> : <ChevronUp />}
                                                     </div>
 
                                                     {!isCollapsed && (
@@ -3355,7 +2736,7 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                             </div>
                         ) : (
                             <div className={fluentStyles.emptyState}>
-                                <Text italic style={{ color: tokens.colorNeutralForeground4, display: "block" }}>
+                                <Text italic style={{ color: "var(--text-muted)", display: "block" }}>
                                     {category === "Custom SQL" ? "No Custom SQL queries were detected or selected for validation in this workbook." : "No detailed comparison results found for this category."}
                                 </Text>
                             </div>
@@ -3389,9 +2770,6 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                 {/* TEMPORARILY DISABLED - ENABLE LATER */}
                 {ENABLE_RERUN_VALIDATION && (
                     <Button
-                        appearance="primary"
-                        size="large"
-                        icon={<ArrowClockwise24Regular />}
                         onClick={handleRerunValidation}
                         disabled={isRevalidating}
                         style={{
@@ -3399,12 +2777,13 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                             fontWeight: 600,
                             padding: "0 24px",
                             height: "48px",
-                            backgroundColor: tokens.colorBrandBackground,
-                            boxShadow: tokens.shadow8,
+                            backgroundColor: "var(--primary)",
+                            boxShadow: "var(--shadow-sm)",
                             flexShrink: 0,
                             marginTop: "4px"
                         }}
                     >
+                        <RefreshCw style={{ marginRight: 8 }} />
                         {isRevalidating ? "Triggering..." : "Re-run Validation"}
                     </Button>
                 )}
@@ -3418,7 +2797,7 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
             }}>
                 {isRefreshingValidationResults && (
                     <div className="devops-loading-overlay">
-                        <Spinner size="large" appearance="primary" />
+                        <Spinner size="large" />
                         <span className="devops-loading-text">Synchronizing latest validation updates...</span>
                     </div>
                 )}
@@ -3471,11 +2850,11 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                     });
                 })()}
 
-                <div className={styles.metricCard} style={{ background: tokens.colorBrandBackground2, border: `1px solid ${tokens.colorBrandStroke2}` }}>
-                    <div className={styles.metricValue} style={{ color: tokens.colorBrandForeground2 }}>
+                <div className={styles.metricCard} style={{ background: "var(--primary)", border: `1px solid var(--primary)` }}>
+                    <div className={styles.metricValue} style={{ color: "var(--primary)" }}>
                         {overallAccuracy ? (String(overallAccuracy).includes('%') ? overallAccuracy : `${overallAccuracy}%`) : "0%"}
                     </div>
-                    <div className={styles.metricLabel} style={{ color: tokens.colorBrandForeground2 }}>OVERALL ACCURACY</div>
+                    <div className={styles.metricLabel} style={{ color: "var(--primary)" }}>OVERALL ACCURACY</div>
                 </div>
             </div>
 
@@ -3485,21 +2864,21 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                     className={fluentStyles.aiSummaryCard}
                     style={{
                         marginBottom: "32px",
-                        borderLeftColor: (overallAiSummary.conclusion === "PASS" || overallAiSummary.conclusion === "SUCCESS") ? tokens.colorPaletteGreenForeground1 : tokens.colorPalettePeachBorderActive
+                        borderLeftColor: (overallAiSummary.conclusion === "PASS" || overallAiSummary.conclusion === "SUCCESS") ? "var(--success)" : "var(--warning)"
                     }}
                 >
                     <div className={fluentStyles.aiSummaryHeader}>
                         <div className={fluentStyles.headerGroup}>
                             <div className={fluentStyles.iconBox}>
-                                <BrainCircuit24Regular style={{ color: tokens.colorBrandForeground1 }} />
+                                <BrainCircuit style={{ color: "var(--primary)" }} />
                             </div>
                             <div>
                                 <Text weight="bold" size={500}>Summary</Text>
                                 <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
-                                    <Badge color={getStatusColor("", overallAiSummary.conclusion || "PASS")} size="small">
+                                    <Badge variant={getStatusColor("", overallAiSummary.conclusion || "PASS")}>
                                         {(overallAiSummary.conclusion || "PASS").toUpperCase()}
                                     </Badge>
-                                    <Badge appearance="tint" color="informative" size="small">
+                                    <Badge variant="secondary">
                                         {overallAccuracy ? (String(overallAccuracy).includes('%') ? overallAccuracy : `${overallAccuracy}%`) : "N/A"} Accuracy
                                     </Badge>
                                 </div>
@@ -3507,7 +2886,7 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                         </div>
                     </div>
 
-                    <Text size={300} style={{ lineHeight: "1.7", color: tokens.colorNeutralForeground2, display: "block" }}>
+                    <Text size={300} style={{ lineHeight: "1.7", color: "var(--text-secondary)", display: "block" }}>
                         {overallAiSummary.summary || overallAiSummary.summary_text || (typeof overallAiSummary === 'string' ? overallAiSummary : "Analysis complete.")}
                     </Text>
                 </div>
@@ -3530,8 +2909,8 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                     style={{
                                         padding: "16px 20px",
                                         cursor: "pointer",
-                                        border: `1px solid ${tokens.colorNeutralStroke1}`,
-                                        background: tokens.colorNeutralBackground1,
+                                        border: `1px solid var(--border)`,
+                                        background: "var(--surface)",
                                         borderRadius: "12px",
                                         transition: "all 0.2s ease",
                                         marginBottom: "12px"
@@ -3541,7 +2920,7 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                                             <div style={{
-                                                background: tokens.colorBrandBackground2,
+                                                background: "var(--primary)",
                                                 padding: "10px",
                                                 borderRadius: "10px",
                                                 display: "flex"
@@ -3549,24 +2928,24 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                                                 {getCategoryIcon(category)}
                                             </div>
                                             <div>
-                                                <Text weight="bold" size={400} style={{ color: tokens.colorNeutralForeground1, display: "block" }}>{category}</Text>
-                                                <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>Detailed verification items</Text>
+                                                <Text weight="bold" size={400} style={{ color: "var(--text)", display: "block" }}>{category}</Text>
+                                                <Text size={200} style={{ color: "var(--text-muted)" }}>Detailed verification items</Text>
                                             </div>
                                         </div>
 
                                         <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
                                             <div style={{ textAlign: "right", marginRight: "12px" }}>
                                                 <Text weight="bold" size={500} style={{
-                                                    color: getStatusColor(category, String(status)) === "success" ? tokens.colorPaletteGreenForeground1 :
-                                                        getStatusColor(category, String(status)) === "warning" ? tokens.colorPaletteYellowForeground2 :
-                                                            tokens.colorNeutralForeground1,
+                                                    color: getStatusColor(category, String(status)) === "success" ? "var(--success)" :
+                                                        getStatusColor(category, String(status)) === "warning" ? "var(--warning)" :
+                                                            "var(--text)",
                                                     display: "block"
                                                 }}>
                                                     {status}
                                                 </Text>
-                                                <Text size={100} weight="semibold" style={{ color: tokens.colorNeutralForeground4, textTransform: "uppercase", letterSpacing: "0.05em" }}>ACCURACY</Text>
+                                                <Text size={100} weight="semibold" style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>ACCURACY</Text>
                                             </div>
-                                            <ChevronRight20Regular style={{ color: tokens.colorNeutralForeground4 }} />
+                                            <ChevronRight style={{ color: "var(--text-muted)" }} />
                                         </div>
                                     </div>
                                 </Card>
@@ -3586,28 +2965,27 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                     <Card style={{
                         width: "90%", maxWidth: "1200px", maxHeight: "90vh",
                         display: "flex", flexDirection: "column", padding: 0,
-                        backgroundColor: tokens.colorNeutralBackground1,
-                        borderRadius: "16px", boxShadow: tokens.shadow64
+                        backgroundColor: "var(--surface)",
+                        borderRadius: "16px", boxShadow: "var(--shadow-md)"
                     }}>
                         <div style={{
-                            padding: "20px 24px", borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+                            padding: "20px 24px", borderBottom: `1px solid var(--border)`,
                             display: "flex", justifyContent: "space-between", alignItems: "center",
                             background: "linear-gradient(to right, #f8fafc, #ffffff)"
                         }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                                <div style={{ background: tokens.colorBrandBackground2, padding: "8px", borderRadius: "8px" }}>
+                                <div style={{ background: "var(--primary)", padding: "8px", borderRadius: "8px" }}>
                                     {getCategoryIcon(selectedCategory)}
                                 </div>
                                 <div>
                                     <Text weight="bold" size={500}>{selectedCategory === "Tables & Columns" ? selectedCategory : (selectedCategory.endsWith("Validation") ? selectedCategory : `${selectedCategory} Validation`)}</Text>
-                                    <Text size={200} style={{ color: tokens.colorNeutralForeground3, display: "block" }}>Deep-dive comparison audit</Text>
+                                    <Text size={200} style={{ color: "var(--text-muted)", display: "block" }}>Deep-dive comparison audit</Text>
                                 </div>
                             </div>
                             <Button
-                                icon={<Dismiss24Regular />}
-                                appearance="subtle"
+                                variant="ghost"
                                 onClick={() => { setSelectedCategory(null); setDebugOpen(false); }}
-                            />
+                            ><X /></Button>
                         </div>
                         <div className={fluentStyles.scrollableContent} style={{ padding: "24px" }}>
                             {renderCategoryDetail(selectedCategory)}
@@ -3621,33 +2999,33 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
             {/* ── END VALIDATION RESULTS CONTENT (REFRESH EFFECT) ── */}
 
             {/* Validation Re-run Notification Dialog */}
-            <Dialog open={revalidationSuccessOpen} onOpenChange={(_, data) => setRevalidationSuccessOpen(data.open)}>
-                <DialogSurface style={{ maxWidth: "450px" }}>
-                    <DialogBody>
+            <Dialog open={revalidationSuccessOpen} onOpenChange={setRevalidationSuccessOpen}>
+                <DialogContent style={{ maxWidth: "450px" }}>
+                    <DialogHeader>
                         <DialogTitle>Validation Re-Run Triggered</DialogTitle>
-                        <DialogContent style={{ paddingTop: "12px", display: "flex", flexDirection: "column", gap: "12px" }}>
-                            <Text>Validation Re-Run completed successfully.</Text>
-                            <Text>The latest validation results are currently being refreshed and synchronized.</Text>
-                            <Text>Please review the updated validation results to observe the latest changes, fixes, and validation updates.</Text>
-                        </DialogContent>
-                        <DialogActions>
-                            <Button appearance="primary" onClick={() => {
-                                setRevalidationSuccessOpen(false);
-                                // Clear any previous timer to prevent animation stacking on repeated re-runs
-                                if (refreshTimerRef.current) {
-                                    clearTimeout(refreshTimerRef.current);
-                                    refreshTimerRef.current = null;
-                                }
-                                setIsRefreshingValidationResults(true);
-                                // Auto-stop after 1.5s (matches CSS overlay fade animation)
-                                refreshTimerRef.current = setTimeout(() => {
-                                    setIsRefreshingValidationResults(false);
-                                    refreshTimerRef.current = null;
-                                }, 1500);
-                            }}>OK</Button>
-                        </DialogActions>
-                    </DialogBody>
-                </DialogSurface>
+                    </DialogHeader>
+                    <div style={{ paddingTop: "12px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                        <span>Validation Re-Run completed successfully.</span>
+                        <span>The latest validation results are currently being refreshed and synchronized.</span>
+                        <span>Please review the updated validation results to observe the latest changes, fixes, and validation updates.</span>
+                    </div>
+                    <DialogFooter>
+                        <Button onClick={() => {
+                            setRevalidationSuccessOpen(false);
+                            // Clear any previous timer to prevent animation stacking on repeated re-runs
+                            if (refreshTimerRef.current) {
+                                clearTimeout(refreshTimerRef.current);
+                                refreshTimerRef.current = null;
+                            }
+                            setIsRefreshingValidationResults(true);
+                            // Auto-stop after 1.5s (matches CSS overlay fade animation)
+                            refreshTimerRef.current = setTimeout(() => {
+                                setIsRefreshingValidationResults(false);
+                                refreshTimerRef.current = null;
+                            }, 1500);
+                        }}>OK</Button>
+                    </DialogFooter>
+                </DialogContent>
             </Dialog>
         </div>
     );

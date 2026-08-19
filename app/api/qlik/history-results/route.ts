@@ -23,10 +23,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }
 
+    // These per-folder result documents live on the Qlik migration store
+    // (QLIK_MONGO_DB_URL), not on the async records API.
     const endpoint = `/${type}/${encodeURIComponent(folder)}`;
 
     const data = await httpClient.get<any>(endpoint, {
-      apiType: "sql",
+      apiType: "qlik-mongo",
       headers: { Authorization: authHeader },
     });
     return NextResponse.json(data);

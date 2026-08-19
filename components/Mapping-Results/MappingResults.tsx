@@ -45,6 +45,12 @@ export default function MappingResults({ appId = "", mappingData: propMappingDat
   const toast = useQlikToast();
 
   useEffect(() => {
+    if (propMappingData) {
+      setMappingData(propMappingData);
+      setLoading(false);
+      return;
+    }
+
     try {
       const storedAssessmentData = localStorage.getItem("api_results");
       let fetchedAppName = "Unknown";
@@ -79,7 +85,7 @@ export default function MappingResults({ appId = "", mappingData: propMappingDat
     } finally {
       setLoading(false);
     }
-  }, [appId]);
+  }, [appId, propMappingData]);
 
   const handleProceedToReportGeneration = async () => {
     setLoading(true);

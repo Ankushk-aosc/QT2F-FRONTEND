@@ -1,33 +1,19 @@
 "use client"
 
 import React, { useMemo, useCallback, useState, useEffect } from "react"
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import {
-  Card,
-  makeStyles,
-  mergeClasses,
-  tokens,
-  Text,
-  shorthands,
-  Button,
-  Table,
-  TableHeader,
-  TableRow,
-  TableHeaderCell,
-  TableBody,
-  TableCell,
-  Badge,
-  Spinner,
-} from "@fluentui/react-components"
-import {
-  DocumentDatabase24Regular,
-  DatabaseSearch24Regular,
-  Layer24Regular,
-  BrainCircuit24Regular,
-  Table24Regular,
-  Settings24Regular,
-  DocumentPdf24Regular,
-  ArrowRight24Regular,
-} from "@fluentui/react-icons"
+  Database,
+  Search,
+  Layers,
+  BrainCircuit,
+  Table as TableIcon,
+  Settings,
+  FileText,
+  ArrowRight,
+} from "lucide-react"
 import { useAgentStore } from "@/stores/agent.store"
 import { useDashboardStore } from "@/stores/dashboard.store"
 import { useParsingStore } from "@/stores/parsing.store"
@@ -37,165 +23,16 @@ import { useGenerationStore } from "@/stores/generation.store"
 import { OnlyAssessmentTab, SectionHeading } from "@/components/tabs/OnlyAssessmentTab"
 import dynamic from "next/dynamic"
 
-const useStyles = makeStyles({
-  container: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "24px",
-    padding: "32px",
-    backgroundColor: tokens.colorNeutralBackground2,
-    minHeight: "100%",
-  },
-  heroBanner: {
-    backgroundColor: tokens.colorNeutralBackground1,
-    borderRadius: "16px",
-    padding: "32px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-    position: "relative",
-    marginBottom: "8px",
-    overflow: "hidden",
-    boxShadow: tokens.shadow4,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-  },
-  roadmapContainer: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    width: "100%",
-    boxSizing: "border-box",
-    padding: "0 20px",
-  },
-  intelligenceGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-    gap: "20px",
-    width: "100%",
-  },
-  tileIcon: {
-    fontSize: "24px",
-    color: tokens.colorBrandForeground1,
-  },
-  sparkline: {
-    height: "4px",
-    backgroundColor: tokens.colorNeutralBackground3,
-    borderRadius: "2px",
-    marginTop: "12px",
-    overflow: "hidden",
-  },
-  sparklineBar: {
-    height: "100%",
-    backgroundColor: tokens.colorBrandBackground,
-    borderRadius: "2px",
-    transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
-  },
-  stepIndicator: {
-    height: "24px",
-    width: "24px",
-    borderRadius: "50%",
-    backgroundColor: tokens.colorNeutralStroke2,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 3,
-    transition: "all 0.3s ease",
-    "&.active": {
-      backgroundColor: tokens.colorBrandBackground,
-      color: "#fff",
-    },
-    "&.done": {
-      backgroundColor: tokens.colorPaletteGreenBackground3,
-      color: "#fff",
-    }
-  },
-  stepLine: {
-    position: "absolute",
-    top: "8px",
-    left: "50%",
-    width: "100%",
-    height: "2px",
-    backgroundColor: tokens.colorNeutralStroke2,
-    zIndex: 2,
-    "&.done": {
-      backgroundColor: tokens.colorPaletteGreenBackground3,
-    }
-  },
-  stepLabel: {
-    fontSize: tokens.fontSizeBase200,
-    fontWeight: tokens.fontWeightBold,
-    color: tokens.colorNeutralForeground3,
-    transition: "all 0.3s ease",
-    "&.active": {
-      color: tokens.colorBrandForeground1,
-    },
-    "&.done": {
-      color: tokens.colorNeutralForeground1,
-    }
-  },
-  heroStatusLabel: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "16px",
-    padding: "12px 32px",
-    borderRadius: tokens.borderRadiusCircular,
-    width: "fit-content",
-    margin: "0 auto",
-    backgroundColor: tokens.colorNeutralBackground2,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-  },
-  heroActionArea: {
-    width: "100%",
-    display: "flex",
-    flexDirection: "column",
-    gap: "24px",
-    marginBottom: "32px",
-  },
-  headerActionsContainer: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "16px",
-    marginBottom: "16px",
-    flexWrap: "wrap",
-  },
-  downloadButton: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    minWidth: "220px",
-    fontSize: tokens.fontSizeBase400,
-    ...shorthands.padding("12px", "32px"),
-  },
-  roadmapTitle: {
-    fontSize: "12px",
-    fontWeight: 700,
-    color: tokens.colorNeutralForeground4,
-    textTransform: "uppercase",
-    letterSpacing: "0.1em",
-    textAlign: "center",
-  },
-  roadmapStep: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "8px",
-    position: "relative",
-    flex: 1,
-  },
-  statusBadge: {
-    height: "10px",
-    width: "10px",
-    borderRadius: "50%",
-    position: "relative",
-  }
-})
+const styles = {
+  container: "mo-container",
+  heroBanner: "mo-heroBanner",
+  intelligenceGrid: "mo-intelligenceGrid",
+  tileIcon: "mo-tileIcon",
+  headerActionsContainer: "mo-headerActionsContainer",
+  downloadButton: "mo-downloadButton",
+}
 
 export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMode?: boolean; onRequestPdf?: () => void }) {
-  const styles = useStyles()
   const { currentRunId, currentWorkbookIds, assessmentData, assessmentActivitiesDone, parsingActivitiesDone, mappingActivitiesDone, generationActivitiesDone, validationActivitiesDone } = useAgentStore()
   const { selectedProject, selectedProjectName, selectedSite, selectedProjects, selectedProjectNames, tableauSiteName, selectedWorkspaceName } = useDashboardStore()
   const parsingDataMap = useParsingStore(state => state.parsingData)
@@ -1001,14 +838,13 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
         </div>
         {!isPdfMode && isAllParsingDone && (
           <Button
-            icon={isGeneratingInsights ? <Spinner size="extra-tiny" /> : <DocumentPdf24Regular />}
-            appearance="primary"
-            size="large"
+            size="lg"
             disabled={isGeneratingInsights}
             onClick={handleDownloadPDF}
             className={styles.downloadButton}
             title={isGeneratingInsights ? "Waiting for AI insights..." : "Download migration report as PDF"}
           >
+            {isGeneratingInsights ? <Spinner size="tiny" /> : <FileText />}
             {isGeneratingInsights ? "Generating Insights..." : "Download Report"}
           </Button>
         )}
@@ -1022,17 +858,34 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
           {/* Source Card */}
           <div style={{ flex: 1, backgroundColor: "#eff6ff", borderRadius: "8px", border: "1px solid #bfdbfe", padding: "24px", display: "flex", flexDirection: "column", boxSizing: "border-box" }}>
             <div style={{ color: "#1e40af", fontWeight: 600, fontSize: "18px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "12px" }}>
-              <img src="https://img.icons8.com/?size=100&id=9Kvi1p1F0tUo&format=png&color=000000" alt="Tableau" width={32} height={32} />
+              <div
+                aria-hidden="true"
+                style={{
+                  width: 32,
+                  height: 32,
+                  flexShrink: 0,
+                  borderRadius: "6px",
+                  backgroundColor: "#1e40af",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                }}
+              >
+                T
+              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                 <span style={{ fontSize: "16px" }}>Source</span>
                 <span style={{ fontSize: "12px", color: "#2563eb", fontWeight: "normal" }}>Tableau Environment</span>
               </div>
             </div>
             <div style={{ backgroundColor: "#ffffff", borderRadius: "6px", padding: "16px", border: "1px solid #e2e8f0", flex: 1 }}>
-              <div style={{ fontSize: "16px", fontWeight: "bold", color: tokens.colorNeutralForeground1, marginBottom: "8px" }}>
+              <div style={{ fontSize: "16px", fontWeight: "bold", color: "var(--text)", marginBottom: "8px" }}>
                 {siteNames.length > 0 ? siteNames[0] : "vectorlab"}
               </div>
-              <div style={{ fontSize: "14px", color: tokens.colorNeutralForeground2, display: "flex", flexDirection: "column", gap: "4px" }}>
+              <div style={{ fontSize: "14px", color: "var(--text-secondary)", display: "flex", flexDirection: "column", gap: "4px" }}>
                 <span>{projectNames.length > 0 ? projectNames.join(', ') : selectedProjectName || "Project"}</span>
               </div>
             </div>
@@ -1040,7 +893,7 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
 
           {/* Arrow */}
           <div style={{ color: "#64748b", display: "flex", alignItems: "center", padding: "0 16px" }}>
-            <ArrowRight24Regular primaryFill="#64748b" />
+            <ArrowRight color="#64748b" />
           </div>
 
           {/* Target Card */}
@@ -1053,10 +906,10 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
               </div>
             </div>
             <div style={{ backgroundColor: "#ffffff", borderRadius: "6px", padding: "16px", border: "1px solid #e2e8f0", flex: 1 }}>
-              <div style={{ fontSize: "16px", fontWeight: "bold", color: tokens.colorNeutralForeground1, marginBottom: "8px" }}>
+              <div style={{ fontSize: "16px", fontWeight: "bold", color: "var(--text)", marginBottom: "8px" }}>
                 Target Fabric Workspace
               </div>
-              <div style={{ fontSize: "14px", color: tokens.colorNeutralForeground2 }}>
+              <div style={{ fontSize: "14px", color: "var(--text-secondary)" }}>
                 {workspaceNames.length > 0 ? workspaceNames[0] : selectedWorkspaceName || "Workspace"}
               </div>
             </div>
@@ -1067,12 +920,12 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
 
       <div className={styles.heroBanner} style={isPdfMode ? { backgroundColor: "#ffffff" } : {}}>
         <div className={styles.intelligenceGrid}>
-          <IntelligenceTile label="Workbooks" value={projectMetrics.workbooks} icon={<DocumentDatabase24Regular />} />
-          <IntelligenceTile label="Data Sources" value={projectMetrics.datasources} icon={<DatabaseSearch24Regular />} />
-          <IntelligenceTile label="Logical Tables" value={projectMetrics.tables} icon={<Table24Regular />} />
-          <IntelligenceTile label="Measures" value={projectMetrics.measures} icon={<Layer24Regular />} />
-          <IntelligenceTile label="Dimensions" value={projectMetrics.dimensions} icon={<Settings24Regular />} />
-          <IntelligenceTile label="LOD" value={projectMetrics.lods} icon={<BrainCircuit24Regular />} />
+          <IntelligenceTile label="Workbooks" value={projectMetrics.workbooks} icon={<Database />} />
+          <IntelligenceTile label="Data Sources" value={projectMetrics.datasources} icon={<Search />} />
+          <IntelligenceTile label="Logical Tables" value={projectMetrics.tables} icon={<TableIcon />} />
+          <IntelligenceTile label="Measures" value={projectMetrics.measures} icon={<Layers />} />
+          <IntelligenceTile label="Dimensions" value={projectMetrics.dimensions} icon={<Settings />} />
+          <IntelligenceTile label="LOD" value={projectMetrics.lods} icon={<BrainCircuit />} />
         </div>
       </div>
 
@@ -1086,7 +939,7 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
             <div style={{ fontSize: "15px", color: "#334155", lineHeight: "1.6", fontWeight: 500, backgroundColor: "#f8faff", padding: "20px", borderRadius: "10px", border: "1px solid #bfdbfe", borderLeft: "4px solid #3b82f6", minHeight: "64px", display: "flex", alignItems: "center" }}>
               {(aiGenerationState !== 'completed' && aiGenerationState !== 'error') && !isPdfMode ? (
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", color: "#64748b" }}>
-                  <Spinner size="extra-tiny" /> {aiGenerationState === 'waiting_for_assessment' ? 'Waiting for Assessment completion...' : 'Generating executive summary...'}
+                  <Spinner size="tiny" /> {aiGenerationState === 'waiting_for_assessment' ? 'Waiting for Assessment completion...' : 'Generating executive summary...'}
                 </div>
               ) : (
                 executiveInsightsData?.executiveSummary
@@ -1100,10 +953,10 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
       <div style={{ padding: "0 8px", marginTop: "32px", marginBottom: "32px" }}>
         <Card
           style={{
-            backgroundColor: tokens.colorNeutralBackground1,
+            backgroundColor: "var(--surface)",
             padding: "32px",
-            border: `1px solid ${tokens.colorNeutralStroke2}`,
-            boxShadow: tokens.shadow8,
+            border: `1px solid var(--border)`,
+            boxShadow: "var(--shadow-sm)",
             borderRadius: "16px",
             display: "flex",
             flexDirection: "column",
@@ -1113,32 +966,32 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
           <SectionHeading title="Content Counts" description="Detailed breakdown of key migration metrics and elements discovered during assessment." />
 
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", border: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: "15px", borderRadius: "8px", overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", border: `1px solid var(--border)`, fontSize: "15px", borderRadius: "8px", overflow: "hidden" }}>
               <thead>
                 <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
-                  <th style={{ padding: "16px", borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: "16px", color: tokens.colorNeutralForeground1 }}>Metric</th>
-                  <th style={{ padding: "16px", borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: "16px", color: tokens.colorNeutralForeground1, width: "120px" }}>Count</th>
+                  <th style={{ padding: "16px", borderBottom: `1px solid var(--border)`, fontSize: "16px", color: "var(--text)" }}>Metric</th>
+                  <th style={{ padding: "16px", borderBottom: `1px solid var(--border)`, fontSize: "16px", color: "var(--text)", width: "120px" }}>Count</th>
                 </tr>
               </thead>
               <tbody style={{ backgroundColor: "#ffffff" }}>
                 <tr>
-                  <td style={{ padding: "16px", borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, color: tokens.colorNeutralForeground2 }}>Custom SQL Queries</td>
-                  <td style={{ padding: "16px", borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, fontWeight: 600 }}>{challengesSummaryData.totalCustomSql}</td>
+                  <td style={{ padding: "16px", borderBottom: `1px solid var(--border)`, color: "var(--text-secondary)" }}>Custom SQL Queries</td>
+                  <td style={{ padding: "16px", borderBottom: `1px solid var(--border)`, fontWeight: 600 }}>{challengesSummaryData.totalCustomSql}</td>
                 </tr>
                 <tr>
-                  <td style={{ padding: "16px", borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, color: tokens.colorNeutralForeground2 }}>LOD Expressions</td>
-                  <td style={{ padding: "16px", borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, fontWeight: 600 }}>{challengesSummaryData.totalLods}</td>
+                  <td style={{ padding: "16px", borderBottom: `1px solid var(--border)`, color: "var(--text-secondary)" }}>LOD Expressions</td>
+                  <td style={{ padding: "16px", borderBottom: `1px solid var(--border)`, fontWeight: 600 }}>{challengesSummaryData.totalLods}</td>
                 </tr>
                 <tr>
-                  <td style={{ padding: "16px", borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, color: tokens.colorNeutralForeground2 }}>Parameters</td>
-                  <td style={{ padding: "16px", borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, fontWeight: 600 }}>{challengesSummaryData.totalParameters}</td>
+                  <td style={{ padding: "16px", borderBottom: `1px solid var(--border)`, color: "var(--text-secondary)" }}>Parameters</td>
+                  <td style={{ padding: "16px", borderBottom: `1px solid var(--border)`, fontWeight: 600 }}>{challengesSummaryData.totalParameters}</td>
                 </tr>
                 <tr>
-                  <td style={{ padding: "16px", borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, color: tokens.colorNeutralForeground2 }}>Logical Data Sources</td>
-                  <td style={{ padding: "16px", borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, fontWeight: 600 }}>{challengesSummaryData.totalLogicalSources}</td>
+                  <td style={{ padding: "16px", borderBottom: `1px solid var(--border)`, color: "var(--text-secondary)" }}>Logical Data Sources</td>
+                  <td style={{ padding: "16px", borderBottom: `1px solid var(--border)`, fontWeight: 600 }}>{challengesSummaryData.totalLogicalSources}</td>
                 </tr>
                 <tr>
-                  <td style={{ padding: "16px", color: tokens.colorNeutralForeground2 }}>Workbooks w/ Legacy Risks</td>
+                  <td style={{ padding: "16px", color: "var(--text-secondary)" }}>Workbooks w/ Legacy Risks</td>
                   <td style={{ padding: "16px", fontWeight: 600 }}>{challengesSummaryData.legacyDetectedCount}</td>
                 </tr>
               </tbody>
@@ -1155,24 +1008,24 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
           <SectionHeading title="Source System Inventory" />
           <div style={{ overflowX: "auto" }}>
             {migrationSummaryData.length > 0 ? (
-              <Table aria-label="Source System Inventory Table" style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #e2e8f0", fontSize: "14px", pageBreakInside: "auto" }}>
-                <TableHeader style={{ breakInside: "avoid" }}>
-                  <TableRow style={{ background: "#f1f5f9", textAlign: "left", breakInside: "avoid" }}>
-                    <TableHeaderCell style={{ padding: "10px", borderBottom: "1px solid #e2e8f0", fontWeight: "bold" }}>Workbook Name</TableHeaderCell>
-                    <TableHeaderCell style={{ padding: "10px", borderBottom: "1px solid #e2e8f0", fontWeight: "bold" }}>Tableau Data Sources</TableHeaderCell>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <table aria-label="Source System Inventory Table" style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #e2e8f0", fontSize: "14px", pageBreakInside: "auto" }}>
+                <thead style={{ breakInside: "avoid" }}>
+                  <tr style={{ background: "#f1f5f9", textAlign: "left", breakInside: "avoid" }}>
+                    <th style={{ padding: "10px", borderBottom: "1px solid #e2e8f0", fontWeight: "bold" }}>Workbook Name</th>
+                    <th style={{ padding: "10px", borderBottom: "1px solid #e2e8f0", fontWeight: "bold" }}>Tableau Data Sources</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {migrationSummaryData.map((item) => (
-                    <TableRow key={item.id} style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
-                      <TableCell style={{ padding: "10px", borderBottom: "1px solid #e2e8f0", wordBreak: "break-word" }}><Text weight="semibold">{item.workbookName}</Text></TableCell>
-                      <TableCell style={{ padding: "10px", borderBottom: "1px solid #e2e8f0", wordBreak: "break-word" }}>{item.tableauDs}</TableCell>
-                    </TableRow>
+                    <tr key={item.id} style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
+                      <td style={{ padding: "10px", borderBottom: "1px solid #e2e8f0", wordBreak: "break-word" }}><span style={{ fontWeight: 600 }}>{item.workbookName}</span></td>
+                      <td style={{ padding: "10px", borderBottom: "1px solid #e2e8f0", wordBreak: "break-word" }}>{item.tableauDs}</td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             ) : (
-              <div style={{ padding: "32px", color: tokens.colorNeutralForeground3, fontStyle: "italic", textAlign: "center", border: "1px dashed #e2e8f0", borderRadius: "8px", backgroundColor: "#f8fafc" }}>
+              <div style={{ padding: "32px", color: "var(--text-muted)", fontStyle: "italic", textAlign: "center", border: "1px dashed #e2e8f0", borderRadius: "8px", backgroundColor: "#f8fafc" }}>
                 Workbook metadata will appear after assessment is completed.
               </div>
             )}
@@ -1185,7 +1038,7 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
               {/* CHALLENGES SUMMARY SECTION */}
               <div className="pdf-section" style={{ breakInside: "auto", pageBreakInside: "auto" }}>
                 <SectionHeading title="Migration Challenges Summary" />
-                <div style={{ display: "flex", flexDirection: "column", gap: "32px", fontSize: "15px", color: tokens.colorNeutralForeground1 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "32px", fontSize: "15px", color: "var(--text)" }}>
                   {(() => {
                     const {
                       totalCustomSql, totalLods, totalCalculations, totalParameters, totalLogicalSources,
@@ -1204,9 +1057,9 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
                           <div style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
                             <strong style={{ fontSize: "20px", display: "block", marginBottom: "16px" }}>Overall Assessment</strong>
                             <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", background: "#f8fafc", padding: "16px", borderRadius: "8px", fontSize: "16px", lineHeight: "1.6" }}>
-                              <div><span style={{ color: tokens.colorNeutralForeground3 }}>Average Complexity:</span> <strong>{avgScore} ({overallRating})</strong></div>
-                              {maxWbName && <div><span style={{ color: tokens.colorNeutralForeground3 }}>Highest Complexity:</span> <strong>{maxWbName} ({maxComplexity})</strong></div>}
-                              {minWbName && minWbName !== maxWbName && <div><span style={{ color: tokens.colorNeutralForeground3 }}>Lowest Complexity:</span> <strong>{minWbName} ({minComplexity})</strong></div>}
+                              <div><span style={{ color: "var(--text-muted)" }}>Average Complexity:</span> <strong>{avgScore} ({overallRating})</strong></div>
+                              {maxWbName && <div><span style={{ color: "var(--text-muted)" }}>Highest Complexity:</span> <strong>{maxWbName} ({maxComplexity})</strong></div>}
+                              {minWbName && minWbName !== maxWbName && <div><span style={{ color: "var(--text-muted)" }}>Lowest Complexity:</span> <strong>{minWbName} ({minComplexity})</strong></div>}
                             </div>
                           </div>
                         )}
@@ -1232,7 +1085,7 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
                                       <ul style={{ margin: 0, paddingLeft: "20px" }}>
                                         {wb.challenges.map((c, idx) => <li key={idx} style={{ marginBottom: "8px" }}>{c}</li>)}
                                       </ul>
-                                    ) : <span style={{ color: tokens.colorNeutralForeground3 }}>None</span>}
+                                    ) : <span style={{ color: "var(--text-muted)" }}>None</span>}
                                   </td>
                                 </tr>
                               ))}
@@ -1248,7 +1101,7 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
                               {recommendations.map((rec, i) => (
                                 <li key={i} style={{ marginBottom: "16px" }}>
                                   <strong>{rec.issue}:</strong> {rec.impact} <br />
-                                  <em>Action:</em> <span style={{ color: tokens.colorNeutralForeground3 }}>{rec.action}</span>
+                                  <em>Action:</em> <span style={{ color: "var(--text-muted)" }}>{rec.action}</span>
                                 </li>
                               ))}
                             </ul>
@@ -1268,10 +1121,10 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
           return (
             <Card
               style={{
-                backgroundColor: isPdfMode ? "#ffffff" : tokens.colorNeutralBackground1,
+                backgroundColor: isPdfMode ? "#ffffff" : "var(--surface)",
                 padding: isPdfMode ? "0" : "32px",
-                border: isPdfMode ? "none" : `1px solid ${tokens.colorNeutralStroke2}`,
-                boxShadow: isPdfMode ? "none" : tokens.shadow8,
+                border: isPdfMode ? "none" : `1px solid var(--border)`,
+                boxShadow: isPdfMode ? "none" : "var(--shadow-sm)",
                 borderRadius: isPdfMode ? "0" : "16px",
                 breakInside: "avoid",
                 pageBreakInside: "avoid",
@@ -1289,7 +1142,7 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
                       <strong>AI Generation Failed:</strong> {aiError}. Falling back to rules-based insights.
                     </div>
                     {!isPdfMode && (
-                      <Button appearance="outline" onClick={handleRetryAi}>Retry</Button>
+                      <Button variant="outline" onClick={handleRetryAi}>Retry</Button>
                     )}
                   </div>
                 )}
@@ -1302,7 +1155,7 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                       {(aiGenerationState !== 'completed' && aiGenerationState !== 'error') && !isPdfMode ? (
                         <div style={{ display: "flex", gap: "12px", alignItems: "center", backgroundColor: "#f0fdf4", padding: "16px 20px", borderRadius: "10px", border: "1px solid #bbf7d0", color: "#64748b" }}>
-                          <Spinner size="extra-tiny" /> Preparing AI recommendations...
+                          <Spinner size="tiny" /> Preparing AI recommendations...
                         </div>
                       ) : (
                         ei.recommendedApproach.map((f: string, i: number) => (
@@ -1354,7 +1207,7 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                       {(aiGenerationState !== 'completed' && aiGenerationState !== 'error') && !isPdfMode ? (
                         <div style={{ display: "flex", gap: "12px", alignItems: "center", backgroundColor: "#f8fafc", padding: "16px 20px", borderRadius: "10px", border: "1px solid #e2e8f0", color: "#64748b" }}>
-                          <Spinner size="extra-tiny" /> Analyzing migration portfolio...
+                          <Spinner size="tiny" /> Analyzing migration portfolio...
                         </div>
                       ) : (
                         ei.keyFindings.map((f: string, i: number) => (

@@ -1,51 +1,56 @@
 "use client"
 
-import { useEffect, useState, useRef, useCallback, useMemo } from "react"
+import { useEffect, useState, useRef, useCallback, useMemo, type HTMLAttributes } from "react"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Spinner } from "@/components/ui/spinner"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Dropdown, Option } from "@/components/ui/dropdown"
+import { Combobox } from "@/components/ui/combobox"
+import { Radio, RadioGroup } from "@/components/ui/radio"
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Tooltip } from "@/components/ui/tooltip"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
-  makeStyles,
-  mergeClasses,
-  shorthands,
-  tokens,
-  Button,
-  Card,
-  Spinner,
-  Input,
-  Label,
-  Text,
-  Dropdown,
-  Combobox,
-  Option,
-  Radio,
-  RadioGroup,
-  MessageBar,
-  MessageBarBody,
-  MessageBarTitle,
-  TabList,
-  Tab,
-  Dialog,
-  DialogTrigger,
-  DialogSurface,
-  DialogTitle,
-  DialogBody,
-  DialogActions,
-  DialogContent,
-  Tooltip,
-  Checkbox,
-} from "@fluentui/react-components"
-import {
-  Play24Regular,
-  Database24Regular,
-  Cloud24Regular,
-  ArrowRight24Regular,
-  ArrowClockwise24Regular,
-  CheckmarkCircle24Regular,
-  ErrorCircle24Regular,
-  Add24Regular,
-  Delete24Regular,
-  Info16Regular,
-  Edit20Regular,
-  Dismiss20Regular,
-} from "@fluentui/react-icons"
+  Play,
+  ArrowRight,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  Plus,
+  Trash2,
+  Info,
+  Pencil,
+  X,
+} from "lucide-react"
+
+function cx(...parts: Array<string | undefined | false>) {
+  return parts.filter(Boolean).join(" ")
+}
+
+const WEIGHT_MAP: Record<string, number> = { regular: 400, medium: 500, semibold: 600, bold: 700 }
+const SIZE_MAP: Record<number, number> = { 100: 10, 200: 12, 300: 14, 400: 16, 500: 20, 600: 24, 700: 28, 800: 32, 900: 40, 1000: 68 }
+
+function Text({
+  weight,
+  size,
+  style,
+  ...props
+}: { weight?: "regular" | "medium" | "semibold" | "bold"; size?: number } & HTMLAttributes<HTMLSpanElement>) {
+  return (
+    <span
+      style={{
+        fontWeight: weight ? WEIGHT_MAP[weight] : undefined,
+        fontSize: size ? `${SIZE_MAP[size]}px` : undefined,
+        ...style,
+      }}
+      {...props}
+    />
+  )
+}
 import { debounce } from "lodash"
 import { useMsal } from "@azure/msal-react"
 import Image from "next/image"
@@ -67,6 +72,8 @@ import { batchService } from "@/services/batch.service"
 import { recordsService } from "@/services/records.service"
 
 import { ResultTab } from "@/components/tabs/ResultTab"
+import { ConnectorRequired } from "@/components/connectors/ConnectorRequired"
+import { useConnectorReadiness } from "@/hooks/useConnectorReadiness"
 import { MigrationOverview } from "./MigrationOverview"
 import ConfigurationsContent from "./ConfigurationsContent"
 import { isLiteMode } from "@/lib/config"
@@ -79,210 +86,49 @@ const PdfReportRenderer = dynamic(
   { ssr: false }
 )
 
-// const useStyles = makeStyles({
-//   root: { ...shorthands.padding("24px", "16px") },
-//   errorAlert: { marginBottom: "24px" },
-//   successAlert: { marginBottom: "24px", backgroundColor: "#f0fdf4", ...shorthands.border("1px", "solid", "#bbf7d0") },
-//   mainGrid: { display: "flex", gap: "32px", alignItems: "stretch", "@media (max-width: 1024px)": { flexDirection: "column", gap: "24px" } },
-//   card: { flex: 1, ...shorthands.borderRadius(tokens.borderRadiusMedium), boxShadow: tokens.shadow4, minHeight: "520px", overflow: "hidden" },
-//   sourceCard: { backgroundColor: "#eff6ff", ...shorthands.border("1px", "solid", "#bfdbfe") },
-//   targetCard: { backgroundColor: "#f0fdf4", ...shorthands.border("1px", "solid", "#bbf7d0") },
-//   cardHeader: { ...shorthands.padding("16px", "20px"), ...shorthands.borderBottom("1px", "solid", "#bfdbfe") },
-//   sourceHeader: { backgroundColor: "#dbeafe", ...shorthands.borderBottom("1px", "solid", "#bfdbfe") },
-//   targetHeader: { backgroundColor: "#dcfce7", ...shorthands.borderBottom("1px", "solid", "#bbf7d0") },
-//   header: { marginBottom: "10px", textAlign: "left" },
-//   title: { fontSize: tokens.fontSizeHero800, fontWeight: tokens.fontWeightBold, color: tokens.colorNeutralForeground1, marginBottom: "8px" },
-//   headerContent: { display: "flex", alignItems: "center", gap: "12px" },
-//   icon: { fontSize: "28px" },
-//   arrowContainer: { display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", color: tokens.colorNeutralStroke2, minWidth: "20px", ...shorthands.padding("0", "8px"), "@media (max-width: 1024px)": { minWidth: "auto", transform: "rotate(90deg)", ...shorthands.padding("16px", "0"), fontSize: "48px" } },
-//   configCard: { backgroundColor: "#f8fafc", ...shorthands.border("1px", "solid", "#e2e8f0"), marginTop: "24px", ...shorthands.borderRadius(tokens.borderRadiusMedium) },
-//   configHeader: { ...shorthands.padding("12px", "16px"), ...shorthands.borderBottom("1px", "solid", "#e2e8f0"), backgroundColor: "#f1f5f9" },
-//   configRow: { display: "flex", justifyContent: "space-between", alignItems: "center", ...shorthands.padding("12px", "16px"), ...shorthands.borderBottom("1px", "solid", "#e2e8f0"), ":last-child": { ...shorthands.borderBottom("none") } },
-//   labelText: { color: "#475569", fontSize: tokens.fontSizeBase200 },
-//   statusGreen: { color: "#15803d", fontWeight: tokens.fontWeightSemibold },
-//   statusYellow: { color: "#a16207", fontWeight: tokens.fontWeightSemibold },
-//   statusIndigo: { color: "#4f46e5", fontWeight: tokens.fontWeightSemibold },
-//   buttonContainer: { display: "flex", justifyContent: "center", marginTop: "40px", gap: "24px", flexWrap: "wrap", minHeight: "48px" },
-//   largeButton: { minWidth: "220px", fontSize: tokens.fontSizeBase400, ...shorthands.padding("12px", "32px") },
-//   sectionTitle: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, marginBottom: "8px", display: "block" },
-//   cardInnerPadding: { ...shorthands.padding("24px") },
-//   subTabsWrapper: { backgroundColor: "#eaf4ff", ...shorthands.borderRadius(tokens.borderRadiusMedium), ...shorthands.margin("32px", "0", "20px", "0"), ...shorthands.padding("6px", "12px"), display: "flex", justifyContent: "center", alignItems: "center", boxShadow: tokens.shadow2, ...shorthands.border("1px", "solid", tokens.colorNeutralStroke2) },
-//   subTabList: { display: "grid !important" as any, gridTemplateColumns: "1fr 1fr", columnGap: "24px", alignItems: "center", width: "100%", maxWidth: "400px", "::after": { display: "none !important" }, "::before": { display: "none !important" }, "> div:not([role])": { display: "none !important" } },
-//   subTabBase: { width: "100%", boxSizing: "border-box", whiteSpace: "nowrap", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", ...shorthands.padding("0", "12px"), ...shorthands.margin("0"), fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForeground1, backgroundColor: "transparent", ...shorthands.borderRadius("8px"), ...shorthands.border("1px", "solid", "transparent"), cursor: "pointer", transitionProperty: "background-color, box-shadow, border-color", transitionDuration: tokens.durationNormal, ":hover": { backgroundColor: tokens.colorSubtleBackgroundHover, boxShadow: tokens.shadow2 }, ":focus": { outlineStyle: "none" }, "& .fui-Tab__content": { overflow: "visible !important" }, "& .fui-Tab__indicator": { display: "none !important" }, "::after": { display: "none !important" } },
-//   subTabSelected: { fontWeight: tokens.fontWeightSemibold, boxShadow: tokens.shadow4, ...shorthands.border("1px", "solid", tokens.colorNeutralStroke1), backgroundColor: tokens.colorNeutralBackground1 },
-//   subTabDisabled: { color: tokens.colorNeutralForeground3, cursor: "not-allowed", opacity: 0.65, ":hover": { backgroundColor: "transparent", boxShadow: "none" } },
-//   inputGroup: { display: "flex", gap: "12px", alignItems: "center", marginTop: "4px" },
-//   inputField: { flexGrow: 1 },
-//   marginTopSpacing: { marginTop: "24px" },
-// })
 
-const useStyles = makeStyles({
-  root: { ...shorthands.padding("24px", "16px") },
-  errorAlert: { marginBottom: "24px" },
-  successAlert: { marginBottom: "24px", backgroundColor: "#f0fdf4", ...shorthands.border("1px", "solid", "#bbf7d0") },
-  mainGrid: { display: "flex", gap: "32px", alignItems: "stretch", "@media (max-width: 1200px)": { flexDirection: "column", gap: "24px" } },
-  card: { flex: 1, ...shorthands.borderRadius(tokens.borderRadiusMedium), boxShadow: tokens.shadow4, minHeight: "520px", overflow: "hidden" },
-  sourceCard: { backgroundColor: "#eff6ff", ...shorthands.border("1px", "solid", "#bfdbfe") },
-  targetCard: { backgroundColor: "#f0fdf4", ...shorthands.border("1px", "solid", "#bbf7d0") },
-  cardHeader: { ...shorthands.padding("16px", "20px"), ...shorthands.borderBottom("1px", "solid", "#bfdbfe") },
-  sourceHeader: { backgroundColor: "#dbeafe", ...shorthands.borderBottom("1px", "solid", "#bfdbfe") },
-  targetHeader: { backgroundColor: "#dcfce7", ...shorthands.borderBottom("1px", "solid", "#bbf7d0") },
-  header: { marginBottom: "10px", textAlign: "left" },
-  title: { fontSize: tokens.fontSizeHero800, fontWeight: tokens.fontWeightBold, color: tokens.colorNeutralForeground1, marginBottom: "8px" },
-  headerContent: { display: "flex", alignItems: "center", gap: "12px" },
-  icon: { fontSize: "28px" },
-  arrowContainer: { display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", color: "#64748b", minWidth: "20px", ...shorthands.padding("0", "8px"), "@media (max-width: 1200px)": { minWidth: "auto", transform: "rotate(90deg)", ...shorthands.padding("16px", "0"), fontSize: "48px" } },
-  configCard: { backgroundColor: "#f8fafc", ...shorthands.border("1px", "solid", "#e2e8f0"), marginTop: "24px", ...shorthands.borderRadius(tokens.borderRadiusMedium) },
-  configHeader: { ...shorthands.padding("12px", "16px"), ...shorthands.borderBottom("1px", "solid", "#e2e8f0"), backgroundColor: "#f1f5f9" },
-  configRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: "8px",
-    ...shorthands.padding("12px", "16px"),
-    ...shorthands.borderBottom("1px", "solid", "#e2e8f0"),
-    ":last-child": { ...shorthands.borderBottom("none") }
-  },
-  labelText: { color: "#475569", fontSize: tokens.fontSizeBase200 },
-  statusGreen: { color: "#15803d", fontWeight: tokens.fontWeightSemibold },
-  statusYellow: { color: "#a16207", fontWeight: tokens.fontWeightSemibold },
-  statusIndigo: { color: "#4f46e5", fontWeight: tokens.fontWeightSemibold },
-  buttonContainer: { display: "flex", justifyContent: "center", marginTop: "40px", gap: "24px", flexWrap: "wrap", minHeight: "48px" },
-  largeButton: { minWidth: "220px", fontSize: tokens.fontSizeBase400, ...shorthands.padding("12px", "32px") },
-  sectionTitle: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, marginBottom: "8px", display: "block" },
-  cardInnerPadding: { ...shorthands.padding("24px") },
+const styles = {
+  root: "mt-root",
+  errorAlert: "mt-errorAlert",
+  successAlert: "mt-successAlert",
+  mainGrid: "mt-mainGrid",
+  card: "mt-card",
+  sourceCard: "mt-sourceCard",
+  targetCard: "mt-targetCard",
+  cardHeader: "mt-cardHeader",
+  sourceHeader: "mt-sourceHeader",
+  targetHeader: "mt-targetHeader",
+  headerContent: "mt-headerContent",
+  arrowContainer: "mt-arrowContainer",
+  configCard: "mt-configCard",
+  configHeader: "mt-configHeader",
+  configRow: "mt-configRow",
+  labelText: "mt-labelText",
+  statusGreen: "mt-statusGreen",
+  statusYellow: "mt-statusYellow",
+  statusIndigo: "mt-statusIndigo",
+  buttonContainer: "mt-buttonContainer",
+  largeButton: "mt-largeButton",
+  sectionTitle: "mt-sectionTitle",
+  cardInnerPadding: "mt-cardInnerPadding",
+  subTabsWrapper: "mt-subTabsWrapper",
+  subTabList: "mt-subTabList",
+  subTabBase: "mt-subTabBase",
+  subTabSelected: "mt-subTabSelected",
+  subTabDisabled: "mt-subTabDisabled",
+  truncateDropdown: "mt-truncateDropdown",
+  inputGroup: "mt-inputGroup",
+  inputField: "mt-inputField",
+  marginTopSpacing: "mt-marginTopSpacing",
+  pulseButton: "mt-pulseButton",
+}
 
-  // --- FIXED TAB STYLES START HERE ---
-  subTabsWrapper: {
-    backgroundColor: "#eaf4ff",
-    ...shorthands.borderRadius(tokens.borderRadiusMedium),
-
-    // Restored standard margins so it stretches full width
-    marginTop: "32px",
-    marginBottom: "20px",
-    marginLeft: "0",
-    marginRight: "0",
-    width: "100%", // Forces the blue background to stretch
-    boxSizing: "border-box", // Prevents it from spilling past the page edges
-
-    ...shorthands.padding("6px", "12px"),
-    display: "flex",
-    justifyContent: "center", // Keeps the buttons grouped in the dead center
-    alignItems: "center",
-    boxShadow: tokens.shadow2,
-    ...shorthands.border("1px", "solid", tokens.colorNeutralStroke2),
-    overflowX: "auto",
-    scrollbarWidth: "none",
-    msOverflowStyle: "none",
-    WebkitOverflowScrolling: "touch",
-  },
-
-  subTabList: {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: "12px", // Updated to 12px to perfectly match the main navigation gap
-    minWidth: "max-content",
-  },
-
-  subTabBase: {
-    // Copied exactly from page.tsx (tabBase) for identical behavior
-    boxSizing: "border-box",
-    height: "32px",
-    minWidth: "fit-content",
-    flex: 1, // Equally balance the tabs
-    maxWidth: "200px", // Prevent them from becoming overly wide on huge screens
-
-    paddingTop: "0",
-    paddingBottom: "0",
-    paddingLeft: "16px",
-    paddingRight: "16px",
-
-    fontSize: tokens.fontSizeBase200,
-    fontWeight: tokens.fontWeightRegular,
-    color: tokens.colorNeutralForeground1,
-    backgroundColor: "transparent",
-
-    ...shorthands.borderRadius("8px"),
-    ...shorthands.border("1px", "solid", "transparent"),
-
-    cursor: "pointer",
-    transition: `background-color ${tokens.durationNormal}, box-shadow ${tokens.durationNormal}, border-color ${tokens.durationNormal}`,
-
-    // Completely hide the blue line
-    "& .fui-Tab__indicator": {
-      display: "none",
-    },
-
-    ":hover": {
-      backgroundColor: tokens.colorSubtleBackgroundHover,
-      boxShadow: tokens.shadow2, // Added the subtle shadow from page.tsx
-    },
-
-    ":focus": {
-      outlineStyle: "none"
-    }
-  },
-
-  subTabSelected: {
-    // Copied exactly from page.tsx (selectedTab)
-    fontWeight: tokens.fontWeightSemibold,
-    boxShadow: tokens.shadow4,
-    backgroundColor: tokens.colorNeutralBackground1,
-    ...shorthands.border("1px", "solid", tokens.colorNeutralStroke1),
-
-    ":hover": {
-      backgroundColor: tokens.colorNeutralBackground1,
-    }
-  },
-
-  subTabDisabled: {
-    color: tokens.colorNeutralForeground3,
-    cursor: "not-allowed",
-    opacity: 0.65,
-    ":hover": {
-      backgroundColor: "transparent",
-      boxShadow: "none"
-    }
-  },
-  // --- FIXED TAB STYLES END HERE ---
-
-  truncateDropdown: {
-    "& button": {
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      "& span": {
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-      }
-    }
-  },
-
-  inputGroup: { display: "flex", gap: "12px", alignItems: "center", marginTop: "4px" },
-  inputField: { flexGrow: 1 },
-  marginTopSpacing: { marginTop: "24px" },
-  pulseButton: {
-    boxShadow: `0 0 0 0 ${tokens.colorBrandBackground2}`,
-    animationName: {
-      from: { boxShadow: `0 0 0 0 ${tokens.colorBrandBackground2}` },
-      to: { boxShadow: `0 0 0 10px rgba(0, 120, 212, 0)` },
-    },
-    animationDuration: "2s",
-    animationIterationCount: "infinite",
-    animationTimingFunction: "ease-out",
-  },
-})
-
-import { getStorageToken, getFabricToken } from "@/components/providers/MsalProviderWrapper"
+import { getFabricToken } from "@/components/providers/MsalProviderWrapper"
 
 type MigrationScope = "selected" | "project" | "site" | "entire"
 type SubTab = "configurations" | "overview" | "results"
 
 export function MigrationTab() {
-  const styles = useStyles()
   const { instance, accounts } = useMsal()
   const account = accounts[0]
   const { user, isAuthenticated } = useAuthStore()
@@ -432,6 +278,17 @@ export function MigrationTab() {
   const [configStatus, setConfigStatus] = useState<"idle" | "success" | "error">("idle")
 
   const [savedCredentials, setSavedCredentials] = useState<TableauCredentials[]>([])
+
+  // The Tableau connection configured in Settings. Its `connectionId` is a Key
+  // Vault id in the same backend store these saved connections come from, so
+  // the configured connection appears in `savedCredentials` too — this just
+  // says which of them to prefer, rather than being a separate credential.
+  const tableauConnector = useConnectorReadiness("tableau")
+  const configuredConnectionId =
+    typeof tableauConnector.connection?.values?.connectionId === "string"
+      ? tableauConnector.connection.values.connectionId
+      : ""
+
   const hasStartedRef = useRef(false)
   const assessmentTriggeredRef = useRef(false)
 
@@ -448,12 +305,17 @@ export function MigrationTab() {
       const credsArray = Array.isArray(creds) ? creds : (creds ? [creds] : [])
       setSavedCredentials(credsArray)
 
-      // Preserve currently selected connection if it still exists in the fetched list
+      // Preserve the current selection; otherwise prefer the connection
+      // configured in Settings, so someone who set Tableau up there lands on it
+      // rather than on whichever connection happens to be first.
       let singleCred = null;
       if (selectedConnectionId) {
         singleCred = credsArray.find(c => c.connection_id === selectedConnectionId) || credsArray[0] || null;
       } else {
-        singleCred = credsArray[0] ?? null;
+        singleCred =
+          (configuredConnectionId
+            ? credsArray.find(c => c.connection_id === configuredConnectionId)
+            : null) ?? credsArray[0] ?? null;
       }
 
       setTableauCredentials(singleCred)
@@ -968,23 +830,20 @@ export function MigrationTab() {
     // --- Reset single run mode continuation flag
     setHasContinued(false);
 
-    let oneLakeToken: string | undefined;
     let fabricToken: string | undefined;
 
     try {
       const { getActiveToken } = await import("@/components/providers/MsalProviderWrapper");
 
-      // Force-refresh all 3 tokens: bearer, fabric_access_token, onelake_token
-      [oneLakeToken, fabricToken] = await Promise.all([
-        getStorageToken(true),
+      // Force-refresh tokens: bearer, fabric_access_token
+      [fabricToken] = await Promise.all([
         getFabricToken(true)
       ]);
       await getActiveToken(true);
-      console.log("[MigrationTab] All 3 tokens force-refreshed for Start Migration");
+      console.log("[MigrationTab] All tokens force-refreshed for Start Migration");
     } catch (tokenErr) {
       console.warn("[MigrationTab] Failed to force-refresh tokens, proceeding with what is available", tokenErr);
       // Fallback to sessionStorage if acquisition failed
-      oneLakeToken = oneLakeToken || sessionStorage.getItem("onelake_token") || undefined;
       fabricToken = fabricToken || sessionStorage.getItem("fabric_access_token") || undefined;
     }
 
@@ -1025,7 +884,6 @@ export function MigrationTab() {
           tableauSiteId,
           tableauEnv,
           tableauCredentials.TABLEAU_TOKEN_NAME || configTableauTokenName,
-          oneLakeToken,
           fabricToken,
           dataLayerEnabled ? selectedLakehouse : undefined,
           tableauCredentials.connection_id
@@ -1044,7 +902,6 @@ export function MigrationTab() {
           tableauSiteId,
           tableauEnv,
           tableauCredentials.TABLEAU_TOKEN_NAME || configTableauTokenName,
-          oneLakeToken,
           fabricToken,
           dataLayerEnabled ? selectedLakehouse : undefined,
           tableauCredentials.connection_id
@@ -1062,7 +919,6 @@ export function MigrationTab() {
           tableauSiteId,
           tableauEnv,
           tableauCredentials.TABLEAU_TOKEN_NAME || configTableauTokenName,
-          oneLakeToken,
           fabricToken,
           dataLayerEnabled ? selectedLakehouse : undefined,
           tableauCredentials.connection_id
@@ -1082,7 +938,6 @@ export function MigrationTab() {
           tableauSiteId,
           tableauEnv,
           tableauCredentials.TABLEAU_TOKEN_NAME || configTableauTokenName,
-          oneLakeToken,
           fabricToken,
           dataLayerEnabled ? selectedLakehouse : undefined,
           tableauCredentials.connection_id
@@ -1197,39 +1052,57 @@ export function MigrationTab() {
   if (!isAuthenticated || !user?.email) {
     return (
       <div className={styles.root}>
-        <MessageBar intent="warning" className={styles.errorAlert}><MessageBarBody><MessageBarTitle>Please sign in</MessageBarTitle>You need to be signed in to start a migration.</MessageBarBody></MessageBar>
+        <Alert variant="default" className={styles.errorAlert}><AlertTitle>Please sign in</AlertTitle><AlertDescription>You need to be signed in to start a migration.</AlertDescription></Alert>
       </div>
     )
   }
 
   return (
+    <ConnectorRequired
+      connectorId="tableau"
+      // Someone with a working saved connection keeps using it. The gate only
+      // catches the genuinely unconfigured case, where the alternative would be
+      // an empty screen with no explanation.
+      bypass={savedCredentials.length > 0}
+      description="Configure the Tableau connection once in Settings. Its projects and workbooks are discovered automatically and appear here."
+    >
     <div className={styles.root}>
       {error && (
-        <MessageBar intent="error" className={styles.errorAlert}><MessageBarBody><MessageBarTitle>Error</MessageBarTitle>{error}</MessageBarBody></MessageBar>
+        <Alert variant="destructive" className={styles.errorAlert}><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>
       )}
 
 
       <div className={styles.mainGrid}>
-        <Card className={mergeClasses(styles.card, styles.sourceCard)}>
-          <div className={mergeClasses(styles.cardHeader, styles.sourceHeader)}>
+        <Card className={cx(styles.card, styles.sourceCard)}>
+          <div className={cx(styles.cardHeader, styles.sourceHeader)}>
             <div className={styles.headerContent}>
-              <Image
-                src="https://img.icons8.com/?size=100&id=9Kvi1p1F0tUo&format=png&color=000000"
-                alt="Tableau"
-                width={48}
-                height={48}
-                style={{ flexShrink: 0 }}
-                unoptimized
-              />
+              <div
+                aria-hidden="true"
+                style={{
+                  width: 48,
+                  height: 48,
+                  flexShrink: 0,
+                  borderRadius: "8px",
+                  backgroundColor: "#1e40af",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "20px",
+                  fontWeight: 700,
+                }}
+              >
+                T
+              </div>
               <div><Text size={500} weight="semibold" style={{ color: "#1e40af" }}>Source</Text><br /><Text size={200} style={{ color: "#2563eb" }}>Tableau Environment</Text></div>
             </div>
           </div>
           <div className={styles.cardInnerPadding}>
             <div style={{ marginBottom: "20px" }}>
-              <TabList
-                selectedValue={tableauEnv}
-                onTabSelect={(_, d) => {
-                  const newEnv = d.value as "cloud" | "server" | "cloud_trial";
+              <Tabs
+                value={tableauEnv}
+                onValueChange={(value) => {
+                  const newEnv = value as "cloud" | "server" | "cloud_trial";
                   setTableauEnv(newEnv);
                   setTableauCredentials(null)
 
@@ -1249,13 +1122,13 @@ export function MigrationTab() {
                   setConfigTcmTokenSecret("");
                   setConfigTableauTokenValue("");
                 }}
-                appearance="subtle"
-                size="small"
               >
-                <Tab value="cloud">Cloud</Tab>
-                <Tab value="cloud_trial">Cloud Trial</Tab>
-                <Tab value="server">Server</Tab>
-              </TabList>
+                <TabsList>
+                  <TabsTrigger value="cloud">Cloud</TabsTrigger>
+                  <TabsTrigger value="cloud_trial">Cloud Trial</TabsTrigger>
+                  <TabsTrigger value="server">Server</TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
             <div>
               <Label className={styles.sectionTitle} style={{ color: "#1e40af" }}>Connection Name</Label>
@@ -1276,20 +1149,22 @@ export function MigrationTab() {
                     </Option>
                   ))}
                 </Combobox>
-                <Dialog open={isConfigDialogOpen} onOpenChange={(_, d) => setIsConfigDialogOpen(d.open)}>
+                <Dialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen}>
                   <DialogTrigger disableButtonEnhancement>
-                    <Button appearance="primary" size="small" onClick={fetchConfig} disabled={isProcessing || isStarting || loadingTableau}>{loadingTableau ? <Spinner size="tiny" /> : "Configure"}</Button>
+                    <Button size="sm" onClick={fetchConfig} disabled={isProcessing || isStarting || loadingTableau}>{loadingTableau ? <Spinner size="tiny" /> : "Configure"}</Button>
                   </DialogTrigger>
-                  <DialogSurface>
-                    <DialogBody>
+                  <DialogContent>
+                    <DialogHeader>
                       <DialogTitle>Configure Source Connection</DialogTitle>
-                      <DialogContent style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "16px" }}>
+                    </DialogHeader>
+                    <div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "16px" }}>
                         <div style={{ display: "flex", alignItems: "flex-end", gap: "12px", marginBottom: "8px" }}>
                           <div style={{ flexGrow: 1 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                               <Label weight="semibold" style={{ color: "#1e40af" }}>Saved Connections</Label>
                               <Tooltip content="Select a previously saved Tableau connection configuration or create a new one." relationship="label">
-                                <Info16Regular style={{ color: "#64748b", cursor: "help" }} />
+                                <Info style={{ color: "#64748b", cursor: "help" }} />
                               </Tooltip>
                             </div>
                             <Dropdown
@@ -1307,58 +1182,52 @@ export function MigrationTab() {
                             </Dropdown>
                           </div>
                           <Button
-                            icon={<Add24Regular />}
-                            appearance="subtle"
+                            variant="ghost"
                             title="Add New Connection"
                             onClick={handleAddNew}
                             style={{ height: "32px" }}
-                          />
+                          ><Plus /></Button>
                           <Button
-                            icon={<Delete24Regular />}
-                            appearance="subtle"
+                            variant="ghost"
                             title="Delete Selected Connection"
                             onClick={handleDeleteConnection}
                             disabled={!selectedConnectionId || loadingTableau}
                             style={{ height: "32px", color: "#ef4444" }}
-                          />
+                          ><Trash2 /></Button>
                         </div>
 
                         <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "16px", paddingBottom: "16px" }}>
                           {toastMessage && (
-                            <MessageBar intent={toastMessage.type} style={{ marginBottom: "12px" }}>
-                              <MessageBarBody>
-                                <MessageBarTitle>{toastMessage.type === "success" ? "Success" : "Error"}</MessageBarTitle>
-                                {toastMessage.text}
-                              </MessageBarBody>
-                            </MessageBar>
+                            <Alert variant={toastMessage.type === "success" ? "default" : "destructive"} style={{ marginBottom: "12px" }}>
+                              <AlertTitle>{toastMessage.type === "success" ? "Success" : "Error"}</AlertTitle>
+                              <AlertDescription>{toastMessage.text}</AlertDescription>
+                            </Alert>
                           )}
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                               <Label weight="semibold">Connection Name <span style={{ color: "red" }}>*</span></Label>
                               <Tooltip content="A friendly name to identify this connection (e.g., Production, QA, Dotnet)." relationship="label">
-                                <Info16Regular style={{ color: "#64748b", cursor: "help" }} />
+                                <Info style={{ color: "#64748b", cursor: "help" }} />
                               </Tooltip>
                             </div>
                             {tableauCredentials?.connection_id && !isConnectionNameEditable && (
                               <Button
-                                icon={<Edit20Regular />}
-                                appearance="subtle"
+                                variant="ghost"
                                 onClick={() => setIsConnectionNameEditable(true)}
                                 title="Edit Connection Name"
-                                size="small"
-                              />
+                                size="sm"
+                              ><Pencil /></Button>
                             )}
                             {isConnectionNameEditable && (
                               <Button
-                                icon={<Dismiss20Regular />}
-                                appearance="subtle"
+                                variant="ghost"
                                 onClick={() => {
                                   setIsConnectionNameEditable(false);
                                   setConfigConnectionName(tableauCredentials?.CONNECTION_NAME || "");
                                 }}
                                 title="Cancel Edit"
-                                size="small"
-                              />
+                                size="sm"
+                              ><X /></Button>
                             )}
                           </div>
                           <Input
@@ -1384,7 +1253,7 @@ export function MigrationTab() {
                               }
                               relationship="label"
                             >
-                              <Info16Regular style={{ color: "#64748b", cursor: "help" }} />
+                              <Info style={{ color: "#64748b", cursor: "help" }} />
                             </Tooltip>
                           </div>
                           <Input
@@ -1411,7 +1280,7 @@ export function MigrationTab() {
                                   }
                                   relationship="label"
                                 >
-                                  <Info16Regular style={{ color: "#64748b", cursor: "help" }} />
+                                  <Info style={{ color: "#64748b", cursor: "help" }} />
                                 </Tooltip>
                               </div>
                               <Input
@@ -1435,7 +1304,7 @@ export function MigrationTab() {
                                   }
                                   relationship="label"
                                 >
-                                  <Info16Regular style={{ color: "#64748b", cursor: "help" }} />
+                                  <Info style={{ color: "#64748b", cursor: "help" }} />
                                 </Tooltip>
                               </div>
                               <Input
@@ -1464,7 +1333,7 @@ export function MigrationTab() {
                                 }
                                 relationship="label"
                               >
-                                <Info16Regular style={{ color: "#64748b", cursor: "help" }} />
+                                <Info style={{ color: "#64748b", cursor: "help" }} />
                               </Tooltip>
                             </div>
                             <Input
@@ -1490,7 +1359,7 @@ export function MigrationTab() {
                               }
                               relationship="label"
                             >
-                              <Info16Regular style={{ color: "#64748b", cursor: "help" }} />
+                              <Info style={{ color: "#64748b", cursor: "help" }} />
                             </Tooltip>
                           </div>
                           <Input
@@ -1514,7 +1383,7 @@ export function MigrationTab() {
                               }
                               relationship="label"
                             >
-                              <Info16Regular style={{ color: "#64748b", cursor: "help" }} />
+                              <Info style={{ color: "#64748b", cursor: "help" }} />
                             </Tooltip>
                           </div>
                           <Input
@@ -1525,7 +1394,7 @@ export function MigrationTab() {
                             placeholder="pat-secret-token-value"
                           />
                         </div>
-                      </DialogContent>
+                      </div>
 
                       <div
                         style={{
@@ -1551,7 +1420,7 @@ export function MigrationTab() {
                         >
                           {configStatus === "success" && (
                             <>
-                              <CheckmarkCircle24Regular style={{ color: "#16a34a" }} />
+                              <CheckCircle2 style={{ color: "#16a34a" }} />
                               <Text
                                 size={200}
                                 weight="semibold"
@@ -1564,7 +1433,7 @@ export function MigrationTab() {
 
                           {configStatus === "error" && (
                             <>
-                              <ErrorCircle24Regular style={{ color: "#ef4444" }} />
+                              <XCircle style={{ color: "#ef4444" }} />
                               <Text
                                 size={200}
                                 weight="semibold"
@@ -1577,7 +1446,7 @@ export function MigrationTab() {
                         </div>
 
                         {/* RIGHT SIDE → BUTTONS */}
-                        <DialogActions
+                        <DialogFooter
                           style={{
                             display: "flex",
                             gap: "12px",
@@ -1590,7 +1459,7 @@ export function MigrationTab() {
                         >
                           <DialogTrigger disableButtonEnhancement>
                             <Button
-                              appearance="secondary"
+                              variant="secondary"
                               onClick={() => setIsConfigDialogOpen(false)}
                             >
                               Cancel
@@ -1598,16 +1467,15 @@ export function MigrationTab() {
                           </DialogTrigger>
 
                           <Button
-                            appearance="primary"
                             onClick={handleSave}
                             disabled={loadingTableau}
                           >
                             {loadingTableau ? <Spinner size="tiny" /> : "Save"}
                           </Button>
-                        </DialogActions>
+                        </DialogFooter>
                       </div>
-                    </DialogBody>
-                  </DialogSurface>
+                    </div>
+                  </DialogContent>
                 </Dialog>
               </div>
             </div>
@@ -1701,17 +1569,17 @@ export function MigrationTab() {
               <div className={styles.marginTopSpacing}>
                 <Label className={styles.sectionTitle} style={{ color: "#1e40af" }}>Select Workbook</Label>
                 {workbooks.length > 30 ? (
-                  <Dialog open={isWorkbookDialogOpen} onOpenChange={(e, d) => {
-                    if (d.open) {
+                  <Dialog open={isWorkbookDialogOpen} onOpenChange={(open) => {
+                    if (open) {
                       setDraftSelectedWorkbooks([...selectedWorkbooks]);
                       setDialogSearchQuery("");
                       setWorkbookCurrentPage(1);
                     }
-                    setIsWorkbookDialogOpen(d.open);
+                    setIsWorkbookDialogOpen(open);
                   }}>
                     <DialogTrigger disableButtonEnhancement>
-                      <Button 
-                        appearance="outline" 
+                      <Button
+                        variant="outline"
                         style={{ width: "100%", justifyContent: "flex-start", fontWeight: "normal", color: selectedWorkbooks.length > 0 ? "inherit" : "#64748b" }}
                         disabled={!selectedProject || loadingWorkbooks || isProcessing || isStarting}
                       >
@@ -1722,10 +1590,11 @@ export function MigrationTab() {
                         )}
                       </Button>
                     </DialogTrigger>
-                    <DialogSurface style={{ width: "100%", maxWidth: "600px" }}>
-                      <DialogBody>
+                    <DialogContent style={{ width: "100%", maxWidth: "600px" }}>
+                      <DialogHeader>
                         <DialogTitle>Select Workbooks to Migrate</DialogTitle>
-                        <DialogContent style={{ display: "flex", flexDirection: "column", gap: "16px", height: "550px", maxHeight: "70vh", overflow: "hidden" }}>
+                      </DialogHeader>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "16px", height: "550px", maxHeight: "70vh", overflow: "hidden" }}>
                           <Input 
                             placeholder="Search workbooks..." 
                             value={dialogSearchQuery}
@@ -1778,16 +1647,16 @@ export function MigrationTab() {
 
                           {workbookTotalPages > 1 && (
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #e2e8f0", paddingTop: "12px" }}>
-                              <Button 
-                                appearance="subtle" 
+                              <Button
+                                variant="ghost"
                                 disabled={workbookCurrentPage <= 1}
                                 onClick={() => setWorkbookCurrentPage(p => p - 1)}
                               >
                                 Previous
                               </Button>
                               <Text size={200}>Page {workbookCurrentPage} of {workbookTotalPages}</Text>
-                              <Button 
-                                appearance="subtle" 
+                              <Button
+                                variant="ghost"
                                 disabled={workbookCurrentPage >= workbookTotalPages}
                                 onClick={() => setWorkbookCurrentPage(p => p + 1)}
                               >
@@ -1795,16 +1664,15 @@ export function MigrationTab() {
                               </Button>
                             </div>
                           )}
-                        </DialogContent>
-                        <DialogActions>
-                          <Button appearance="secondary" onClick={() => setIsWorkbookDialogOpen(false)}>Cancel</Button>
-                          <Button appearance="primary" onClick={() => {
+                      </div>
+                      <DialogFooter>
+                          <Button variant="secondary" onClick={() => setIsWorkbookDialogOpen(false)}>Cancel</Button>
+                          <Button onClick={() => {
                             setSelectedWorkbooks(draftSelectedWorkbooks);
                             setIsWorkbookDialogOpen(false);
                           }}>Apply Selection</Button>
-                        </DialogActions>
-                      </DialogBody>
-                    </DialogSurface>
+                      </DialogFooter>
+                    </DialogContent>
                   </Dialog>
                 ) : (
                   <Combobox
@@ -1854,10 +1722,10 @@ export function MigrationTab() {
           </div>
         </Card>
 
-        <div className={styles.arrowContainer}><ArrowRight24Regular primaryFill="#64748b" /></div>
+        <div className={styles.arrowContainer}><ArrowRight color="#64748b" /></div>
 
-        <Card className={mergeClasses(styles.card, styles.targetCard)}>
-          <div className={mergeClasses(styles.cardHeader, styles.targetHeader)}>
+        <Card className={cx(styles.card, styles.targetCard)}>
+          <div className={cx(styles.cardHeader, styles.targetHeader)}>
             <div className={styles.headerContent}>
               <Image
                 src="/Fabric_Color_48.svg"
@@ -1945,26 +1813,24 @@ export function MigrationTab() {
       <div className={styles.buttonContainer}>
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "16px" }}>
           <Button
-            appearance="primary"
-            size="large"
+            size="lg"
             className={styles.largeButton}
-            icon={isParsingPaused || isValidationPaused ? <CheckmarkCircle24Regular /> : (isStarting || isProcessing ? <Spinner size="tiny" /> : currentRunId ? <ArrowClockwise24Regular /> : <Play24Regular />)}
             onClick={isParsingPaused || isValidationPaused || (currentRunId && !isProcessing && !isStarting) ? handleReload : debouncedStart}
             disabled={isStarting || (isProcessing && !isParsingPaused && !isValidationPaused) || (!isReady && !currentRunId)}
           >
+            {isParsingPaused || isValidationPaused ? <CheckCircle2 /> : (isStarting || isProcessing ? <Spinner size="tiny" /> : currentRunId ? <RefreshCw /> : <Play />)}
             {isStarting ? "Starting..." : isParsingPaused ? "Quit" : hasAnyGenerationFailure ? "Generation Failed" : isValidationPaused ? "Completed" : isProcessing ? `Processing` : currentRunId ? "Start New Migration" : mode === 'single' ? "Start Assessment" : isLiteMode() ? "Assess" : "Migrate"}
           </Button>
 
           {isParsingPaused && !hasContinued && !isLiteMode() && (
             <Button
-              appearance="primary"
-              size="large"
-              icon={isResuming ? <Spinner size="tiny" /> : <ArrowRight24Regular />}
+              size="lg"
               disabled={!isAllParsingDone || isResuming}
               onClick={handleResumeClick}
-              className={mergeClasses(styles.largeButton, isAllParsingDone && !isResuming && styles.pulseButton)}
+              className={cx(styles.largeButton, isAllParsingDone && !isResuming && styles.pulseButton)}
               style={{ paddingLeft: "32px", paddingRight: "32px" }}
             >
+              {isResuming ? <Spinner size="tiny" /> : <ArrowRight />}
               {isResuming ? "Processing..." : "Continue to Full Analysis"}
             </Button>
           )}
@@ -1974,35 +1840,35 @@ export function MigrationTab() {
 
       {migrationStartedLocal && (
         <div style={{ marginTop: "32px" }}>
-          <MessageBar
-            intent={hasAnyGenerationFailure ? "error" : (isParsingPaused || isValidationPaused ? "success" : (isProcessing ? "info" : "success"))}
+          <Alert
+            variant={hasAnyGenerationFailure ? "destructive" : "default"}
             className={styles.successAlert}
           >
-            <MessageBarBody>
-              <MessageBarTitle>
-                {hasAnyGenerationFailure ? "Report Generation Failed" : (isParsingPaused ? (isLiteMode() ? "Extraction Completed" : "Parsing Complete") : (isValidationPaused ? "Generation Complete" : (isProcessing ? "Processing Workbooks..." : (isLiteMode() ? "Extraction Completed" : "Extraction Complete"))))}
-              </MessageBarTitle>
+            <AlertTitle>
+              {hasAnyGenerationFailure ? "Report Generation Failed" : (isParsingPaused ? (isLiteMode() ? "Extraction Completed" : "Parsing Complete") : (isValidationPaused ? "Generation Complete" : (isProcessing ? "Processing Workbooks..." : (isLiteMode() ? "Extraction Completed" : "Extraction Complete"))))}
+            </AlertTitle>
+            <AlertDescription>
               {hasAnyGenerationFailure ? (
-                <Text>Report Generation failed. Migration process stopped before the Validation stage. Please review the error in the <strong>Results → Report Generation</strong> tab.</Text>
+                <span>Report Generation failed. Migration process stopped before the Validation stage. Please review the error in the <strong>Results → Report Generation</strong> tab.</span>
               ) : isParsingPaused ? (
                 isLiteMode() ? (
-                  <Text>Extraction Completed</Text>
+                  <span>Extraction Completed</span>
                 ) : (
-                  <Text>Detailed analysis and parsing is finished. Click <strong>&quot;Continue to Full Analysis&quot;</strong> in the Results tab to proceed.</Text>
+                  <span>Detailed analysis and parsing is finished. Click <strong>&quot;Continue to Full Analysis&quot;</strong> in the Results tab to proceed.</span>
                 )
               ) : isValidationPaused ? (
-                <Text>Migration successful till Report Generation. Please run the <strong>Validation Agent</strong> in the Results section to see the validation results.</Text>
+                <span>Migration successful till Report Generation. Please run the <strong>Validation Agent</strong> in the Results section to see the validation results.</span>
               ) : isProcessing ? (
-                <Text>Orchestrating Agents. Please wait...</Text>
+                <span>Orchestrating Agents. Please wait...</span>
               ) : (
                 isLiteMode() ? (
-                  <Text>Extraction Completed</Text>
+                  <span>Extraction Completed</span>
                 ) : (
-                  <Text>All agents completed successfully. You can review the results below.</Text>
+                  <span>All agents completed successfully. You can review the results below.</span>
                 )
               )}
-            </MessageBarBody>
-          </MessageBar>
+            </AlertDescription>
+          </Alert>
         </div>
       )}
 
@@ -2012,16 +1878,16 @@ export function MigrationTab() {
             display: none;
           }
         `}</style>
-        <TabList
-          selectedValue={activeSubTab}
-          onTabSelect={(_, data) => { const value = data.value as SubTab; if (value === "results" && !canAccessResults) return; setActiveSubTab(value) }}
-          className={mergeClasses(styles.subTabList, "vl-subtabs-scroll-wrapper")}
-          appearance="subtle"
+        <Tabs
+          value={activeSubTab}
+          onValueChange={(value) => { if (value === "results" && !canAccessResults) return; setActiveSubTab(value as SubTab) }}
         >
-          <Tab value="configurations" className={mergeClasses(styles.subTabBase, activeSubTab === "configurations" && styles.subTabSelected)}>Configurations</Tab>
-          <Tab value="overview" className={mergeClasses(styles.subTabBase, activeSubTab === "overview" && styles.subTabSelected, !canAccessResults && styles.subTabDisabled)} disabled={!canAccessResults}>Migration Overview</Tab>
-          <Tab value="results" className={mergeClasses(styles.subTabBase, activeSubTab === "results" && styles.subTabSelected, !canAccessResults && styles.subTabDisabled)} disabled={!canAccessResults}>Results</Tab>
-        </TabList>
+          <TabsList className={cx(styles.subTabList, "vl-subtabs-scroll-wrapper")}>
+            <TabsTrigger value="configurations" className={cx(styles.subTabBase, activeSubTab === "configurations" && styles.subTabSelected)}>Configurations</TabsTrigger>
+            <TabsTrigger value="overview" className={cx(styles.subTabBase, activeSubTab === "overview" && styles.subTabSelected, !canAccessResults && styles.subTabDisabled)} disabled={!canAccessResults}>Migration Overview</TabsTrigger>
+            <TabsTrigger value="results" className={cx(styles.subTabBase, activeSubTab === "results" && styles.subTabSelected, !canAccessResults && styles.subTabDisabled)} disabled={!canAccessResults}>Results</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
       {activeSubTab === "configurations" && <ConfigurationsContent />}
       {activeSubTab === "overview" && <MigrationOverview onRequestPdf={() => setIsGeneratingPdf(true)} />}
@@ -2034,5 +1900,6 @@ export function MigrationTab() {
         <PdfReportRenderer onClose={() => setIsGeneratingPdf(false)} />
       )}
     </div>
+    </ConnectorRequired>
   )
 }

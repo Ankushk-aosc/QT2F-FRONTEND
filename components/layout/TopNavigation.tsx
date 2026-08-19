@@ -1,167 +1,32 @@
 "use client"
 
-import React, { useState } from "react"   // ← added React + useState
-import {
-  Avatar,
-  Button,
-  Menu,
-  MenuTrigger,
-  MenuPopover,
-  MenuList,
-  MenuItem,
-  makeStyles,
-  shorthands,
-  tokens,
-  Tooltip,
-} from "@fluentui/react-components"
-import {
-  Dismiss24Regular,
-  List24Regular,
-  SignOut20Regular,
-  Settings24Regular,
-} from "@fluentui/react-icons"
+import React, { useState } from "react"
+import { Bell, HelpCircle, LogOut, Menu as MenuIcon } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
-import { useUIStore } from "@/stores/ui.store"
-import { useDashboardStore } from "@/stores/dashboard.store"
-import { SettingsCenter } from "@/components/settings/SettingsCenter"
-import Image from "next/image"
+import { Button } from "@/components/ui/button"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
+import { Tooltip } from "@/components/ui/tooltip"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { NAV_ITEMS, isNavItemActive } from "@/lib/navigation"
 
-const useStyles = makeStyles({
-  header: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 50,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    padding: "16px 24px",
-    backgroundColor: "var(--background)",
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-  },
-  logoContainer: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-  },
-  titleContainer: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "left 0.3s ease-in-out, width 0.3s ease-in-out",
-    pointerEvents: "none",
-    "@media (max-width: 767px)": {
-      left: "0 !important",
-      width: "100% !important",
-    }
-  },
-  menuButton: {
-    padding: "0",
-    minWidth: "auto",
-  },
-  logo: {
-    height: "48px",
-    width: "auto",
-    objectFit: "contain",
-  },
-  rightSection: {
-    display: "flex",
-    alignItems: "center",
-    gap: "16px",
-  },
-  avatarButton: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "40px",
-    height: "40px",
-    ...shorthands.borderRadius("50%"),
-    backgroundColor: tokens.colorNeutralBackground4,
-    color: tokens.colorNeutralForeground2,
-    fontSize: tokens.fontSizeBase300,
-    fontWeight: tokens.fontWeightSemibold,
-    cursor: "pointer",
-    transitionProperty: "background-color",
-    transitionDuration: tokens.durationNormal,
-    ":hover": {
-      backgroundColor: tokens.colorNeutralBackground3,
-    },
-    ":focus": {
-      outlineStyle: "none",
-    },
-  },
-  settingsButton: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "40px",
-    height: "40px",
-    ...shorthands.borderRadius("50%"),
-    backgroundColor: "transparent",
-    color: tokens.colorNeutralForeground2,
-    border: "none",
-    cursor: "pointer",
-    transitionProperty: "background-color",
-    transitionDuration: tokens.durationNormal,
-    ":hover": {
-      backgroundColor: tokens.colorSubtleBackgroundHover,
-    },
-    ":focus": {
-      outlineStyle: "none",
-    },
-  },
-  dropdown: {
-    position: "absolute",
-    right: 0,
-    top: "100%",
-    marginTop: "12px",
-    width: "192px",
-    ...shorthands.borderRadius(tokens.borderRadiusMedium),
-    backgroundColor: tokens.colorNeutralBackground1,
-    boxShadow: tokens.shadow8,
-    zIndex: 60,
-    overflow: "hidden",
-  },
-  settingsDropdown: {
-    width: "192px",
-    ...shorthands.borderRadius(tokens.borderRadiusMedium),
-    backgroundColor: tokens.colorNeutralBackground1,
-    boxShadow: tokens.shadow8,
-    zIndex: 60,
-    overflow: "hidden",
-    ...shorthands.padding("4px", "0"),
-  },
-  userInfo: {
-    padding: "8px 16px",
-    fontSize: tokens.fontSizeBase300,
-    color: tokens.colorNeutralForeground1,
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-  },
-  menuItem: {
-    width: "100%",
-    textAlign: "left",
-    padding: "8px 16px",
-    fontSize: tokens.fontSizeBase300,
-    color: tokens.colorNeutralForeground1,
-    cursor: "pointer",
-    ":hover": {
-      backgroundColor: tokens.colorSubtleBackgroundHover,
-    },
-  },
-})
-
+/**
+ * The content-area header: notifications, help, and the account menu.
+ *
+ * Primary navigation lives in `AppSidebar` only — this used to repeat the same
+ * `NAV_ITEMS` links, which meant two competing navigation systems. The mobile
+ * menu below is the exception: the sidebar is hidden under 900px, so the
+ * hamburger is the only nav at that width.
+ *
+ * The bell and help button are deliberately inert: this deployment has no
+ * notification feed and no help destination, so they announce that rather than
+ * showing a count or linking nowhere. No badge is ever rendered.
+ */
 export function TopNavigation() {
-  const styles = useStyles()
   const { user, logout } = useAuth()
-  const { mode, setMode } = useUIStore()
-  const { isProcessing } = useDashboardStore()
-  const { isSettingsOpen, setSettingsOpen, isSidebarOpen, workspace } = useUIStore()
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false)
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
+  const pathname = usePathname()
 
   const userInitial = user?.name?.charAt(0)?.toUpperCase() ||
                       user?.email?.charAt(0)?.toUpperCase() ||
@@ -175,94 +40,77 @@ export function TopNavigation() {
   }
 
   return (
-    <div className={styles.header}>
-      <div className={styles.logoContainer}>
-        <Image
-          src="/Switchblade_Logo.png"
-          alt="Switchblade Logo"
-          width={360}
-          height={65}
-          className={styles.logo}
-          priority
-        />
-      </div>
+    <header className="topnav-header">
+      <div className="topnav-right-section">
+        <Popover open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="icon" className="topnav-menu-button" aria-label="Open navigation">
+              <MenuIcon size={24} />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="topnav-dropdown" style={{ right: 0, left: "auto" }}>
+            {NAV_ITEMS.map((item) => {
+              const active = isNavItemActive(pathname, item)
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className={active ? "topnav-mobile-nav-item topnav-mobile-nav-item-active" : "topnav-mobile-nav-item"}
+                  onClick={() => setIsMobileNavOpen(false)}
+                >
+                  {item.label}
+                </Link>
+              )
+            })}
+          </PopoverContent>
+        </Popover>
 
-      <div 
-        className={styles.titleContainer}
-        style={{
-          left: isSidebarOpen ? '340px' : '64px',
-          width: `calc(100vw - ${isSidebarOpen ? '340px' : '64px'})`
-        }}
-      >
-        <span style={{ 
-          fontSize: "24px", 
-          fontWeight: 600, 
-          color: tokens.colorNeutralForeground1,
-          letterSpacing: "0.5px",
-          whiteSpace: "nowrap"
-        }}>
-          {workspace === "qlik" ? "Qlik Sense → Microsoft Fabric Migration" : "Tableau → Microsoft Fabric Migration"}
-        </span>
-      </div>
-
-      <div className={styles.rightSection}>
-        {isProcessing ? (
-          <Tooltip content="Cannot change mode while a migration is in progress" relationship="label">
-            <span style={{ display: "inline-block" }}>
-              <button 
-                className={styles.settingsButton} 
-                aria-label="Settings" 
-                disabled 
-                style={{ opacity: 0.5, cursor: "not-allowed" }}
-              >
-                <Settings24Regular />
-              </button>
-            </span>
-          </Tooltip>
-        ) : (
-          <button 
-            className={styles.settingsButton} 
-            aria-label="Settings"
-            onClick={() => setSettingsOpen(true)}
+        <Tooltip content="Notifications are not configured for this deployment">
+          <button
+            type="button"
+            className="topnav-icon-button"
+            aria-label="Notifications"
+            aria-disabled="true"
+            disabled
           >
-            <Settings24Regular />
+            <Bell size={18} />
           </button>
-        )}
+        </Tooltip>
 
-        <SettingsCenter />
+        <Tooltip content="Help Center is not available yet">
+          <button
+            type="button"
+            className="topnav-icon-button"
+            aria-label="Help"
+            aria-disabled="true"
+            disabled
+          >
+            <HelpCircle size={18} />
+          </button>
+        </Tooltip>
 
-        <Menu
-          open={isUserDropdownOpen}
-          onOpenChange={(_, data) => setIsUserDropdownOpen(data.open)}
-        >
-          <MenuTrigger disableButtonEnhancement>
-            <div className={styles.avatarButton}>
-              <Avatar
-                name={userDisplayName}
-                initials={userInitial}
-                color="neutral"
-                size={40}
-                active="unset"
-              />
-            </div>
-          </MenuTrigger>
+        <Popover open={isUserDropdownOpen} onOpenChange={setIsUserDropdownOpen}>
+          <PopoverTrigger asChild>
+            <button type="button" className="topnav-account" aria-label="Account menu">
+              <span className="topnav-avatar">{userInitial}</span>
+              <span className="topnav-account-text">
+                <span className="topnav-account-name">{userDisplayName}</span>
+                {user?.email && user.email !== userDisplayName && (
+                  <span className="topnav-account-meta">{user.email}</span>
+                )}
+              </span>
+            </button>
+          </PopoverTrigger>
 
-          <MenuPopover className={styles.dropdown}>
-            <MenuList>
-              <div className={styles.userInfo}>
-                {userDisplayName}
-              </div>
-              <MenuItem
-                className={styles.menuItem}
-                icon={<SignOut20Regular />}
-                onClick={handleLogout}
-              >
-                Logout
-              </MenuItem>
-            </MenuList>
-          </MenuPopover>
-        </Menu>
+          <PopoverContent className="topnav-dropdown" style={{ right: 0, left: "auto" }}>
+            <div className="topnav-user-info">{userDisplayName}</div>
+            <button type="button" className="topnav-menu-item" onClick={handleLogout}>
+              <LogOut size={20} />
+              Logout
+            </button>
+          </PopoverContent>
+        </Popover>
       </div>
-    </div>
+    </header>
   )
 }

@@ -28,9 +28,9 @@ export async function GET(req: NextRequest) {
 
         if (logsBase) {
             const base = logsBase.replace(/\/$/, "");
-            // LOGS_API_BASE goes to .../api/records
-            // Postman URL: .../api/records/validation
-            candidateUrls.push(`${base}/validation?${query}`);
+            // LOGS_API_BASE is ".../api", not ".../api/records" — the records
+            // segment has to be spelled out to reach /api/records/validation.
+            candidateUrls.push(`${base}/records/validation?${query}`);
         }
 
         if (validationBase) {

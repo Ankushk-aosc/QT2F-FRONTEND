@@ -18,9 +18,13 @@ export type SettingsSectionId =
   | "ai-models"
   | "ai-agents"
   // Integrations
-  | "qlik"
-  | "tableau"
-  | "fabric"
+  //
+  // One section rather than one per platform. Every connector is configured
+  // through the same registry-driven framework, so splitting the menu by vendor
+  // would add an entry for each future connector without adding any capability
+  // — and would reintroduce exactly the per-platform configuration screens the
+  // Administration Center exists to consolidate.
+  | "integrations"
   | "azure"
   // Infrastructure
   | "authentication"
@@ -143,28 +147,40 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   },
 
   {
-    id: "qlik",
-    label: "Qlik",
-    description: "Qlik Cloud tenant, spaces, applications and connection health.",
+    id: "integrations",
+    label: "Integrations",
+    description:
+      "Every connected platform in one place. Configure each connector once — credentials are verified and metadata discovered automatically.",
     group: "integrations",
-    status: "planned",
-    keywords: ["qlik", "tenant", "spaces", "apps", "certificate"],
-  },
-  {
-    id: "tableau",
-    label: "Tableau",
-    description: "Tableau server, site, personal access token, projects and workbooks.",
-    group: "integrations",
-    status: "planned",
-    keywords: ["tableau", "pat", "site", "projects", "workbooks"],
-  },
-  {
-    id: "fabric",
-    label: "Microsoft Fabric",
-    description: "Fabric workspace, lakehouse, warehouse, SQL endpoint and capacity.",
-    group: "integrations",
-    status: "planned",
-    keywords: ["fabric", "lakehouse", "warehouse", "capacity", "semantic model"],
+    status: "available",
+    // Vendor names are keywords rather than sections, so searching "tableau"
+    // still lands the administrator in the right place.
+    keywords: [
+      "connector",
+      "qlik",
+      "tenant",
+      "spaces",
+      "apps",
+      "tableau",
+      "pat",
+      "site",
+      "projects",
+      "workbooks",
+      "fabric",
+      "lakehouse",
+      "warehouse",
+      "capacity",
+      "power bi",
+      "snowflake",
+      "databricks",
+      "oracle",
+      "sql server",
+      "sap",
+      "looker",
+      "postgresql",
+      "mysql",
+      "bigquery",
+    ],
   },
   {
     id: "azure",

@@ -3,6 +3,24 @@
 
 import { create } from "zustand"
 
+/**
+ * The application's view of the signed-in user.
+ *
+ * This store is a *projection* of the MSAL session, not a second source of
+ * truth. `AuthSync` writes it from the active MSAL account on every account
+ * change, and the protected layout decides what is authenticated by asking
+ * MSAL directly.
+ *
+ * It deliberately does not persist.
+ *
+ * An earlier version wrote the user to `localStorage["auth"]` and re-hydrated
+ * `isAuthenticated: true` from it at module load. That made a value an attacker
+ * (or the user) could edit in devtools into the app's notion of who was signed
+ * in, and it survived sign-out in another tab. Identity now lives exactly one
+ * place — the MSAL token — and this store is repopulated from it on each load.
+ * Nothing here is authorisation: the backend authorises on the bearer token.
+ */
+
 interface User {
   email: string
   name: string
@@ -16,7 +34,16 @@ interface AuthStore {
   logout: () => void
 }
 
-export const useAuthStore = create<AuthStore>((set, get) => ({
+/** "Ada Lovelace" → "AL"; "ada.lovelace@x.com" → "AL". */
+function toInitials(name: string): string {
+  return name
+    .split(/[\s.]+/)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("")
+    .substring(0, 2)
+}
+
+export const useAuthStore = create<AuthStore>((set) => ({
   isAuthenticated: false,
   user: null,
 
@@ -27,54 +54,16 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
 
     const finalName = name || email.split("@")[0]
-    const initials = finalName
-      .split(/[\s.]+/)
-      .map((part) => part[0]?.toUpperCase() || "")
-      .join("")
-      .substring(0, 2)
-
-    const userData: User = {
-      email: email.trim(),
-      name: finalName,
-      initials,
-    }
-
-    console.log("[Auth Store] LOGIN SUCCESS:", userData)
 
     set({
       isAuthenticated: true,
-      user: userData,
+      user: {
+        email: email.trim(),
+        name: finalName,
+        initials: toInitials(finalName),
+      },
     })
-
-    if (typeof window !== "undefined") {
-      localStorage.setItem("auth", JSON.stringify(userData))
-    }
   },
 
-  logout: () => {
-    console.log("[Auth Store] LOGOUT")
-    set({ isAuthenticated: false, user: null })
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("auth")
-    }
-  },
+  logout: () => set({ isAuthenticated: false, user: null }),
 }))
-
-// Hydrate from localStorage
-if (typeof window !== "undefined") {
-  const stored = localStorage.getItem("auth")
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored) as User
-      if (parsed?.email?.trim()) {
-        useAuthStore.setState({ isAuthenticated: true, user: parsed })
-        console.log("[Auth Store] Restored from localStorage:", parsed.email)
-      } else {
-        localStorage.removeItem("auth")
-      }
-    } catch (err) {
-      console.error("[Auth Store] Invalid auth data in localStorage", err)
-      localStorage.removeItem("auth")
-    }
-  }
-}

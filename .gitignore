@@ -20,7 +20,9 @@ yarn-error.log*
 .env*
 .env.local
 
-# runtime settings store written by the Administration Center
+# Runtime stores written by the Administration Center.
+# Also covers .data/connector-secrets.json, which holds connector credentials —
+# this directory must never be committed.
 /.data/
 # vercel
 .vercel

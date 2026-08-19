@@ -10,14 +10,19 @@ export const Select = React.forwardRef<any, any>(({ children, style, onValueChan
     <select
       ref={ref}
       onChange={handleChange}
+      // Width stays 100% by default because form rows across Settings rely on
+      // it; pass `style={{ width: "auto" }}` for inline controls like filter
+      // bars. Colours and metrics come from the design tokens so this control
+      // matches the rest of the application.
       style={{
-        padding: "8px 12px",
-        border: "1px solid #d1d5db",
-        borderRadius: "6px",
+        padding: "0 12px",
+        height: "var(--control-h-md)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-md)",
         width: "100%",
-        backgroundColor: "white",
-        color: "black",
-        fontSize: "14px",
+        backgroundColor: "var(--surface)",
+        color: "var(--text)",
+        fontSize: "var(--text-base)",
         ...style,
       }}
       {...props}

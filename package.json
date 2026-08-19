@@ -17,8 +17,6 @@
     "@azure/msal-browser": "^4.28.0",
     "@azure/msal-react": "^3.0.24",
     "@edge-runtime/vm": "latest",
-    "@fluentui/react-components": "9.72.9",
-    "@fluentui/react-icons": "2.0.316",
     "@opentelemetry/api": "latest",
     "@testing-library/dom": "latest",
     "@vitest/browser-playwright": "latest",

@@ -31,7 +31,11 @@ export async function GET(req: NextRequest) {
     }
 
     const baseUrl = logsBase.replace(/\/$/, "");
-    const targetUrl = new URL(`${baseUrl}/semantic-kernel/summary`);
+    // LOGS_API_BASE is ".../api". The real aggregate lives at
+    // /api/records/monitoring-summary and already returns exactly the shape
+    // MonitoringService expects (total_runs, total_workbooks, completed,
+    // failed, in_progress, pending, filters_applied).
+    const targetUrl = new URL(`${baseUrl}/records/monitoring-summary`);
 
     if (email_id) targetUrl.searchParams.append("email_id", email_id);
     if (project_id) targetUrl.searchParams.append("project_id", project_id);

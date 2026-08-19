@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
-import { tokens } from "@fluentui/react-components"
 import { formatDuration, parseDBTimestamp } from "@/lib/utils"
 
 interface DurationTimerProps {
@@ -151,18 +150,18 @@ export function DurationTimer({
           display: "inline-flex",
           alignItems: "center",
           gap: "6px",
-          fontSize: "12px", 
-          color: tokens.colorNeutralForeground3, 
-          fontFamily: "monospace", 
-          ...style 
+          fontSize: "12px",
+          color: "var(--text-muted)",
+          fontFamily: "monospace",
+          ...style
         }}
       >
-        <span 
+        <span
           style={{
             display: "inline-block",
             width: "11px",
             height: "11px",
-            border: `2px solid ${tokens.colorNeutralForeground3}`,
+            border: "2px solid var(--text-muted)",
             borderTopColor: "transparent",
             borderRadius: "50%",
             animation: "spin 0.85s linear infinite",
@@ -183,12 +182,12 @@ export function DurationTimer({
   return (
     <span 
       className={className}
-      style={{ 
-        fontSize: "12px", 
-        color: tokens.colorNeutralForeground4, 
-        fontFamily: "monospace", 
+      style={{
+        fontSize: "12px",
+        color: "var(--text-muted)",
+        fontFamily: "monospace",
         opacity: 0.8,
-        ...style 
+        ...style
       }}
     >
       {durationStr}

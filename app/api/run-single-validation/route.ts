@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { serverFetchWithAuth as fetchWithAuth } from "@/lib/api/serverFetch";
 
 /**
  * API Proxy for re-running validation on a single workbook.
@@ -13,30 +12,20 @@ export async function POST(req: NextRequest) {
         if (!semanticBase) {
             throw new Error("SEMANTIC_KERNEL_URL is not defined in environment variables");
         }
-        const baseUrl = semanticBase.replace(/\/$/, "");
-        const targetUrl = `${baseUrl}/run-single-validation`;
-        
-        console.log(`[Run-Single-Validation] Proxying to: ${targetUrl}`);
-        
-        const payload: any = {
-            email: body.email,
-            run_id: body.run_id,
-            project_id: body.project_id,
-            workbook_id: body.workbook_id,
-        };
-        
-        if (body.fabric_access_token && body.fabric_access_token.length > 0) {
-            payload.fabric_access_token = body.fabric_access_token;
-        }
-
-        const authHeader = req.headers.get("Authorization");
-
-        const result = await fetchWithAuth(targetUrl, authHeader, {
-            method: "POST",
-            body: JSON.stringify(payload),
-        });
-
-        return NextResponse.json(result, { status: 200 });
+        // Semantic Kernel exposes no /run-single-validation. Validation runs as a
+        // stage of /invoke-batch; there is no single-workbook re-run endpoint.
+        console.warn(
+            `[Run-Single-Validation] No upstream endpoint exists (run ${body.run_id}) — returning 501.`
+        );
+        return NextResponse.json(
+            {
+                error: "Re-running validation for a single workbook is not supported.",
+                details:
+                    "Semantic Kernel runs validation as a stage of POST /api/migration/invoke-batch. " +
+                    "Read validation results from GET /api/validation.",
+            },
+            { status: 501 }
+        );
 
     } catch (err: any) {
         console.error(`[Revalidate-Single] Connection Error:`, err.message);

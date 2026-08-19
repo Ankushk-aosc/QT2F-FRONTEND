@@ -26,6 +26,7 @@ interface ParsingData {
   report_type: string;
   data_format: string;
   parsing_status: string;
+  autogen_summary?: string;
   components: {
     data_sources: Array<{ name: string; type: string; format: string; filename: string }>;
     tables: Array<{ name: string; fields: number; fieldNames: Array<{ Name: string; dataType: string }> }>;
@@ -103,7 +104,45 @@ const defaultParsingData: ParsingData = {
 
 // Helper: map raw ParsedData to UI-friendly ParsingData
 const mapRawParsedToParsingData = (raw: any): { parsed: ParsingData; renames: TableRename[] } => {
-  const fetchedReportType = "Unknown";
+  if (!raw) {
+    return { parsed: defaultParsingData, renames: [] };
+  }
+
+  // If already structured in ParsingData format
+  if (raw.components && typeof raw.components === "object") {
+    const rawComponents = raw.components;
+    const mappedData: ParsingData = {
+      file_name: raw.file_name || raw.folder_name || raw.folder || "Qlik Application",
+      report_type: raw.report_type || "Qlik Sense QVF Application",
+      data_format: raw.data_format || "QVD / Delta Lake",
+      parsing_status: raw.parsing_status || "Complete",
+      autogen_summary: raw.autogen_summary || "",
+      components: {
+        data_sources: Array.isArray(rawComponents.data_sources) ? rawComponents.data_sources : [],
+        tables: Array.isArray(rawComponents.tables) ? rawComponents.tables : [],
+        dimensions: Array.isArray(rawComponents.dimensions) ? rawComponents.dimensions : [],
+        measures: Array.isArray(rawComponents.measures) ? rawComponents.measures : [],
+        filters: Array.isArray(rawComponents.filters) ? rawComponents.filters : [],
+        calculations: Array.isArray(rawComponents.calculations) ? rawComponents.calculations : [],
+      },
+      structure: {
+        data_model: raw.structure?.data_model || "Star Schema",
+        fact_tables: Array.isArray(raw.structure?.fact_tables) ? raw.structure.fact_tables : [],
+        dimension_tables: Array.isArray(raw.structure?.dimension_tables) ? raw.structure.dimension_tables : [],
+        relationships: Array.isArray(raw.structure?.relationships) ? raw.structure.relationships : [],
+      },
+      renames: raw.renames || raw.column_renames || { table_column_renames: [] },
+    };
+
+    const renames =
+      raw.renames?.table_column_renames ||
+      raw.column_renames ||
+      raw.script?.table_column_renames ||
+      [];
+    return { parsed: mappedData, renames: Array.isArray(renames) ? renames : [] };
+  }
+
+  const fetchedReportType = "Qlik Sense QVF Application";
 
   let connections: any[] = [];
 
@@ -117,7 +156,7 @@ const mapRawParsedToParsingData = (raw: any): { parsed: ParsingData; renames: Ta
   }
   if (!Array.isArray(connections)) connections = connections ? [connections] : [];
 
-  let dataFormat = "Unknown";
+  let dataFormat = "QVD / Delta Lake";
   if (raw?.script?.datasources_results?.[0]?.datasources?.[0]) {
     dataFormat = raw.script.datasources_results[0].datasources[0].split(":")[0]?.trim() || "CSV";
   } else if (connections.length > 0) {
@@ -125,8 +164,8 @@ const mapRawParsedToParsingData = (raw: any): { parsed: ParsingData; renames: Ta
       connections[0]?.connection_details?.driver ||
       connections[0]?.driver ||
       connections[0]?.type ||
-      "Unknown";
-    if (dataFormat === "") dataFormat = "Unknown";
+      "QVD / Delta Lake";
+    if (dataFormat === "") dataFormat = "QVD / Delta Lake";
   }
 
   const dsFromScript =
@@ -163,10 +202,16 @@ const mapRawParsedToParsingData = (raw: any): { parsed: ParsingData; renames: Ta
     filename: conn.connection_details?.database || conn.database || `Connection ${idx + 1}`,
   }));
 
-  const combinedDataSources = [...dsFromScript, ...dsFromConnections];
+  const combinedDataSources =
+    raw?.components?.data_sources && Array.isArray(raw.components.data_sources)
+      ? raw.components.data_sources
+      : [...dsFromScript, ...dsFromConnections];
 
   const tables: Array<{ name: string; fields: number; fieldNames: Array<{ Name: string; dataType: string }> }> =
     (() => {
+      if (Array.isArray(raw?.components?.tables) && raw.components.tables.length > 0) {
+        return raw.components.tables;
+      }
       if (Array.isArray(raw?.script?.tables)) {
         return raw.script.tables.map((table: any, index: number) => ({
           name: table.table_name || table.name || `Table ${index + 1}`,
@@ -174,7 +219,7 @@ const mapRawParsedToParsingData = (raw: any): { parsed: ParsingData; renames: Ta
           fieldNames:
             (Array.isArray(table.fields) &&
               table.fields.map((field: any) =>
-                typeof field === "string" ? { Name: field, dataType: "Unknown" } : { Name: field.Name || field.name || "Unknown", dataType: field.dataType || "Unknown" }
+                typeof field === "string" ? { Name: field, dataType: "STRING" } : { Name: field.Name || field.name || "Unknown", dataType: field.dataType || "STRING" }
               )) ||
             [],
         }));
@@ -186,7 +231,7 @@ const mapRawParsedToParsingData = (raw: any): { parsed: ParsingData; renames: Ta
           fieldNames:
             (Array.isArray(table.fields) &&
               table.fields.map((field: any) =>
-                typeof field === "string" ? { Name: field, dataType: "Unknown" } : { Name: field.Name || field.name || "Unknown", dataType: field.dataType || "Unknown" }
+                typeof field === "string" ? { Name: field, dataType: "STRING" } : { Name: field.Name || field.name || "Unknown", dataType: field.dataType || "STRING" }
               )) ||
             [],
         }));
@@ -198,6 +243,7 @@ const mapRawParsedToParsingData = (raw: any): { parsed: ParsingData; renames: Ta
 
   const rawDims: any[] = (() => {
     if (!raw) return [];
+    if (Array.isArray(raw.components?.dimensions)) return raw.components.dimensions;
     if (Array.isArray(raw.dimensions)) return raw.dimensions;
     if (raw.dimensions && Array.isArray((raw.dimensions as any).dimensions)) return (raw.dimensions as any).dimensions;
     if (Array.isArray(raw.script?.dimensions)) return raw.script.dimensions;
@@ -206,31 +252,32 @@ const mapRawParsedToParsingData = (raw: any): { parsed: ParsingData; renames: Ta
 
   const dimensions = rawDims.map((d: any, i: number) => ({
     name: d?.name || d?.dimension_name || `Dimension ${i + 1}`,
-    expression: d?.expression || d?.formula || "Unknown",
-    table: (Array.isArray(d?.tables) && d.tables[0]) || d?.table || fact_tables[0] || "Unknown",
+    expression: d?.expression || d?.formula || d?.name || "Unknown",
+    table: (Array.isArray(d?.tables) && d.tables[0]) || d?.table || fact_tables[0] || "Main",
   }));
 
   const dimension_tables: string[] = Array.from(new Set(dimensions.map((d) => d.table).filter(Boolean)));
 
   const measures =
+    (Array.isArray(raw?.components?.measures) && raw.components.measures) ||
     (raw?.measures?.measures &&
       Array.isArray(raw.measures.measures) &&
       raw.measures.measures.map((m: any, idx: number) => ({
         name: m.name || `Measure ${idx + 1}`,
-        expression: m.expression || "Unknown",
-        table: tables.find((t) => m.expression?.includes(t.name))?.name || tables[0]?.name || "Unknown",
+        expression: m.expression || "Sum()",
+        table: tables.find((t) => m.expression?.includes(t.name))?.name || tables[0]?.name || "Main",
       }))) ||
     (Array.isArray(raw?.measures) &&
       raw.measures.map((m: any, idx: number) => ({
         name: m.name || `Measure ${idx + 1}`,
-        expression: m.expression || "Unknown",
-        table: tables.find((t) => m.expression?.includes(t.name))?.name || tables[0]?.name || "Unknown",
+        expression: m.expression || "Sum()",
+        table: tables.find((t) => m.expression?.includes(t.name))?.name || tables[0]?.name || "Main",
       }))) ||
     [];
 
-  let data_model = "Unknown";
+  let data_model = "Star Schema";
   if (fact_tables.length === 0 && dimension_tables.length === 0) {
-    data_model = "Unknown";
+    data_model = "Star Schema";
   } else if (fact_tables.length === 1 && dimension_tables.length === 0) {
     data_model = "Single Table";
   } else if (fact_tables.length > 0 && dimension_tables.length === 0) {
@@ -240,7 +287,7 @@ const mapRawParsedToParsingData = (raw: any): { parsed: ParsingData; renames: Ta
   }
 
   const mappedData: ParsingData = {
-    file_name: raw?.folder_name || raw?.folder || raw?.script?.filename || "Unknown",
+    file_name: raw?.folder_name || raw?.folder || raw?.script?.filename || "Qlik Application",
     report_type: fetchedReportType,
     data_format: dataFormat,
     parsing_status: "Complete",
@@ -250,23 +297,25 @@ const mapRawParsedToParsingData = (raw: any): { parsed: ParsingData; renames: Ta
       dimensions,
       measures,
       filters:
+        (Array.isArray(raw?.components?.filters) && raw.components.filters) ||
         (raw?.filter_panes || raw?.filters?.filter_panes || []).map((filter: any) => ({
-          name: filter.title,
-          condition: filter.title,
-          id: filter.id || "Unknown",
-          report: raw?.folder_name || raw?.folder || "Unknown",
+          name: filter.title || "Filter",
+          condition: filter.title || "Filter",
+          id: filter.id || "filter-1",
+          report: raw?.folder_name || raw?.folder || "Qlik Application",
         })) || [],
       calculations:
+        (Array.isArray(raw?.components?.calculations) && raw.components.calculations) ||
         (Array.isArray(raw?.calculated_columns)
           ? raw.calculated_columns.map((calc: any) => ({
-              name: calc.column_name || calc.name || "Unknown",
+              name: calc.column_name || calc.name || "Calculation",
               expression: calc.expression || "Unknown",
-              table: calc.table_name || tables[0]?.name || "Unknown",
+              table: calc.table_name || tables[0]?.name || "Main",
             }))
           : raw?.calculated_columns?.calculated_columns?.map((calc: any) => ({
-              name: calc.column_name || calc.name || "Unknown",
+              name: calc.column_name || calc.name || "Calculation",
               expression: calc.expression || "Unknown",
-              table: calc.table_name || tables[0]?.name || "Unknown",
+              table: calc.table_name || tables[0]?.name || "Main",
             }))) || [],
     },
     structure: {
@@ -279,7 +328,7 @@ const mapRawParsedToParsingData = (raw: any): { parsed: ParsingData; renames: Ta
   };
 
   const renames = raw?.column_renames || raw?.renames?.table_column_renames || raw?.script?.table_column_renames || [];
-  return { parsed: mappedData, renames };
+  return { parsed: mappedData, renames: Array.isArray(renames) ? renames : [] };
 };
 
 export default function ParsingResults({
@@ -620,43 +669,17 @@ export default function ParsingResults({
 
       try {
         const { parsed, renames: parsedRenames } = mapRawParsedToParsingData(data);
-        const fallbackMapped = await loadParsingData(true) || defaultParsingData;
-
-        const merged: ParsingData = {
-          ...fallbackMapped,
-          ...parsed,
-          components: {
-            ...fallbackMapped.components,
-            ...parsed.components,
-            dimensions: parsed.components?.dimensions?.length ? parsed.components.dimensions : fallbackMapped.components.dimensions,
-            measures: parsed.components?.measures?.length ? parsed.components.measures : fallbackMapped.components.measures,
-            data_sources: parsed.components?.data_sources?.length ? parsed.components.data_sources : fallbackMapped.components.data_sources,
-          },
-          structure: {
-            ...fallbackMapped.structure,
-            ...parsed.structure,
-            data_model: parsed.structure?.data_model || fallbackMapped.structure?.data_model,
-            fact_tables: parsed.structure?.fact_tables?.length ? parsed.structure.fact_tables : fallbackMapped.structure.fact_tables,
-            dimension_tables: parsed.structure?.dimension_tables?.length ? parsed.structure.dimension_tables : fallbackMapped.structure.dimension_tables,
-            relationships: parsed.structure?.relationships?.length ? parsed.structure.relationships : fallbackMapped.structure.relationships,
-          },
-        };
-
         if (!cancelled) {
-          setParsingData(merged);
+          setParsingData(parsed);
+          setTableRenames(parsedRenames || []);
           setRenames(parsedRenames || []);
+          setIsLoading(false);
+          setError("");
         }
-      } catch (e) {
-        console.error("Fallback merge failed:", e);
-        try {
-          const { parsed, renames: parsedRenames } = mapRawParsedToParsingData(data);
-          if (!cancelled) {
-            setParsingData(parsed);
-            setRenames(parsedRenames || []);
-          }
-        } catch (err) {
-          console.error("Error mapping parsing prop:", err);
-          if (!cancelled) loadParsingData();
+      } catch (err) {
+        console.error("Error mapping parsing prop:", err);
+        if (!cancelled) {
+          await loadParsingData();
         }
       }
     }

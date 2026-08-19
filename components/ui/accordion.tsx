@@ -1,43 +1,70 @@
-import React from "react";
-import {
-  Accordion as FluentAccordion,
-  AccordionItem as FluentAccordionItem,
-  AccordionHeader as FluentAccordionHeader,
-  AccordionPanel as FluentAccordionPanel,
-} from "@fluentui/react-components";
+import React, { useEffect, useRef } from "react";
 
-export function Accordion({ children, type, collapsible, defaultValue, ...props }: any) {
+function cx(...parts: Array<string | undefined | false>) {
+  return parts.filter(Boolean).join(" ");
+}
+
+/**
+ * A group of disclosure sections. Each `AccordionItem` is an independent
+ * native `<details>`, which gets expand/collapse keyboard and screen-reader
+ * semantics for free. The previous Fluent version enforced "only one item
+ * open at a time" (`type="single"`); nothing in this codebase relies on
+ * that — every caller uses it as a plain reference/FAQ list — so independent
+ * items are both simpler and, for that content, the more usable choice.
+ */
+export interface AccordionProps extends React.HTMLAttributes<HTMLDivElement> {
+  /** Accepted for API compatibility with the previous Radix/Fluent-style usage; every item is independently collapsible regardless. */
+  type?: "single" | "multiple";
+  collapsible?: boolean;
+  defaultValue?: string | string[];
+}
+
+export function Accordion({ children, className, type, collapsible, defaultValue, ...props }: AccordionProps) {
   return (
-    <FluentAccordion
-      collapsible={collapsible}
-      defaultValue={defaultValue}
-      {...props}
-    >
+    <div className={className} {...props}>
       {children}
-    </FluentAccordion>
+    </div>
   );
 }
 
-export function AccordionItem({ value, children, ...props }: any) {
+export function AccordionItem({
+  value,
+  children,
+  className,
+  defaultOpen,
+  ...props
+}: { value: string; defaultOpen?: boolean } & React.HTMLAttributes<HTMLDetailsElement>) {
+  const ref = useRef<HTMLDetailsElement>(null);
+
+  // Set the initial open state imperatively, once, on mount only. Passing
+  // `open` as a normal React prop would make React re-assert it on every
+  // render, silently re-closing (or re-opening) a section the user had just
+  // toggled by hand — `<details>` has no `defaultOpen` the way `<input>` has
+  // `defaultChecked`, so this is the uncontrolled equivalent.
+  useEffect(() => {
+    if (defaultOpen && ref.current) ref.current.open = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <FluentAccordionItem value={value} {...props}>
+    <details ref={ref} className={cx("ui-accordion-item", className)} {...(props as any)}>
       {children}
-    </FluentAccordionItem>
+    </details>
   );
 }
 
-export function AccordionTrigger({ children, ...props }: any) {
+export function AccordionTrigger({ children, className, ...props }: React.HTMLAttributes<HTMLElement>) {
   return (
-    <FluentAccordionHeader {...props}>
+    <summary className={cx("ui-accordion-trigger", className)} {...props}>
       {children}
-    </FluentAccordionHeader>
+    </summary>
   );
 }
 
-export function AccordionContent({ children, ...props }: any) {
+export function AccordionContent({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <FluentAccordionPanel {...props}>
+    <div className={cx("ui-accordion-content", className)} {...props}>
       {children}
-    </FluentAccordionPanel>
+    </div>
   );
 }

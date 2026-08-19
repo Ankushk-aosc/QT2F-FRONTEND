@@ -80,7 +80,6 @@ class BatchService {
     siteId?: string,
     sourceType?: string,
     tokenName?: string,
-    oneLakeToken?: string,
     fabricAccessToken?: string,
     lakehouseId?: string,
     connectionId?: string,
@@ -93,10 +92,6 @@ class BatchService {
       tableau_token_name: tokenName || FIXED_TOKEN_NAME,
       scope: scope
     };
-
-    if (oneLakeToken) {
-      body.onelake_token = oneLakeToken;
-    }
 
     if (fabricAccessToken) {
       body.fabric_access_token = fabricAccessToken;
@@ -158,7 +153,6 @@ class BatchService {
     siteId?: string,
     sourceType: string = "cloud",
     tokenName?: string,
-    oneLakeToken?: string,
     fabricAccessToken?: string,
     lakehouseId?: string,
     connectionId?: string
@@ -191,7 +185,6 @@ class BatchService {
         group_id: groupId,
         workspace_id: groupId, // Also set workspace_id for compatibility
         folder_name: folderName,
-        onelake_token: oneLakeToken,
         fabric_access_token: fabricAccessToken,
         connection_id: connectionId,
         scope: "selected",
@@ -235,7 +228,7 @@ class BatchService {
       try {
         // Single API call with all project IDs in the array
         console.log(`[BatchService] Processing ${projectIds.length} project(s) in single call (scope: project)`);
-        const response = await this.callProcessSite(trimmedEmail, trimmedUrl, trimmedSite, projectIds, groupId, folderName, siteId, sourceType, tokenName, oneLakeToken, fabricAccessToken, lakehouseId, connectionId, "project");
+        const response = await this.callProcessSite(trimmedEmail, trimmedUrl, trimmedSite, projectIds, groupId, folderName, siteId, sourceType, tokenName, fabricAccessToken, lakehouseId, connectionId, "project");
         return response;
       } catch (err: unknown) {
         const message = getErrorMessage(err) || "Failed to start migration";
@@ -246,7 +239,7 @@ class BatchService {
 
     // ─── "site" / "entire" scope → single call, no project_id ────
     try {
-      return await this.callProcessSite(trimmedEmail, trimmedUrl, trimmedSite, undefined, groupId, folderName, siteId, sourceType, tokenName, oneLakeToken, fabricAccessToken, lakehouseId, connectionId, scope);
+      return await this.callProcessSite(trimmedEmail, trimmedUrl, trimmedSite, undefined, groupId, folderName, siteId, sourceType, tokenName, fabricAccessToken, lakehouseId, connectionId, scope);
     } catch (err: unknown) {
       const message = getErrorMessage(err) || "Failed to start migration";
       console.error(`[BatchService] startMigration failed (${scope}):`, err);

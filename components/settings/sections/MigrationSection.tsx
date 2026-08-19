@@ -1,21 +1,15 @@
 "use client"
 
 import React, { useCallback, useEffect, useState } from "react"
-import {
-  Button,
-  Dropdown,
-  Input,
-  Option,
-  Spinner,
-  Switch,
-  Text,
-  makeStyles,
-  tokens,
-} from "@fluentui/react-components"
 
 import { isLiteMode } from "@/lib/config"
 import { recordsService } from "@/services/records.service"
 import { useUIStore } from "@/stores/ui.store"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Select, SelectItem } from "@/components/ui/select"
+import { Spinner } from "@/components/ui/spinner"
+import { Switch } from "@/components/ui/switch"
 
 import { SettingRow, SettingsGroup, SettingsPanel } from "../SettingsPrimitives"
 
@@ -37,29 +31,7 @@ const DEPLOYMENT_TYPE_LABELS: Record<string, string> = {
   AZURE_DEVOPS: "Azure DevOps",
 }
 
-const useStyles = makeStyles({
-  fullWidth: { width: "100%" },
-  stack: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-    width: "100%",
-  },
-  inline: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-  },
-  hint: { color: tokens.colorNeutralForeground3 },
-  label: {
-    fontSize: tokens.fontSizeBase200,
-    fontWeight: tokens.fontWeightSemibold,
-  },
-})
-
 export function MigrationSection() {
-  const styles = useStyles()
-
   const {
     mode,
     setMode,
@@ -280,13 +252,9 @@ export function MigrationSection() {
                 : `Runs the full pipeline automatically: Assessment, Parsing, ${dataLayerEnabled ? "Data Layer, " : ""}Mapping, Report Generation and Validation.`
             }
           >
-            <div className={styles.inline}>
+            <div className="migration-inline">
               {updatingMode ? <Spinner size="tiny" /> : null}
-              <Switch
-                checked={mode === "single"}
-                disabled={updatingMode}
-                onChange={(_, data) => void handleModeChange(data.checked)}
-              />
+              <Switch checked={mode === "single"} disabled={updatingMode} onChange={(checked) => void handleModeChange(checked)} />
             </div>
           </SettingRow>
 
@@ -294,12 +262,12 @@ export function MigrationSection() {
             label="Data layer discovery"
             hint="Automated discovery and validation of underlying data sources, schema parity and relationship integrity."
           >
-            <div className={styles.inline}>
+            <div className="migration-inline">
               {updatingDataLayer ? <Spinner size="tiny" /> : null}
               <Switch
                 checked={dataLayerEnabled}
                 disabled={updatingDataLayer}
-                onChange={(_, data) => void handleDataLayerToggle(data.checked)}
+                onChange={(checked) => void handleDataLayerToggle(checked)}
               />
             </div>
           </SettingRow>
@@ -309,54 +277,35 @@ export function MigrationSection() {
       {!lite ? (
         <SettingsGroup title="Deployment target">
           <SettingRow label="Deployment type" hint="Where generated assets are stored or deployed.">
-            <div className={styles.inline}>
+            <div className="migration-inline" style={{ width: "100%" }}>
               {updatingDeploymentType ? <Spinner size="tiny" /> : null}
-              <Dropdown
-                className={styles.fullWidth}
-                value={DEPLOYMENT_TYPE_LABELS[deploymentType] || deploymentType}
-                selectedOptions={[deploymentType]}
+              <Select
+                style={{ width: "100%" }}
+                value={deploymentType}
                 disabled={updatingDeploymentType}
-                onOptionSelect={(_, data) =>
-                  data.optionValue && void handleDeploymentTypeChange(data.optionValue)
-                }
+                onValueChange={(value: string) => void handleDeploymentTypeChange(value)}
               >
                 {Object.entries(DEPLOYMENT_TYPE_LABELS).map(([value, label]) => (
-                  <Option key={value} value={value} text={label}>
+                  <SelectItem key={value} value={value}>
                     {label}
-                  </Option>
+                  </SelectItem>
                 ))}
-              </Dropdown>
+              </Select>
             </div>
           </SettingRow>
 
           {deploymentType === "AZURE_DEVOPS" && !loadingCredentials ? (
             <SettingRow label="Azure DevOps" hint="Target repository for generated assets." stacked>
-              <div className={styles.stack}>
-                <Text className={styles.label}>Organization</Text>
-                <Input
-                  value={azureDevopsOrg}
-                  onChange={(e) => setAzureDevopsOrg(e.target.value)}
-                  disabled={savingCredentials}
-                />
-                <Text className={styles.label}>Project</Text>
-                <Input
-                  value={azureDevopsProject}
-                  onChange={(e) => setAzureDevopsProject(e.target.value)}
-                  disabled={savingCredentials}
-                />
-                <Text className={styles.label}>Repository</Text>
-                <Input
-                  value={azureDevopsRepo}
-                  onChange={(e) => setAzureDevopsRepo(e.target.value)}
-                  disabled={savingCredentials}
-                />
-                <Text className={styles.label}>Branch</Text>
-                <Input
-                  value={azureDevopsBranch}
-                  onChange={(e) => setAzureDevopsBranch(e.target.value)}
-                  disabled={savingCredentials}
-                />
-                <Text className={styles.label}>Personal access token</Text>
+              <div className="migration-stack">
+                <span className="migration-field-label">Organization</span>
+                <Input value={azureDevopsOrg} onChange={(e) => setAzureDevopsOrg(e.target.value)} disabled={savingCredentials} />
+                <span className="migration-field-label">Project</span>
+                <Input value={azureDevopsProject} onChange={(e) => setAzureDevopsProject(e.target.value)} disabled={savingCredentials} />
+                <span className="migration-field-label">Repository</span>
+                <Input value={azureDevopsRepo} onChange={(e) => setAzureDevopsRepo(e.target.value)} disabled={savingCredentials} />
+                <span className="migration-field-label">Branch</span>
+                <Input value={azureDevopsBranch} onChange={(e) => setAzureDevopsBranch(e.target.value)} disabled={savingCredentials} />
+                <span className="migration-field-label">Personal access token</span>
                 <Input
                   type="password"
                   value={azureDevopsPat}
@@ -370,26 +319,14 @@ export function MigrationSection() {
 
           {deploymentType === "GIT" && !loadingCredentials ? (
             <SettingRow label="GitHub" hint="Target repository for generated assets." stacked>
-              <div className={styles.stack}>
-                <Text className={styles.label}>Organization</Text>
-                <Input
-                  value={gitOrg}
-                  onChange={(e) => setGitOrg(e.target.value)}
-                  disabled={savingCredentials}
-                />
-                <Text className={styles.label}>Repository</Text>
-                <Input
-                  value={gitRepo}
-                  onChange={(e) => setGitRepo(e.target.value)}
-                  disabled={savingCredentials}
-                />
-                <Text className={styles.label}>Branch</Text>
-                <Input
-                  value={gitBranch}
-                  onChange={(e) => setGitBranch(e.target.value)}
-                  disabled={savingCredentials}
-                />
-                <Text className={styles.label}>Personal access token</Text>
+              <div className="migration-stack">
+                <span className="migration-field-label">Organization</span>
+                <Input value={gitOrg} onChange={(e) => setGitOrg(e.target.value)} disabled={savingCredentials} />
+                <span className="migration-field-label">Repository</span>
+                <Input value={gitRepo} onChange={(e) => setGitRepo(e.target.value)} disabled={savingCredentials} />
+                <span className="migration-field-label">Branch</span>
+                <Input value={gitBranch} onChange={(e) => setGitBranch(e.target.value)} disabled={savingCredentials} />
+                <span className="migration-field-label">Personal access token</span>
                 <Input
                   type="password"
                   value={gitPat}
@@ -406,30 +343,18 @@ export function MigrationSection() {
               label="Save credentials"
               hint="Tokens are sent through server-side routes and stored in Key Vault. They are never read back into this form."
             >
-              <div className={styles.stack}>
-                <Button
-                  appearance="primary"
-                  disabled={savingCredentials || loadingCredentials}
-                  onClick={() => void handleSaveCredentials()}
-                >
+              <div className="migration-stack">
+                <Button disabled={savingCredentials || loadingCredentials} onClick={() => void handleSaveCredentials()}>
                   {savingCredentials ? "Saving…" : "Save credentials"}
                 </Button>
-                {credentialsMessage ? (
-                  <Text size={200} className={styles.hint}>
-                    {credentialsMessage}
-                  </Text>
-                ) : null}
+                {credentialsMessage ? <span className="settings-row-hint">{credentialsMessage}</span> : null}
               </div>
             </SettingRow>
           ) : null}
         </SettingsGroup>
       ) : null}
 
-      {lite ? (
-        <Text size={200} className={styles.hint}>
-          Pipeline and deployment configuration is not available in lite mode.
-        </Text>
-      ) : null}
+      {lite ? <span className="settings-row-hint">Pipeline and deployment configuration is not available in lite mode.</span> : null}
     </SettingsPanel>
   )
 }

@@ -2,18 +2,24 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useQlikStore } from "@/stores/qlikStore";
+import { useMsal } from "@azure/msal-react";
+import { semanticKernelService } from "@/services/semanticKernel.service";
 import { QlikService } from "@/services/qlik.service";
 import { fabricService, FabricWorkspace } from "@/services/fabric.service";
+import { withRetry } from "@/lib/api/retry";
 import { QlikMigrationDashboard } from "@/components/Qlik-Migration-Dashboard/QlikMigrationDashboard/page";
 import { ConfigurationsAndResults } from "@/components/Qlik-Migration-Dashboard/ConfigurationsAndResults/page";
 import { QlikApp, AssessmentData, ParsedData, MappedData, ReportGenerationData } from "@/types/assessment";
-import { useUIStore } from "@/stores/ui.store";
+import { ConnectorRequired } from "@/components/connectors/ConnectorRequired";
 import { StageProgress } from "@/components/ui/StageProgress";
 import { FadeIn } from "@/components/ui/FadeIn";
-import { Toaster } from "@fluentui/react-components";
-import { QLIK_TOASTER_ID } from "@/hooks/useQlikToast";
+import { Toaster } from "@/components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
+import { formatApiErrorMessage } from "@/lib/utils";
 
 export function QlikMigrationTab() {
+  const { accounts } = useMsal();
+  const { toast } = useToast();
   const {
     apps,
     setApps,
@@ -24,16 +30,6 @@ export function QlikMigrationTab() {
     fetchAgentActions,
   } = useQlikStore();
 
-  const workspace = useUIStore((s) => s.workspace);
-
-  // Connection configurations
-  const [qlikUrl, setQlikUrl] = useState("https://your-qlik-tenant.us.qlikcloud.com");
-  const [originalQlikUrl, setOriginalQlikUrl] = useState("");
-  const [isEditingUrl, setIsEditingUrl] = useState(false);
-  const [isSavingUrl, setIsSavingUrl] = useState(false);
-  const [urlError, setUrlError] = useState<string | null>(null);
-  const [urlSuccess, setUrlSuccess] = useState<string | null>(null);
-
   // Spaces and Apps Selection
   const [qlikSpaces, setQlikSpaces] = useState<{ id: string; name: string }[]>([]);
   const [selectedQlikSpace, setSelectedQlikSpace] = useState("");
@@ -43,6 +39,13 @@ export function QlikMigrationTab() {
 
   // Target Fabric configurations
   const [workspaces, setWorkspaces] = useState<FabricWorkspace[]>([]);
+  const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(true);
+  const [isLoadingSpaces, setIsLoadingSpaces] = useState(true);
+  // Surfaced next to the pickers. Without these a failed load left both
+  // dropdowns silently empty, with a full page reload as the only retry.
+  const [spacesError, setSpacesError] = useState<string | null>(null);
+  const [workspacesError, setWorkspacesError] = useState<string | null>(null);
+  const [configReloadKey, setConfigReloadKey] = useState(0);
   const [selectedWorkspace, setSelectedWorkspace] = useState("");
 
   // Process States
@@ -67,36 +70,52 @@ export function QlikMigrationTab() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dropdownDirection, setDropdownDirection] = useState<"down" | "up">("down");
 
-  // Load Initial Configurations
+  // Load the pickers' options. The Qlik connection itself is not loaded here —
+  // it is configured in Settings and read from the connector store by the
+  // dashboard, which is what stops this screen owning connection state.
   useEffect(() => {
     async function loadConfig() {
+      // Both backends are cold-start prone, so a single attempt on mount is
+      // what left these dropdowns permanently empty after one transient
+      // failure. `withRetry` backs off across the wake-up window.
+      setIsLoadingSpaces(true);
+      setSpacesError(null);
       try {
-        const urlData = await QlikService.getQlikUrl();
-        if (urlData?.server_url) {
-          setQlikUrl(urlData.server_url);
-          setOriginalQlikUrl(urlData.server_url);
-        }
-      } catch (err) {
-        console.warn("Failed to load Qlik URL from server, using default.");
-      }
-
-      try {
-        const spaces = await QlikService.getSpaces();
+        const spaces = await withRetry(() => QlikService.getSpaces(), {
+          retries: 3,
+          delay: 1500,
+        });
         setQlikSpaces(spaces);
       } catch (err) {
         console.error("Failed to load Qlik spaces:", err);
+        setSpacesError(
+          err instanceof Error ? err.message : "Could not load Qlik spaces."
+        );
+      } finally {
+        setIsLoadingSpaces(false);
       }
 
+      setIsLoadingWorkspaces(true);
+      setWorkspacesError(null);
       try {
-        const fbWorkspaces = await fabricService.getWorkspaces();
+        const fbWorkspaces = await withRetry(() => fabricService.getWorkspaces(), {
+          retries: 3,
+          delay: 1500,
+        });
         setWorkspaces(fbWorkspaces);
       } catch (err) {
         console.error("Failed to load Fabric workspaces:", err);
+        setWorkspacesError(
+          err instanceof Error ? err.message : "Could not load Fabric workspaces."
+        );
+      } finally {
+        // Cleared on both paths so a failed fetch stops reading as "loading".
+        setIsLoadingWorkspaces(false);
       }
     }
 
     loadConfig();
-  }, []);
+  }, [configReloadKey]);
 
   // Fetch Qlik apps when space changes
   useEffect(() => {
@@ -138,22 +157,6 @@ export function QlikMigrationTab() {
     setDropdownAppId(e.target.value);
   };
 
-  const handleSaveUrl = async () => {
-    setIsSavingUrl(true);
-    setUrlError(null);
-    setUrlSuccess(null);
-    try {
-      await QlikService.saveQlikUrl(qlikUrl);
-      setOriginalQlikUrl(qlikUrl);
-      setUrlSuccess("URL updated successfully!");
-      setIsEditingUrl(false);
-    } catch (err: any) {
-      setUrlError(err.message || "Failed to save URL");
-    } finally {
-      setIsSavingUrl(false);
-    }
-  };
-
   // Run sequential agent processing
   const handleStartProcessing = async () => {
     if (isProcessCompleted) {
@@ -174,14 +177,35 @@ export function QlikMigrationTab() {
     const selectedAppObjects = apps.filter((app) => selectedApps.includes(app.id));
 
     try {
-      const workspaceName = workspaces.find((w) => w.id === selectedWorkspace)?.name || "Default Workspace";
+      // The Fabric API returns `displayName`; `name` is undefined on these
+      // objects, so reading `.name` alone always fell through to the literal
+      // "Default Workspace" and that string was sent downstream as the real
+      // workspace name.
+      const selected = workspaces.find((w) => w.id === selectedWorkspace);
+      const workspaceName = selected?.displayName || selected?.name || "Default Workspace";
+
+      // ─── Semantic Kernel Space Orchestration Call ───
+      const userEmail = accounts?.[0]?.username || "admin@unified.local";
+      if (selectedQlikSpace) {
+        try {
+          await semanticKernelService.processQlikSpace({
+            email: userEmail,
+            source_type: "cloud",
+            workspace_id: [selectedQlikSpace],
+            deployment_type: "fabric",
+            fabric_group_id: selectedWorkspace,
+          });
+        } catch (skErr) {
+          console.warn("[QlikMigrationTab] Semantic Kernel Space orchestration notice:", skErr);
+        }
+      }
 
       for (let i = 0; i < selectedAppObjects.length; i++) {
         const app = selectedAppObjects[i];
-        await processAppSequence(app, workspaceName);
+        await processAppSequence(app, workspaceName, selectedQlikSpace || "personal");
       }
     } catch (err: any) {
-      setGlobalError(err.message || "Processing encountered error.");
+      setGlobalError(formatApiErrorMessage(err.message));
     } finally {
       setIsProcessing(false);
       setIsProcessCompleted(true);
@@ -193,7 +217,15 @@ export function QlikMigrationTab() {
   };
 
   // Single app sequential execution
-  const processAppSequence = async (app: QlikApp, workspaceName: string) => {
+  // `qlikSpaceId` is the Qlik space the app belongs to and is what the
+  // Assessment and Parsing APIs mean by `workspace_id`. It is distinct from
+  // `workspaceName`, which names the *Fabric* target workspace and was
+  // previously being sent as the Qlik workspace id.
+  const processAppSequence = async (
+    app: QlikApp,
+    workspaceName: string,
+    qlikSpaceId: string
+  ) => {
     const appId = app.id;
     
     // Generate folder name
@@ -229,11 +261,12 @@ export function QlikMigrationTab() {
 
     try {
       // 0. Unbuild
-      await QlikService.unbuild(appId, app.name);
+      const unbuildRes = await QlikService.unbuild(appId, app.name);
+      const engineData = unbuildRes?.data || unbuildRes;
 
       // 1. Assessment
       pollLogs("assessment");
-      const assessmentData = await QlikService.runAssessment(folderName);
+      const assessmentData = await QlikService.runAssessment(appId, folderName, qlikSpaceId, app.name, engineData);
       isPolling = false;
       updateProcessState(appId, "assessment", { status: "completed", result: assessmentData });
       setApiResults((prev) =>
@@ -244,7 +277,7 @@ export function QlikMigrationTab() {
       isPolling = true;
       pollLogs("parsing");
       updateProcessState(appId, "parsing", { status: "running" });
-      const parsedData = await QlikService.runParsing(folderName);
+      const parsedData = await QlikService.runParsing(appId, folderName, qlikSpaceId, app.name, engineData);
       isPolling = false;
       updateProcessState(appId, "parsing", { status: "completed", result: parsedData });
       setApiResults((prev) =>
@@ -255,7 +288,7 @@ export function QlikMigrationTab() {
       isPolling = true;
       pollLogs("mapping");
       updateProcessState(appId, "mapping", { status: "running" });
-      const mappedData = await QlikService.runMapping(appId, folderName);
+      const mappedData = await QlikService.runMapping(appId, folderName, qlikSpaceId, app.name, engineData);
       isPolling = false;
       updateProcessState(appId, "mapping", { status: "completed", result: mappedData });
       setApiResults((prev) =>
@@ -266,7 +299,7 @@ export function QlikMigrationTab() {
       isPolling = true;
       pollLogs("reportGeneration");
       updateProcessState(appId, "reportGeneration", { status: "running" });
-      const reportGenData = await QlikService.runReportGeneration(appId, folderName, workspaceName);
+      const reportGenData = await QlikService.runReportGeneration(appId, folderName, workspaceName, app.name, engineData);
       isPolling = false;
       updateProcessState(appId, "reportGeneration", { status: "completed", result: reportGenData });
       setApiResults((prev) =>
@@ -277,11 +310,12 @@ export function QlikMigrationTab() {
       isPolling = false;
       console.error(`Execution failed for ${app.name}:`, err);
       
-      // Fail remaining stages
+      // Fail remaining stages with clean error
       const stages = ["assessment", "parsing", "mapping", "reportGeneration"] as const;
+      const cleanError = formatApiErrorMessage(err.message);
       stages.forEach((stage) => {
         if (processStates[appId]?.[stage]?.status !== "completed") {
-          updateProcessState(appId, stage, { status: "failed", error: err.message || "Execution failed" });
+          updateProcessState(appId, stage, { status: "failed", error: cleanError });
         }
       });
       throw err;
@@ -304,7 +338,11 @@ export function QlikMigrationTab() {
 
   return (
     <FadeIn>
-      <Toaster toasterId={QLIK_TOASTER_ID} />
+      <Toaster />
+      <ConnectorRequired
+        connectorId="qlik"
+        description="Configure the Qlik connection once in Settings. Its spaces and applications are discovered automatically and appear here."
+      >
       <div style={{ display: "flex", flexDirection: "column", gap: "24px", padding: "16px" }}>
         <QlikMigrationDashboard
           globalError={globalError}
@@ -324,19 +362,11 @@ export function QlikMigrationTab() {
           dropdownRef={dropdownRef}
           selectedWorkspace={selectedWorkspace}
           workspaces={workspaces as any}
-          qlikUrl={qlikUrl}
-          setQlikUrl={setQlikUrl}
-          originalQlikUrl={originalQlikUrl}
-          setOriginalQlikUrl={setOriginalQlikUrl}
-          error={urlError}
-          setError={setUrlError}
-          success={urlSuccess}
-          setSuccess={setUrlSuccess}
-          isEditing={isEditingUrl}
-          setIsEditing={setIsEditingUrl}
-          isSaving={isSavingUrl}
-          setIsSaving={setIsSavingUrl}
-          onSaveSuccess={() => {}}
+          isLoadingWorkspaces={isLoadingWorkspaces}
+          isLoadingSpaces={isLoadingSpaces}
+          spacesError={spacesError}
+          workspacesError={workspacesError}
+          onRetryConfig={() => setConfigReloadKey((key) => key + 1)}
           onQlikSpaceChange={handleQlikSpaceChange}
           onAppSelection={handleAppSelection}
           onRemoveApp={handleRemoveApp}
@@ -361,6 +391,7 @@ export function QlikMigrationTab() {
           backendToken="dummy" // Handled client-side automatically by fetchWithAuth
         />
       </div>
+      </ConnectorRequired>
     </FadeIn>
   );
 }

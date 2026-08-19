@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
     if (created_to) query.set("created_to", created_to);
 
     const data = await httpClient.get<any[]>(
-      `/semantic-kernel?${query.toString()}`,
+      `/records/semantic-kernel?${query.toString()}`,
       { apiType: "logs" } 
     );
 

@@ -1,5 +1,6 @@
 // app/api/records/deployment_type/route.ts
 import { NextResponse } from "next/server";
+import { relayUpstreamError } from "@/lib/api/routeHelpers";
 import { getEnv } from "@/lib/env";
 
 const getBaseUrl = () => {
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
     });
 
     if (!response.ok) {
-      throw new Error(`Backend responded with ${response.status}`);
+      return relayUpstreamError("[API /api/records/deployment_type]", baseUrl, response);
     }
 
     const data = await response.json();
@@ -54,13 +55,7 @@ export async function PATCH(request: Request) {
     });
 
     if (!response.ok) {
-      let errorText = "";
-      try {
-        errorText = await response.text();
-      } catch {
-        // ignore
-      }
-      throw new Error(`Backend responded with ${response.status}: ${errorText}`);
+      return relayUpstreamError("[API /api/records/deployment_type]", baseUrl, response);
     }
 
     const data = await response.json();

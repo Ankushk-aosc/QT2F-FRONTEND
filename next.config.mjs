@@ -32,9 +32,9 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // `ignoreBuildErrors` was on, so a production build shipped whatever tsc
+  // rejected. The type-check gate only means something if the build enforces
+  // it, so errors now fail the build as they should.
   images: {
     unoptimized: true,
   },

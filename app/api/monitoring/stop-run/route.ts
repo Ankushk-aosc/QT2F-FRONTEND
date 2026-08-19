@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
         }
 
         const baseUrl = skUrl.replace(/\/$/, "");
-        const targetUrl = `${baseUrl}/stop-run`;
+        // Semantic Kernel namespaces this under /qlik; a bare /stop-run 404s.
+        const targetUrl = `${baseUrl}/qlik/stop-run`;
 
         console.log(`[API monitoring/stop-run] Forwarding stop run for ${run_id} to: ${targetUrl}`);
 

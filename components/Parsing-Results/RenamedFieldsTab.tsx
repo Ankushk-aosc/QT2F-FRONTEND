@@ -283,13 +283,10 @@ export default function RenamedFieldsTab({ tableRenames }: RenamedFieldsTabProps
                             Table
                           </th>
                           <th className="text-left py-3 px-4 whitespace-nowrap w-[260px]">
-                            Data Source Column
+                            Original Column Name (Qlik)
                           </th>
-                          <th className="text-left py-3 px-4 whitespace-nowrap w-[200px]">
-                            Qlik Name
-                          </th>
-                          <th className="text-left py-3 px-4 whitespace-nowrap w-[200px]">
-                            Fabric Name
+                          <th className="text-left py-3 px-4 whitespace-nowrap w-[260px]">
+                            Renamed Column Name (Fabric)
                           </th>
                         </tr>
                       </thead>
@@ -304,9 +301,6 @@ export default function RenamedFieldsTab({ tableRenames }: RenamedFieldsTabProps
                             </td>
                             <td className="py-3 px-4 whitespace-nowrap">
                               {rename.previous_name}
-                            </td>
-                            <td className="py-3 px-4 whitespace-nowrap">
-                              {rename.renamed}
                             </td>
                             <td className="py-3 px-4 whitespace-nowrap">
                               {rename.renamed}

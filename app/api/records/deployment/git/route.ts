@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { relayUpstreamError } from "@/lib/api/routeHelpers";
 import { getEnv } from "@/lib/env";
 
 const getBaseUrl = () => {
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
     });
 
     if (!response.ok) {
-      throw new Error(`Backend responded with ${response.status}`);
+      return relayUpstreamError("[API /api/records/deployment/git]", getBaseUrl(), response);
     }
 
     const data = await response.json();
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      throw new Error(`Backend responded with ${response.status}`);
+      return relayUpstreamError("[API /api/records/deployment/git]", getBaseUrl(), response);
     }
 
     const data = await response.json();

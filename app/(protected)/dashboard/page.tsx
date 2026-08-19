@@ -1,262 +1,209 @@
 "use client"
 
-import React, { Suspense } from "react"
-import { MigrationTab } from "@/components/tabs/MigrationTab"
-import { MonitoringTab } from "@/components/tabs/MonitoringTab"
-import { RunHistoryTab } from "@/components/tabs/RunHistoryTab"
-import { QlikMigrationTab } from "@/components/qlik/QlikMigrationTab"
-import { QlikMonitoringTab } from "@/components/qlik/QlikMonitoringTab"
-import { QlikRunHistoryTab } from "@/components/qlik/QlikRunHistoryTab"
-import { ErrorBoundary } from "@/components/ErrorBoundary"
-import { MigrationTabSkeleton, RowSkeleton } from "@/components/ui/Skeletons"
-import { useUIStore } from "@/stores/ui.store"
+import React, { useEffect, useState } from "react"
+import Link from "next/link"
 import {
-  Tab,
-  TabList,
-  Button,
-  makeStyles,
-  mergeClasses,
-  shorthands,
-  tokens,
-  Tooltip,
-} from "@fluentui/react-components"
-import {
-  PanelLeftExpand24Regular,
-} from "@fluentui/react-icons"
-import { useEffect, useRef } from "react"
-import { recordsService } from "@/services/records.service"
-import { useAgentStore } from "@/stores/agent.store"
+  ArrowRight,
+  Ban,
+  CheckCircle2,
+  Database,
+  PlayCircle,
+  RefreshCw,
+  XCircle,
+} from "lucide-react"
 
+import { useAuth } from "@/hooks/useAuth"
+import { useRunHistoryStore } from "@/stores/runHistory.store"
+import { monitoringService, type MonitoringSummary } from "@/services/monitoring.service"
+import { MetricCard } from "@/components/dashboard/MetricCard"
+import { RecentMigrations } from "@/components/dashboard/RecentMigrations"
+import { ChartCard } from "@/components/common/ChartCard"
+import { AgentStatusCard } from "@/components/common/AgentStatusCard"
+import { MigrationContextBar } from "@/components/common/MigrationContextBar"
+import { Button } from "@/components/ui/button"
+import { EM_DASH } from "@/lib/display"
 
-const useStyles = makeStyles({
-  container: {
-    display: "flex",
-    flexDirection: "column",
-    height: "100%",
-    overflow: "hidden",
-    backgroundColor: "var(--background)",
-  },
-
-  tabsWrapper: {
-    backgroundColor: "#eaf4ff",
-    ...shorthands.borderRadius(tokens.borderRadiusMedium),
-    margin: "16px 16px 8px 16px",
-    padding: "6px 12px",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    boxShadow: tokens.shadow2,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    flexWrap: "wrap",
-    position: "relative",
-    "@media (max-width: 768px)": {
-      margin: "8px 8px 4px 8px",
-      padding: "8px",
-    },
-  },
-
-  tabList: {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: "12px",
-    width: "100%",
-    maxWidth: "520px",
-    flexWrap: "wrap",
-  },
-
-  tabBase: {
-    // We let Fluent UI keep its internal centering logic (no 'all: unset')
-    boxSizing: "border-box",
-    height: "32px",
-    minWidth: "fit-content",
-    
-    // Apply perfectly symmetrical padding
-    paddingTop: "0",
-    paddingBottom: "0",
-    paddingLeft: "16px", 
-    paddingRight: "16px",
-    
-    fontSize: tokens.fontSizeBase200,
-    fontWeight: tokens.fontWeightRegular,
-    color: tokens.colorNeutralForeground1,
-    backgroundColor: "transparent",
-    
-    ...shorthands.borderRadius("8px"),
-    ...shorthands.border("1px", "solid", "transparent"),
-    
-    cursor: "pointer",
-    transition: `background-color ${tokens.durationNormal}, box-shadow ${tokens.durationNormal}, border-color ${tokens.durationNormal}`,
-
-    // Cleanly hide the default Fluent UI bottom indicator line
-    "& .fui-Tab__indicator": {
-      display: "none",
-    },
-
-    ":hover": {
-      backgroundColor: tokens.colorSubtleBackgroundHover,
-      boxShadow: tokens.shadow2,
-    },
-  },
-
-  selectedTab: {
-    fontWeight: tokens.fontWeightSemibold,
-    boxShadow: tokens.shadow4, 
-    backgroundColor: tokens.colorNeutralBackground1,
-    ...shorthands.border("1px", "solid", tokens.colorNeutralStroke1), 
-    
-    ":hover": {
-      // Prevent the gray hover effect from covering the white active tab
-      backgroundColor: tokens.colorNeutralBackground1,
-    }
-  },
-
-  content: {
-    flex: 1,
-    overflowY: "auto",
-    padding: "0 16px 24px 16px",
-    "@media (max-width: 768px)": {
-      padding: "0 8px 16px 8px",
-    },
-  },
-
-  mobileTrigger: {
-    display: "none",
-    "@media (max-width: 767px)": {
-      display: "inline-flex",
-      position: "absolute",
-      left: "8px",
-    },
-  },
-})
-
+/**
+ * `/dashboard` — the application's home.
+ *
+ * An overview, not a second copy of the migration workspace: totals, recent
+ * runs, and the breakdown/health cards. Starting a migration or looking at
+ * history hands off to `/migrations` and `/run-history` immediately rather than
+ * growing this page to hold their content.
+ *
+ * Several sections here have no backing data in the current backend — the
+ * trend series, the source/type breakdowns and the cancelled total. Those keep
+ * their card and report that the data is unavailable, rather than being dropped
+ * from the layout or filled with placeholder numbers.
+ */
 export default function DashboardPage() {
-  const styles = useStyles()
-  const { activeTab, setActiveTab, isSidebarOpen, setSidebarOpen, fetchInteractiveStatus, fetchDataLayerStatus, workspace } = useUIStore()
+  const { user } = useAuth()
+  const email = user?.email
 
-  const hasInitRef = useRef(false)
+  const currentPageRunHistory = useRunHistoryStore((s) => s.runHistory)
+  const fetchRunHistory = useRunHistoryStore((s) => s.fetchRunHistory)
+  const runHistoryError = useRunHistoryStore((s) => s.error)
+  const [runsLoading, setRunsLoading] = useState(true)
 
-  // Sync both toggles from backend on every page load / refresh
-  useEffect(() => {
-    if (hasInitRef.current) return
-    hasInitRef.current = true
+  const [summary, setSummary] = useState<MonitoringSummary | null>(null)
+  const [summaryError, setSummaryError] = useState<string | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(true)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
-    console.log("[Dashboard] Syncing settings from backend on mount...")
-    
-    fetchInteractiveStatus()
-    fetchDataLayerStatus()
-  }, [fetchInteractiveStatus, fetchDataLayerStatus])
-
-  // Stop polling when navigating away from the dashboard entirely
-  useEffect(() => {
-    return () => {
-      useAgentStore.getState().stopPolling()
+  const loadSummary = React.useCallback(async () => {
+    if (!email) return
+    setSummaryError(null)
+    try {
+      const data = await monitoringService.fetchMonitoringSummary(email)
+      setSummary(data)
+    } catch (err: any) {
+      setSummaryError(err?.message || "Failed to load migration summary")
     }
-  }, [])
+  }, [email])
+
+  const loadRuns = React.useCallback(async () => {
+    if (!email) return
+    await fetchRunHistory(email, { page: 1, pageSize: 5 })
+  }, [email, fetchRunHistory])
+
+  const loadAll = React.useCallback(async () => {
+    setSummaryLoading(true)
+    setRunsLoading(true)
+    await Promise.all([loadSummary(), loadRuns()])
+    setSummaryLoading(false)
+    setRunsLoading(false)
+    setLastUpdated(new Date())
+  }, [loadSummary, loadRuns])
+
+  useEffect(() => {
+    loadAll()
+    // Only on mount / when the signed-in user changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email])
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    await loadAll()
+    setRefreshing(false)
+  }
+
+  const recentRuns = currentPageRunHistory.slice(0, 5)
+
+  // `—` while loading or on failure; a real number only when one arrived.
+  const metric = (value: number | undefined) => {
+    if (summaryLoading) return "…"
+    if (summaryError || value === undefined) return EM_DASH
+    return value
+  }
 
   return (
-    <div className={styles.container}>
-      <div className={styles.tabsWrapper}>
-        {!isSidebarOpen && (
-          <Tooltip content="Expand" relationship="label">
-            <Button
-              appearance="subtle"
-              icon={<PanelLeftExpand24Regular />}
-              onClick={() => setSidebarOpen(true)}
-              className={styles.mobileTrigger}
-              aria-label="Expand Sidebar"
-            />
-          </Tooltip>
-        )}
-        <TabList
-          selectedValue={activeTab}
-          onTabSelect={(_, data) => setActiveTab(data.value as any)}
-          className={styles.tabList}
-          appearance="subtle"
+    <div className="dashboard-page">
+      <div className="dashboard-welcome">
+        <div className="dashboard-welcome-text">
+          <h1 className="dashboard-title">
+            Welcome back{user?.name ? `, ${user.name}` : ""} <span aria-hidden="true">👋</span>
+          </h1>
+          <p className="dashboard-subtitle">
+            Here&apos;s what&apos;s happening with your migrations today.
+          </p>
+        </div>
+        <div className="dashboard-welcome-actions">
+          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw size={16} className={refreshing ? "spin" : undefined} />
+            Refresh Data
+          </Button>
+          <span className="dashboard-last-updated">
+            {lastUpdated
+              ? `Last updated: ${lastUpdated.toLocaleTimeString(undefined, {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}`
+              : "Not yet updated"}
+          </span>
+        </div>
+      </div>
+
+      <section className="dashboard-section">
+        <span className="dashboard-section-title">Migration Overview</span>
+        <div className="dashboard-metrics-row">
+          <MetricCard
+            label="Total Migrations"
+            value={metric(summary?.total_runs)}
+            icon={<Database size={18} />}
+            hint={summaryError ? "Totals unavailable" : undefined}
+          />
+          <MetricCard
+            label="Running"
+            value={metric(summary?.in_progress)}
+            icon={<PlayCircle size={18} />}
+            tone="info"
+            hint="In progress"
+          />
+          <MetricCard
+            label="Successful"
+            value={metric(summary?.completed)}
+            icon={<CheckCircle2 size={18} />}
+            tone="success"
+          />
+          <MetricCard
+            label="Failed"
+            value={metric(summary?.failed)}
+            icon={<XCircle size={18} />}
+            tone="danger"
+          />
+          <MetricCard
+            label="Cancelled"
+            value={EM_DASH}
+            icon={<Ban size={18} />}
+            hint="Not reported"
+          />
+        </div>
+      </section>
+
+      <div className="dashboard-split">
+        <section className="dashboard-section">
+          <div className="dashboard-section-head">
+            <span className="dashboard-section-title">Recent Migration Runs</span>
+            <Link href="/run-history" className="dashboard-view-all">
+              View all
+            </Link>
+          </div>
+          <RecentMigrations
+            runs={recentRuns}
+            loading={runsLoading}
+            error={runHistoryError}
+            onRetry={loadRuns}
+          />
+          <div className="dashboard-start-actions">
+            <Button as="a" href="/migrations/qlik">
+              New Qlik Migration
+              <ArrowRight size={16} />
+            </Button>
+            <Button as="a" href="/migrations/tableau" variant="outline">
+              New Tableau Migration
+              <ArrowRight size={16} />
+            </Button>
+          </div>
+        </section>
+
+        <ChartCard
+          title="Migrations Trend"
+          empty
+          emptyMessage="No migration data available"
+          bodyMinHeight={240}
         >
-          <Tab
-            value="Migration"
-            className={mergeClasses(
-              styles.tabBase,
-              activeTab === "Migration" && styles.selectedTab
-            )}
-          >
-            Migration
-          </Tab>
-
-          <Tab
-            value="Monitoring"
-            className={mergeClasses(
-              styles.tabBase,
-              activeTab === "Monitoring" && styles.selectedTab
-            )}
-          >
-            Monitoring
-          </Tab>
-
-          <Tab
-            value="History"
-            className={mergeClasses(
-              styles.tabBase,
-              activeTab === "History" && styles.selectedTab
-            )}
-          >
-            Run History
-          </Tab>
-        </TabList>
+          {null}
+        </ChartCard>
       </div>
 
-      <div className={styles.content}>
-        {workspace === "qlik" ? (
-          <>
-            <div style={{ display: activeTab === "Migration" ? "block" : "none", height: "100%" }}>
-              <ErrorBoundary>
-                <Suspense fallback={<MigrationTabSkeleton />}>
-                  <QlikMigrationTab />
-                </Suspense>
-              </ErrorBoundary>
-            </div>
-            <div style={{ display: activeTab === "Monitoring" ? "block" : "none", height: "100%" }}>
-              <ErrorBoundary>
-                <Suspense fallback={<MigrationTabSkeleton />}>
-                  <QlikMonitoringTab />
-                </Suspense>
-              </ErrorBoundary>
-            </div>
-            <div style={{ display: activeTab === "History" ? "block" : "none", height: "100%" }}>
-              <ErrorBoundary>
-                <Suspense fallback={<RowSkeleton count={6} />}>
-                  <QlikRunHistoryTab />
-                </Suspense>
-              </ErrorBoundary>
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{ display: activeTab === "Migration" ? "block" : "none", height: "100%" }}>
-              <ErrorBoundary>
-                <Suspense fallback={<MigrationTabSkeleton />}>
-                  <MigrationTab />
-                </Suspense>
-              </ErrorBoundary>
-            </div>
-            <div style={{ display: activeTab === "Monitoring" ? "block" : "none", height: "100%" }}>
-              <ErrorBoundary>
-                <Suspense fallback={<MigrationTabSkeleton />}>
-                  <MonitoringTab />
-                </Suspense>
-              </ErrorBoundary>
-            </div>
-            <div style={{ display: activeTab === "History" ? "block" : "none", height: "100%" }}>
-              <ErrorBoundary>
-                <Suspense fallback={<RowSkeleton count={6} />}>
-                  <RunHistoryTab />
-                </Suspense>
-              </ErrorBoundary>
-            </div>
-          </>
-        )}
+      <div className="dashboard-triple">
+        <ChartCard title="Migrations by Source" empty emptyMessage="No source data available" />
+        <ChartCard title="Migrations by Type" empty emptyMessage="No migration type data available" />
+        <AgentStatusCard title="System Status" />
       </div>
+
+      <MigrationContextBar />
     </div>
   )
 }

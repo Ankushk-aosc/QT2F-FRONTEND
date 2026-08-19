@@ -1,13 +1,10 @@
 import React from "react";
-import { Badge as FluentBadge } from "@fluentui/react-components";
 
-export function Badge({ variant = "default", style, ...props }: any) {
-  let color: "brand" | "danger" | "success" | "warning" | "subtle" = "subtle";
-  if (variant === "secondary") color = "subtle";
-  if (variant === "destructive") color = "danger";
-  if (variant === "success") color = "success";
-  if (variant === "warning") color = "warning";
-  if (variant === "default" || variant === "outline") color = "brand";
+export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
+  variant?: "default" | "secondary" | "destructive" | "success" | "warning" | "outline";
+}
 
-  return <FluentBadge color={color as any} style={style} {...props} />;
+export function Badge({ variant = "default", className, ...props }: BadgeProps) {
+  const classes = ["ui-badge", `ui-badge-${variant}`, className].filter(Boolean).join(" ");
+  return <span className={classes} {...props} />;
 }

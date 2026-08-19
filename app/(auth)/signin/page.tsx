@@ -7,169 +7,11 @@ import { useEffect, useState, Suspense } from "react";
 import Image from "next/image";
 import { getLoginRequest } from "@/lib/auth-constants";
 import { globalApiScope } from "@/components/providers/MsalProviderWrapper";
-import {
-  Button,
-  Card,
-  Text,
-  makeStyles,
-  tokens,
-  Spinner,
-} from "@fluentui/react-components";
-
-const useStyles = makeStyles({
-  container: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-    padding: "16px",
-  },
-  card: {
-    maxWidth: "600px",
-    width: "100%",
-    padding: "80px 32px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "40px",
-    alignItems: "center",
-    backgroundColor: "transparent",
-    boxShadow: "none",
-    border: "none",
-    "@media (max-width: 640px)": {
-      padding: "48px 24px",
-      gap: "32px",
-    },
-  },
-  titleContainer: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-    alignItems: "center",
-    marginBottom: "0px",
-  },
-  title: {
-    fontSize: "32px",
-    fontWeight: "600",
-    textAlign: "center",
-    color: tokens.colorNeutralForeground1,
-    "@media (max-width: 640px)": {
-      fontSize: "28px",
-    },
-  },
-  brandName: {
-    color: tokens.colorBrandForeground1,
-  },
-  subtitle: {
-    fontSize: "16px",
-    textAlign: "center",
-    color: tokens.colorNeutralForeground3,
-    "@media (max-width: 640px)": {
-      fontSize: "14px",
-    },
-  },
-  microsoftButton: {
-    width: "100%",
-    maxWidth: "500px",
-    height: "48px",
-    fontSize: "15px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    backgroundColor: "#EFF6FF",
-    color: "#1F2937",
-    border: `1px solid #DBEAFE`,
-    "&:hover": {
-      backgroundColor: "#DBEAFE",
-    },
-    "@media (max-width: 640px)": {
-      height: "44px",
-      fontSize: "14px",
-    },
-  },
-  visualizationCard: {
-    width: "100%",
-    maxWidth: "520px",
-    padding: "56px 40px",
-    backgroundColor: "#FAFBFC",
-    border: "1px solid #F0F1F3",
-    borderRadius: "12px",
-    display: "flex",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-evenly",
-    gap: "48px",
-    marginTop: "16px",
-    marginBottom: "8px",
-    "@media (max-width: 640px)": {
-      padding: "40px 24px",
-      gap: "32px",
-    },
-  },
-  logoContainer: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "16px",
-    flex: "0 0 auto",
-  },
-  logoCircle: {
-    width: "120px",
-    height: "120px",
-    borderRadius: "12px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-    border: "1px solid #F0F1F3",
-    "@media (max-width: 640px)": {
-      width: "100px",
-      height: "100px",
-      borderRadius: "10px",
-    },
-  },
-  logoText: {
-    fontSize: "16px",
-    fontWeight: "500",
-    color: "#1F2937",
-    textAlign: "center",
-    "@media (max-width: 640px)": {
-      fontSize: "14px",
-    },
-  },
-  arrow: {
-    fontSize: "40px",
-    fontWeight: "300",
-    color: "#64748B",
-    lineHeight: "1",
-    "@media (max-width: 640px)": {
-      fontSize: "32px",
-    },
-  },
-  footer: {
-    marginTop: "8px",
-    textAlign: "center",
-    color: tokens.colorNeutralForeground3,
-    fontSize: "13px",
-    "@media (max-width: 640px)": {
-      fontSize: "12px",
-      marginTop: "8px",
-    },
-  },
-  error: {
-    color: tokens.colorPaletteRedForeground1,
-    textAlign: "center",
-    fontSize: "14px",
-  },
-  microsoftIcon: {
-    width: "20px",
-    height: "20px",
-  },
-});
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 
 function SignInContent() {
-  const styles = useStyles();
   const { instance } = useMsal();
   const isAuthenticated = useIsAuthenticated();
   const router = useRouter();
@@ -208,8 +50,8 @@ function SignInContent() {
 
   if (!mounted) {
     return (
-      <div className={styles.container}>
-        <Card className={styles.card}>
+      <div className="signin-container">
+        <Card className="signin-card">
           <div style={{ padding: "20px 0", textAlign: "center" }}>
             <Spinner label="Loading..." />
           </div>
@@ -219,15 +61,15 @@ function SignInContent() {
   }
 
   return (
-    <div className={styles.container}>
-      <Card className={styles.card}>
-        <div className={styles.titleContainer}>
-          <Text className={styles.title}>
-            Welcome to <span className={styles.brandName}>Switchblade</span>
-          </Text>
-          <Text className={styles.subtitle}>
+    <div className="signin-container">
+      <Card className="signin-card">
+        <div className="signin-title-container">
+          <span className="signin-title">
+            Welcome to <span className="signin-brand-name">Switchblade</span>
+          </span>
+          <span className="signin-subtitle">
             Log into your Switchblade Workspace
-          </Text>
+          </span>
         </div>
 
         {loading ? (
@@ -237,13 +79,13 @@ function SignInContent() {
         ) : (
           <>
             <Button
-              appearance="secondary"
-              size="large"
+              variant="secondary"
+              size="lg"
               onClick={handleLogin}
               disabled={loading}
-              className={styles.microsoftButton}
+              className="signin-microsoft-button"
             >
-              <svg className={styles.microsoftIcon} viewBox="0 0 23 23">
+              <svg className="signin-microsoft-icon" viewBox="0 0 23 23">
                 <rect x="1" y="1" width="10" height="10" fill="#f25022" />
                 <rect x="12" y="1" width="10" height="10" fill="#00a4ef" />
                 <rect x="1" y="12" width="10" height="10" fill="#7fba00" />
@@ -251,26 +93,20 @@ function SignInContent() {
               </svg>
               Continue with Microsoft
             </Button>
-            {error && <Text className={styles.error}>{error}</Text>}
+            {error && <span className="signin-error">{error}</span>}
           </>
         )}
 
-        <div className={styles.visualizationCard}>
-          <div className={styles.logoContainer}>
-            <div className={styles.logoCircle}>
-              <Image
-                src="https://img.icons8.com/?size=100&id=9Kvi1p1F0tUo&format=png&color=000000"
-                alt="Tableau"
-                width={64}
-                height={64}
-                unoptimized
-              />
+        <div className="signin-visualization-card">
+          <div className="signin-logo-container">
+            <div className="signin-logo-circle" aria-hidden="true" style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "40px", fontWeight: 700, color: "#1e40af" }}>
+              T
             </div>
-            <Text className={styles.logoText}>Tableau</Text>
+            <span className="signin-logo-text">Tableau</span>
           </div>
-          <div className={styles.arrow}>→</div>
-          <div className={styles.logoContainer}>
-            <div className={styles.logoCircle}>
+          <div className="signin-arrow">→</div>
+          <div className="signin-logo-container">
+            <div className="signin-logo-circle">
               <Image
                 src="/Fabric_Color_48.svg"
                 alt="Fabric"
@@ -279,13 +115,13 @@ function SignInContent() {
                 unoptimized
               />
             </div>
-            <Text className={styles.logoText}>Fabric</Text>
+            <span className="signin-logo-text">Fabric</span>
           </div>
         </div>
 
-        <Text className={styles.footer}>
+        <span className="signin-footer">
           By continuing, you agree to the terms of service
-        </Text>
+        </span>
       </Card>
     </div>
   );

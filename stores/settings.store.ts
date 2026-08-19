@@ -6,6 +6,7 @@ import { DEFAULT_PLATFORM_SETTINGS } from "@/lib/settings/defaults"
 import { DEFAULT_SECTION_ID, type SettingsSectionId } from "@/lib/settings/navigation"
 import { settingsService } from "@/services/settings.service"
 import { useUIStore } from "@/stores/ui.store"
+import type { ConnectorId } from "@/types/connectors"
 import type {
   PlatformSettings,
   PlatformSettingsPatch,
@@ -50,6 +51,18 @@ interface SettingsStore {
   /** Currently selected section in the admin navigation. */
   activeSection: SettingsSectionId
   setActiveSection: (section: SettingsSectionId) => void
+
+  /**
+   * A connector the Integrations section should open directly, set by callers
+   * outside the Administration Center.
+   *
+   * This is how the migration wizard sends an administrator to configure the
+   * exact connector that is blocking them, rather than to the Integrations grid
+   * to find it themselves. The section consumes it and clears it, so it is a
+   * one-shot instruction rather than persistent selection.
+   */
+  requestedConnectorId: ConnectorId | null
+  setRequestedConnector: (connectorId: ConnectorId | null) => void
 
   /** Fetches settings. Skips the request if already loaded unless `force`. */
   loadSettings: (force?: boolean) => Promise<void>
@@ -106,6 +119,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   activeSection: DEFAULT_SECTION_ID,
   setActiveSection: (activeSection) => set({ activeSection }),
+
+  requestedConnectorId: null,
+  setRequestedConnector: (requestedConnectorId) => set({ requestedConnectorId }),
 
   loadSettings: async (force = false) => {
     if (get().loading) return

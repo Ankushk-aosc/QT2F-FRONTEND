@@ -17,6 +17,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./"),
+      // Lets server-side modules (connector adapters, the http client) be unit
+      // tested. See the stub for why this does not weaken the production guard.
+      "server-only": path.resolve(__dirname, "./vitest.server-only.stub.ts"),
     },
   },
 })

@@ -4,23 +4,12 @@ import { useEffect, useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { InteractionStatus } from "@azure/msal-browser";
 import { useRouter } from "next/navigation";
-import { Spinner, makeStyles } from "@fluentui/react-components";
+import { Spinner } from "@/components/ui/spinner";
 
 // Optional brief pause to let MSAL state fully settle
 const DELAY_MS = 500;
 
-const useStyles = makeStyles({
-  container: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-  },
-});
-
 export default function AuthCallbackPage() {
-  const styles = useStyles();
   const { instance, accounts, inProgress } = useMsal();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -48,7 +37,7 @@ export default function AuthCallbackPage() {
   }, [inProgress, accounts, instance, router, mounted]);
 
   return (
-    <div className={styles.container}>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF" }}>
       <Spinner size="large" label="Applying your secure access..." />
     </div>
   );

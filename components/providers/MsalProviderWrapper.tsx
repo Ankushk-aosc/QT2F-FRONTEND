@@ -4,17 +4,64 @@ import { MsalProvider } from "@azure/msal-react";
 import {
   PublicClientApplication,
   InteractionRequiredAuthError,
+  BrowserAuthError,
   AccountInfo,
+  InteractionStatus,
 } from "@azure/msal-browser";
 import { ReactNode, useEffect, useState } from "react";
-import { Spinner } from "@fluentui/react-components";
+import { Spinner } from "@/components/ui/spinner";
 import { useUIStore } from "@/stores/ui.store";
 import { MIGRATION_MODE } from "@/lib/constants";
 
 export let globalApiScope: string = "";
 
+// ─── Singleton MSAL instance ───────────────────────────────────────────────────
+// There must be exactly one PublicClientApplication for the lifetime of the app.
+// globalMsalInstance is set once and never replaced.
 let globalMsalInstance: PublicClientApplication | null = null;
 
+// ─── Initialization guard ──────────────────────────────────────────────────────
+// Prevents double-initialization caused by React Strict Mode (effects run twice
+// in development) or any other re-mount scenario.
+// The promise is stored so a second caller can await the first and get the same result.
+let initializationPromise: Promise<PublicClientApplication> | null = null;
+
+// ─── In-flight token deduplication ────────────────────────────────────────────
+// Maps a scope-string → in-flight Promise<string> so concurrent callers
+// (dashboard, connectors, fetchWithAuth, proactive refresh) share one MSAL round-trip
+// instead of hammering MSAL with parallel requests.
+const tokenInflight = new Map<string, Promise<string>>();
+
+/**
+ * Returns true once the MSAL PublicClientApplication has been created
+ * AND initialize() + handleRedirectPromise() have both completed.
+ * Safe to call at any time (returns false before init, never throws).
+ */
+export function isMsalReady(): boolean {
+  return globalMsalInstance !== null;
+}
+
+/**
+ * Returns the current MSAL interaction status.
+ * Returns null if MSAL has not been initialized yet.
+ */
+function getMsalInteractionStatus(): InteractionStatus | null {
+  if (!globalMsalInstance) return null;
+  return (globalMsalInstance as any).getInteractionStatus?.() ?? null;
+}
+
+/**
+ * Returns true when MSAL is currently handling an interactive operation
+ * (Login, Redirect, Popup, AcquireToken, Logout, SsoSilent, etc.).
+ * We must NOT open another popup while this is true.
+ */
+function isMsalInteracting(): boolean {
+  const status = getMsalInteractionStatus();
+  if (status === null) return false;
+  return status !== InteractionStatus.None;
+}
+
+// ─── Refresh-token seed (server-side confidential flow) ───────────────────────
 /**
  * One-time, silent seeding of the server-side refresh_token used by Semantic
  * Kernel for long-run Fabric/OneLake token renewal. Redirects through the
@@ -38,6 +85,7 @@ function maybeSeedRefreshToken(): void {
   window.location.href = `/api/auth/seed-rt?returnTo=${encodeURIComponent(returnTo)}`;
 }
 
+// ─── Consent resources ────────────────────────────────────────────────────────
 type ConsentResource = {
   label: string;
   tokenScopes: string[];
@@ -52,12 +100,6 @@ function getConsentResources(): ConsentResource[] {
       tokenScopes: [globalApiScope],
       consentScopes: [globalApiScope],
       requiredScp: ["API.Access"],
-    },
-    {
-      label: "Azure Storage",
-      tokenScopes: ["https://storage.azure.com/user_impersonation"],
-      consentScopes: ["https://storage.azure.com/user_impersonation"],
-      requiredScp: ["user_impersonation"],
     },
     {
       label: "Fabric API",
@@ -98,6 +140,19 @@ function getConsentResources(): ConsentResource[] {
   ];
 }
 
+// ─── Token acquisition ────────────────────────────────────────────────────────
+
+/**
+ * Acquires a bearer token for the configured API scope.
+ *
+ * Silent acquisition is always attempted first.
+ * If that fails with InteractionRequiredAuthError, a popup is opened — BUT
+ * only when MSAL is not already handling another interaction. If MSAL is busy
+ * the error is re-thrown so the caller can decide how to handle it.
+ *
+ * Concurrent calls for the same scope share a single in-flight promise so
+ * MSAL is never hit with parallel requests for identical tokens.
+ */
 export async function getActiveToken(
   forceRefresh: boolean = false
 ): Promise<string> {
@@ -110,95 +165,69 @@ export async function getActiveToken(
     throw new Error("No active account! Verify a user has been signed in.");
   }
 
-  try {
-    const request = {
-      scopes: [globalApiScope],
-      account,
-      forceRefresh, // useful when we know the token is bad
-    };
+  const inflightKey = `bearer:${globalApiScope}:${forceRefresh}`;
 
-    const res = await globalMsalInstance.acquireTokenSilent(request);
-    sessionStorage.setItem("access_token", res.accessToken);
-    return res.accessToken;
-  } catch (error: unknown) {
-    if (error instanceof InteractionRequiredAuthError) {
-      console.warn(
-        "[getActiveToken] Silent acquisition failed → falling back to popup"
-      );
+  // Return the existing in-flight promise if one exists for this key.
+  const existing = tokenInflight.get(inflightKey);
+  if (existing) return existing;
 
-      try {
-        const res = await globalMsalInstance.acquireTokenPopup({
-          scopes: [globalApiScope],
-          account,
-        });
+  const promise = (async (): Promise<string> => {
+    try {
+      const request = {
+        scopes: [globalApiScope],
+        account,
+        forceRefresh,
+      };
 
-        sessionStorage.setItem("access_token", res.accessToken);
-        console.log("[getActiveToken] New token acquired via popup");
-        return res.accessToken;
-      } catch (popupError) {
-        console.error("[getActiveToken] Popup acquisition failed", popupError);
-        throw new Error("Unable to acquire access token (popup failed)");
+      const res = await globalMsalInstance!.acquireTokenSilent(request);
+      sessionStorage.setItem("access_token", res.accessToken);
+      return res.accessToken;
+    } catch (error: unknown) {
+      if (error instanceof InteractionRequiredAuthError) {
+        // Only open a popup when MSAL is not already busy with another interaction.
+        if (isMsalInteracting()) {
+          console.warn(
+            "[getActiveToken] Silent acquisition failed but MSAL interaction is in progress — cannot open popup now. Will retry silently later."
+          );
+          throw new Error(
+            "interaction_in_progress: Cannot open popup while MSAL is busy. Please retry."
+          );
+        }
+
+        console.warn(
+          "[getActiveToken] Silent acquisition failed → falling back to popup"
+        );
+
+        try {
+          const res = await globalMsalInstance!.acquireTokenPopup({
+            scopes: [globalApiScope],
+            account,
+          });
+
+          sessionStorage.setItem("access_token", res.accessToken);
+          if (process.env.NODE_ENV === "development") {
+            console.log("[getActiveToken] New token acquired via popup");
+          }
+          return res.accessToken;
+        } catch (popupError) {
+          console.error("[getActiveToken] Popup acquisition failed", popupError);
+          throw new Error("Unable to acquire access token (popup failed)");
+        }
       }
-    }
 
-    console.error("[getActiveToken] Unexpected error", error);
-    throw error;
-  }
+      console.error("[getActiveToken] Unexpected error", error);
+      throw error;
+    } finally {
+      tokenInflight.delete(inflightKey);
+    }
+  })();
+
+  // Register the in-flight promise.
+  tokenInflight.set(inflightKey, promise);
+
+  return promise;
 }
 
-/**
- * Acquires a token for Azure Storage user_impersonation scope.
- */
-export async function getStorageToken(
-  forceRefresh: boolean = false
-): Promise<string> {
-  if (!globalMsalInstance) {
-    throw new Error("Auth not initialized");
-  }
-
-  const account: AccountInfo | null = globalMsalInstance.getActiveAccount();
-  if (!account) {
-    throw new Error("No active account! Verify a user has been signed in.");
-  }
-
-  const storageScope = "https://storage.azure.com/user_impersonation";
-
-  try {
-    const request = {
-      scopes: [storageScope],
-      account,
-      forceRefresh,
-    };
-
-    const res = await globalMsalInstance.acquireTokenSilent(request);
-    sessionStorage.setItem("onelake_token", res.accessToken);
-    console.log("[getStorageToken] One Lake token acquired silently");
-    return res.accessToken;
-  } catch (error: unknown) {
-    if (error instanceof InteractionRequiredAuthError) {
-      console.warn(
-        "[getStorageToken] Silent acquisition failed → falling back to popup"
-      );
-
-      try {
-        const res = await globalMsalInstance.acquireTokenPopup({
-          scopes: [storageScope],
-          account,
-        });
-
-        sessionStorage.setItem("onelake_token", res.accessToken);
-        console.log("[getStorageToken] New One Lake token acquired via popup");
-        return res.accessToken;
-      } catch (popupError) {
-        console.error("[getStorageToken] Popup acquisition failed", popupError);
-        throw new Error("Unable to acquire One Lake access token (popup failed)");
-      }
-    }
-
-    console.error("[getStorageToken] Unexpected error", error);
-    throw error;
-  }
-}
 
 /**
  * Acquires a token for Microsoft Fabric API scope.
@@ -216,52 +245,85 @@ export async function getFabricToken(
   }
 
   const fabricScope = "https://api.fabric.microsoft.com/.default";
+  const inflightKey = `fabric:${fabricScope}:${forceRefresh}`;
 
-  try {
-    const request = {
-      scopes: [fabricScope],
-      account,
-      forceRefresh,
-    };
+  const existing = tokenInflight.get(inflightKey);
+  if (existing) return existing;
 
-    const res = await globalMsalInstance.acquireTokenSilent(request);
-    sessionStorage.setItem("fabric_access_token", res.accessToken);
-    console.log("[getFabricToken] Fabric token acquired silently");
-    return res.accessToken;
-  } catch (error: unknown) {
-    if (error instanceof InteractionRequiredAuthError) {
-      console.warn(
-        "[getFabricToken] Silent acquisition failed → falling back to popup"
-      );
+  const promise = (async (): Promise<string> => {
+    try {
+      const request = {
+        scopes: [fabricScope],
+        account,
+        forceRefresh,
+      };
 
-      try {
-        const res = await globalMsalInstance.acquireTokenPopup({
-          scopes: [fabricScope],
-          account,
-        });
-
-        sessionStorage.setItem("fabric_access_token", res.accessToken);
-        console.log("[getFabricToken] New Fabric token acquired via popup");
-        return res.accessToken;
-      } catch (popupError) {
-        console.error("[getFabricToken] Popup acquisition failed", popupError);
-        throw new Error("Unable to acquire Fabric access token (popup failed)");
+      const res = await globalMsalInstance!.acquireTokenSilent(request);
+      sessionStorage.setItem("fabric_access_token", res.accessToken);
+      if (process.env.NODE_ENV === "development") {
+        console.log("[getFabricToken] Fabric token acquired silently");
       }
-    }
+      return res.accessToken;
+    } catch (error: unknown) {
+      if (error instanceof InteractionRequiredAuthError) {
+        if (isMsalInteracting()) {
+          console.warn(
+            "[getFabricToken] Silent acquisition failed but MSAL interaction is in progress — cannot open popup now."
+          );
+          throw new Error(
+            "interaction_in_progress: Cannot open popup while MSAL is busy."
+          );
+        }
 
-    console.error("[getFabricToken] Unexpected error", error);
-    throw error;
-  }
+        console.warn(
+          "[getFabricToken] Silent acquisition failed → falling back to popup"
+        );
+
+        try {
+          const res = await globalMsalInstance!.acquireTokenPopup({
+            scopes: [fabricScope],
+            account,
+          });
+
+          sessionStorage.setItem("fabric_access_token", res.accessToken);
+          if (process.env.NODE_ENV === "development") {
+            console.log("[getFabricToken] New Fabric token acquired via popup");
+          }
+          return res.accessToken;
+        } catch (popupError) {
+          console.error("[getFabricToken] Popup acquisition failed", popupError);
+          throw new Error("Unable to acquire Fabric access token (popup failed)");
+        }
+      }
+
+      console.error("[getFabricToken] Unexpected error", error);
+      throw error;
+    } finally {
+      tokenInflight.delete(inflightKey);
+    }
+  })();
+
+  // Register the in-flight promise.
+  tokenInflight.set(inflightKey, promise);
+
+  return promise;
 }
+
+// ─── Consent ──────────────────────────────────────────────────────────────────
 
 /**
  * Checks if the user has consented to all required resources.
  * Returns true if all silent token checks pass, false if any need consent.
+ *
+ * IMPORTANT: Only calls acquireTokenSilent — never triggers redirect or popup.
+ * Only call this after MSAL is fully initialized and inProgress === None.
  */
 async function checkAllConsents(account: AccountInfo): Promise<boolean> {
   const resourcesToCheck = getConsentResources();
 
-  console.group("[ensureConsent] Checking permissions for", account.username);
+  if (process.env.NODE_ENV === "development") {
+    console.group("[ensureConsent] Checking permissions for", account.username);
+  }
 
   for (const resource of resourcesToCheck) {
     try {
@@ -280,35 +342,45 @@ async function checkAllConsents(account: AccountInfo): Promise<boolean> {
       );
 
       if (missingScp.length > 0) {
-        console.warn(
-          `❌ ${resource.label} — token acquired but missing scopes:`,
-          missingScp,
-          "\n   Granted scp:", grantedScp
-        );
-        console.groupEnd();
+        if (process.env.NODE_ENV === "development") {
+          console.warn(
+            `❌ ${resource.label} — token acquired but missing scopes:`,
+            missingScp,
+            "\n   Granted scp:", grantedScp
+          );
+          console.groupEnd();
+        }
         return false;
       }
 
-      console.log(
-        `✅ ${resource.label}`,
-        "\n   Scopes granted:", tokenResponse.scopes,
-        "\n   Token audience:", payload.aud,
-        "\n   scp claim:", payload.scp || "(none)",
-        "\n   roles claim:", payload.roles || "(none)"
-      );
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          `✅ ${resource.label}`,
+          "\n   Scopes granted:", tokenResponse.scopes,
+          "\n   Token audience:", payload.aud,
+          "\n   scp claim:", payload.scp || "(none)",
+          "\n   roles claim:", payload.roles || "(none)"
+        );
+      }
     } catch (error) {
       if (error instanceof InteractionRequiredAuthError) {
-        console.warn(`❌ ${resource.label} — MISSING CONSENT`);
-        console.groupEnd();
+        if (process.env.NODE_ENV === "development") {
+          console.warn(`❌ ${resource.label} — MISSING CONSENT`);
+          console.groupEnd();
+        }
         return false;
       }
       console.error(`⚠️ ${resource.label} — unexpected error`, error);
-      console.groupEnd();
+      if (process.env.NODE_ENV === "development") {
+        console.groupEnd();
+      }
       return false;
     }
   }
 
-  console.groupEnd();
+  if (process.env.NODE_ENV === "development") {
+    console.groupEnd();
+  }
   return true;
 }
 
@@ -316,6 +388,8 @@ async function checkAllConsents(account: AccountInfo): Promise<boolean> {
  * Silently checks all required resources.
  * Returns true if all consents are in place, false if anything is missing.
  * Never triggers any redirect or popup — only silent checks.
+ *
+ * Callers must ensure MSAL is initialized and inProgress === None before calling.
  */
 export async function ensureConsent(): Promise<boolean> {
   if (!globalMsalInstance) return false;
@@ -334,6 +408,12 @@ export async function grantConsent(): Promise<boolean> {
   if (!globalMsalInstance) return false;
   const account = globalMsalInstance.getActiveAccount();
   if (!account) return false;
+
+  // Never open a consent popup while MSAL is already interacting.
+  if (isMsalInteracting()) {
+    console.warn("[grantConsent] MSAL interaction in progress — cannot open consent popup now.");
+    return false;
+  }
 
   const resources = getConsentResources();
   const missingResources: ConsentResource[] = [];
@@ -371,6 +451,12 @@ export async function grantConsent(): Promise<boolean> {
     // Azure AD does not allow oversized, cross-resource scope lists.
     // Request consent per missing resource to avoid AADSTS28004.
     for (const resource of missingResources) {
+      // Re-check interaction status before each popup.
+      if (isMsalInteracting()) {
+        console.warn(`[grantConsent] MSAL became busy before consent popup for ${resource.label} — aborting.`);
+        return false;
+      }
+
       console.warn(`[grantConsent] Requesting consent for ${resource.label}`);
       const response = await globalMsalInstance.acquireTokenPopup({
         scopes: resource.consentScopes,
@@ -410,6 +496,114 @@ export async function grantConsent(): Promise<boolean> {
   }
 }
 
+// ─── MSAL initialization ──────────────────────────────────────────────────────
+
+/**
+ * Initializes the MSAL PublicClientApplication singleton.
+ *
+ * Lifecycle:
+ *   1. Fetch config from /api/auth/config
+ *   2. new PublicClientApplication(config)
+ *   3. pca.initialize()
+ *   4. pca.handleRedirectPromise()
+ *      - Handles a valid redirect response (sets active account)
+ *      - Handles no pending redirect (null response — normal page load)
+ *      - Handles no_token_request_cache_error (expected on fresh loads, not fatal)
+ *   5. Account selection (redirect → existing active → first available → none)
+ *   6. globalMsalInstance = pca  ← app is now ready
+ *   7. If account exists: token acquisition + consent check (deferred until here)
+ *
+ * The initializationPromise guard ensures this runs at most once,
+ * even under React Strict Mode (double useEffect invocation in development).
+ */
+export async function initializeMsal(): Promise<PublicClientApplication> {
+  // ── Guard: return existing instance immediately ──
+  if (globalMsalInstance) return globalMsalInstance;
+
+  // ── Guard: second call during initialization — share the first promise ──
+  if (initializationPromise) return initializationPromise;
+
+  initializationPromise = (async (): Promise<PublicClientApplication> => {
+    const res = await fetch("/api/auth/config");
+    if (!res.ok) throw new Error("Failed to load auth config");
+    const config = await res.json();
+
+    // Hydrate migrationMode centrally
+    useUIStore.getState().setMigrationMode(config.migrationMode || MIGRATION_MODE.STANDARD);
+
+    globalApiScope = config.apiScope;
+
+    const msalConfig = {
+      auth: {
+        clientId: config.clientId,
+        authority: config.authority,
+        redirectUri: config.redirectUri,
+        postLogoutRedirectUri: config.postLogoutRedirectUri || config.redirectUri,
+      },
+      cache: {
+        cacheLocation: "sessionStorage",
+        storeAuthStateInCookie: false,
+      },
+    };
+
+    const pca = new PublicClientApplication(msalConfig);
+
+    // Step 3: initialize() must complete before any other MSAL API call.
+    await pca.initialize();
+
+    // Step 4: handleRedirectPromise()
+    // - Returns AuthenticationResult when processing a loginRedirect() callback.
+    // - Returns null on a normal page load (no redirect in flight).
+    // - Throws no_token_request_cache_error on a fresh load with no MSAL cache entry.
+    //   This is expected and safe — it simply means there was nothing to process.
+    try {
+      const redirectResponse = await pca.handleRedirectPromise();
+
+      if (redirectResponse?.account) {
+        // A loginRedirect() just completed — use the returned account.
+        pca.setActiveAccount(redirectResponse.account);
+        if (process.env.NODE_ENV === "development") {
+          console.log("[MsalProviderWrapper] Redirect response processed, account set:", redirectResponse.account.username);
+        }
+      }
+    } catch (redirectError: unknown) {
+      if (
+        redirectError instanceof BrowserAuthError &&
+        (redirectError as any).errorCode === "no_token_request_cache_error"
+      ) {
+        // Expected: no redirect was in progress. Not an application error.
+        if (process.env.NODE_ENV === "development") {
+          console.debug(
+            "[MsalProviderWrapper] handleRedirectPromise: no pending redirect — normal page load."
+          );
+        }
+      } else {
+        // A genuine redirect-handling error. Re-throw so the init fails visibly.
+        throw redirectError;
+      }
+    }
+
+    // Step 5: Account selection
+    // Priority: redirect account (already set above) → existing active → first available → none
+    if (!pca.getActiveAccount()) {
+      const allAccounts = pca.getAllAccounts();
+      if (allAccounts.length > 0) {
+        pca.setActiveAccount(allAccounts[0]);
+      }
+    }
+
+    // Step 6: Mark MSAL ready — publish the instance BEFORE deferred work
+    // so React can render children. Deferred work below must not block rendering.
+    globalMsalInstance = pca;
+
+    return pca;
+  })();
+
+  return initializationPromise;
+}
+
+// ─── React component ──────────────────────────────────────────────────────────
+
 interface MsalProviderWrapperProps {
   children: ReactNode;
 }
@@ -434,60 +628,30 @@ export default function MsalProviderWrapper({
   };
 
   useEffect(() => {
+    let cancelled = false;
+
     const initialize = async () => {
-      if (globalMsalInstance) {
-        setMsalInstance(globalMsalInstance);
-        return;
-      }
-
       try {
-        const res = await fetch("/api/auth/config");
-        if (!res.ok) throw new Error("Failed to load auth config");
-        const config = await res.json();
+        // initializeMsal() is idempotent: returns the cached instance or runs once.
+        const pca = await initializeMsal();
 
-        // Hydrate migrationMode centrally
-        useUIStore.getState().setMigrationMode(config.migrationMode || MIGRATION_MODE.STANDARD);
+        if (cancelled) return;
 
-        globalApiScope = config.apiScope;
-
-        const msalConfig = {
-          auth: {
-            clientId: config.clientId,
-            authority: config.authority,
-            redirectUri: config.redirectUri,
-            postLogoutRedirectUri:
-              config.postLogoutRedirectUri || config.redirectUri,
-          },
-          cache: {
-            cacheLocation: "sessionStorage",
-            storeAuthStateInCookie: false,
-          },
-        };
-
-        const pca = new PublicClientApplication(msalConfig);
-        await pca.initialize();
-
-        await pca.handleRedirectPromise().then((response) => {
-          if (response?.account) {
-            pca.setActiveAccount(response.account);
-          }
-        });
-
-        if (!pca.getActiveAccount() && pca.getAllAccounts().length > 0) {
-          pca.setActiveAccount(pca.getAllAccounts()[0]);
-        }
-
-        globalMsalInstance = pca;
         setMsalInstance(pca);
 
+        // ── Step 7: Deferred post-init work ──────────────────────────────────
+        // Everything below runs AFTER MSAL is ready and the component has
+        // updated its state. This guarantees we are not calling token
+        // acquisition while handleRedirectPromise() is still in progress.
         const activeAccount = pca.getActiveAccount();
         if (activeAccount) {
+          // Initial token acquisition (silent — no popup here).
           try {
-            await getActiveToken(); // initial token
-            console.log(
-              "[MsalProviderWrapper] Initial access token acquired"
-            );
-            
+            await getActiveToken();
+            if (process.env.NODE_ENV === "development") {
+              console.log("[MsalProviderWrapper] Initial access token acquired");
+            }
+
             // Fetch and set user timezone preference (or auto-detect if new)
             useUIStore.getState().fetchTimezone().catch((err) => {
               console.warn("[MsalProviderWrapper] Failed to initialize timezone", err);
@@ -499,18 +663,18 @@ export default function MsalProviderWrapper({
             );
           }
 
-          // Check consent silently — if missing, show blocking screen.
-          // Never redirects, no loop possible.
+          // Consent check — silent only, no redirect or popup possible here.
+          // Only runs when an account exists and MSAL is fully settled.
           try {
             const allGranted = await ensureConsent();
-            if (!allGranted) {
+            if (!allGranted && !cancelled) {
               setConsentNeeded(true);
             }
           } catch (err) {
             console.warn("[MsalProviderWrapper] Consent check failed", err);
           }
 
-          // ── Auto-seed refresh_token (server-side confidential flow) ──────────
+          // ── Auto-seed refresh_token (server-side confidential flow) ──────
           // MSAL Browser can't emit an RT, so SK long runs need one seeded via a
           // one-time silent redirect (SSO session already exists → no new prompt).
           // Guarded by a JS-readable cookie + sessionStorage to avoid loops.
@@ -521,8 +685,8 @@ export default function MsalProviderWrapper({
           }
         }
 
-        // ── Proactive refresh every 20 min (tokens live ~60–90 min) ──────────────
-        // Refreshes ALL three tokens: bearer, fabric_access_token, onelake_token
+        // ── Proactive refresh every 20 min (tokens live ~60–90 min) ─────────
+        // Refreshes tokens: bearer, fabric_access_token
         // This ensures long-running migrations (~1hr+) never hit expiry mid-run.
         const REFRESH_INTERVAL_MS = 20 * 60 * 1000;
         const interval = setInterval(async () => {
@@ -530,11 +694,12 @@ export default function MsalProviderWrapper({
           if (acc) {
             try {
               await Promise.all([
-                getActiveToken(),      // refreshes bearer token → sessionStorage["access_token"]
-                getFabricToken(),      // refreshes fabric token → sessionStorage["fabric_access_token"]
-                getStorageToken(),     // refreshes onelake token → sessionStorage["onelake_token"]
+                getActiveToken(),   // refreshes bearer token → sessionStorage["access_token"]
+                getFabricToken(),   // refreshes fabric token → sessionStorage["fabric_access_token"]
               ]);
-              console.log("[MsalProviderWrapper] All tokens proactively refreshed (bearer, fabric, onelake)");
+              if (process.env.NODE_ENV === "development") {
+                console.log("[MsalProviderWrapper] All tokens proactively refreshed (bearer, fabric)");
+              }
             } catch (e) {
               console.warn("[MsalProviderWrapper] Proactive token refresh failed", e);
             }
@@ -544,11 +709,19 @@ export default function MsalProviderWrapper({
         return () => clearInterval(interval);
       } catch (err: any) {
         console.error("Auth init failed", err);
-        setInitError(err.message);
+        if (!cancelled) {
+          setInitError(err.message);
+        }
       }
     };
 
-    initialize();
+    const cleanup = initialize();
+
+    return () => {
+      cancelled = true;
+      // If initialize() returned a cleanup fn (clearInterval), call it.
+      cleanup.then((fn) => fn?.());
+    };
   }, []);
 
   if (initError) {

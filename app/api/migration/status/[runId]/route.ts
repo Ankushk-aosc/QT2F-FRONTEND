@@ -18,23 +18,16 @@ export async function GET(
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        // Semantic Kernel exposes no /status/{run_id}; run state is persisted to
+        // the records store as it progresses, so that is the source of truth.
         const data = await httpClient.get<unknown>(
-            `/status/${runId}`,
-            { apiType: "semantic" } // httpClient automatically forwards headers from context if not available manually? 
-            // Wait, httpClient implementation:
-            // if (forwardHeaders) { const headerStore = await headers(); ... }
-            // Since this is a Route Handler, `headers()` works.
-            // But we already checked `req.headers`.
-            // The `httpClient` will automatically pick up Authorization header from request context via `next/headers`.
-            // BUT passing it explicitly is safer/clearer since we already have it.
-            // However, `httpClient` options supports `headers` but NOT strictly 'Authorization' as a named prop in the same way `httpGet` did.
-            // We can rely on automatic forwarding OR pass it in options.headers.
-            // Let's rely on auto forwarding as it's cleaner.
+            `/records/semantic-kernel?run_id=${encodeURIComponent(runId)}`,
+            { apiType: "logs", headers: { Authorization: authHeader } }
         );
 
         return NextResponse.json(data, { status: 200 });
     } catch (err: any) {
         console.error("[API /api/migration/status] Error:", err.message);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        return NextResponse.json({ error: err.message }, { status: err.status || 500 });
     }
 }

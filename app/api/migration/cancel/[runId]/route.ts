@@ -18,14 +18,16 @@ export async function POST(
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        // Semantic Kernel has no /cancel/{run_id}; cancelling a whole run is
+        // what /qlik/stop-run does, and it takes the id in the body.
         const data = await httpClient.post<{ success: boolean; message: string }>(
-            `/cancel/${runId}`,
-            null, // No body
-            { apiType: "semantic" }
+            "/qlik/stop-run",
+            { run_id: runId },
+            { apiType: "semantic", headers: { Authorization: authHeader } }
         );
         return NextResponse.json(data, { status: 200 });
     } catch (err: any) {
         console.error("[API /api/migration/cancel] Error:", err.message);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        return NextResponse.json({ error: err.message }, { status: err.status || 500 });
     }
 }

@@ -1,7 +1,9 @@
 "use client";
 
 import React, { Component, ErrorInfo, ReactNode } from "react";
-import { MessageBar, MessageBarBody, MessageBarTitle, Button } from "@fluentui/react-components";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { HOME_ROUTE } from "@/lib/navigation";
 
 interface Props {
   children?: ReactNode;
@@ -29,19 +31,19 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: "24px", maxWidth: "600px", margin: "40px auto", fontFamily: "Segoe UI, sans-serif" }}>
-          <MessageBar intent="error">
-            <MessageBarBody>
-              <MessageBarTitle>Something went wrong</MessageBarTitle>
+        <div style={{ padding: "24px", maxWidth: "600px", margin: "40px auto" }}>
+          <Alert variant="destructive">
+            <AlertTitle>Something went wrong</AlertTitle>
+            <AlertDescription>
               {this.state.error?.message || "An unexpected rendering error has occurred in this view."}
-            </MessageBarBody>
-          </MessageBar>
+            </AlertDescription>
+          </Alert>
           <div style={{ marginTop: "16px", display: "flex", gap: "12px" }}>
-            <Button appearance="primary" onClick={() => window.location.reload()}>
-              Reload Page
-            </Button>
             <Button onClick={() => this.setState({ hasError: false, error: null })}>
               Try Again
+            </Button>
+            <Button as="a" href={HOME_ROUTE} variant="secondary">
+              Go Home
             </Button>
           </div>
         </div>

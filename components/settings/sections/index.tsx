@@ -7,6 +7,7 @@ import { getSection, type SettingsSectionId } from "@/lib/settings/navigation"
 import { AboutSection } from "./AboutSection"
 import { AppearanceSection } from "./AppearanceSection"
 import { GeneralSection } from "./GeneralSection"
+import { IntegrationsSection } from "./IntegrationsSection"
 import { MigrationSection } from "./MigrationSection"
 import { PlannedSection } from "./PlannedSection"
 import { WorkspaceSection } from "./WorkspaceSection"
@@ -23,6 +24,7 @@ const IMPLEMENTED_SECTIONS: Partial<Record<SettingsSectionId, React.ComponentTyp
   appearance: AppearanceSection,
   workspace: WorkspaceSection,
   migration: MigrationSection,
+  integrations: IntegrationsSection,
   about: AboutSection,
 }
 

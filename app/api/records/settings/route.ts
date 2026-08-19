@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { relayUpstreamError } from "@/lib/api/routeHelpers";
 import { getEnv } from "@/lib/env";
 
 const getBaseUrl = () => {
@@ -15,6 +16,7 @@ export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get("Authorization");
     const baseUrl = getBaseUrl();
+    console.log(`[TESTING /api/records/settings] Fetching URL: ${baseUrl}`);
     const response = await fetch(baseUrl, {
       method: "GET",
       headers: {
@@ -25,7 +27,7 @@ export async function GET(request: Request) {
     });
 
     if (!response.ok) {
-      throw new Error(`Backend responded with ${response.status}`);
+      return relayUpstreamError("[API /api/records/settings]", baseUrl, response);
     }
 
     const data = await response.json();

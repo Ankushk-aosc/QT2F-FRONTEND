@@ -1,19 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { makeStyles, tokens } from "@fluentui/react-components";
-
-const useStyles = makeStyles({
-  enter: {
-    opacity: 0,
-    transform: "translateY(8px)",
-    transition: `opacity 220ms ${tokens.curveEasyEase}, transform 220ms ${tokens.curveEasyEase}`,
-  },
-  visible: {
-    opacity: 1,
-    transform: "translateY(0)",
-  },
-});
 
 interface FadeInProps {
   children: React.ReactNode;
@@ -22,12 +9,8 @@ interface FadeInProps {
   className?: string;
 }
 
-/**
- * FadeIn – wraps children in a subtle entrance animation.
- * Uses Fluent UI motion tokens for consistent timing.
- */
+/** Wraps children in a subtle entrance animation (opacity + translateY). */
 export function FadeIn({ children, delay = 0, className }: FadeInProps) {
-  const styles = useStyles();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -37,7 +20,7 @@ export function FadeIn({ children, delay = 0, className }: FadeInProps) {
 
   return (
     <div
-      className={`${styles.enter} ${visible ? styles.visible : ""} ${className ?? ""}`}
+      className={`ui-fade-in ${visible ? "ui-fade-in-visible" : ""} ${className ?? ""}`}
     >
       {children}
     </div>

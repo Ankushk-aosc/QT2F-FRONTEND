@@ -45,7 +45,8 @@ export async function GET(req: NextRequest) {
         }
 
         const baseUrl = logsBase.replace(/\/$/, "");
-        const targetUrl = new URL(`${baseUrl}/logs`);
+        // LOGS_API_BASE is ".../api"; the agent log feed is /records/monitoring-logs.
+        const targetUrl = new URL(`${baseUrl}/records/monitoring-logs`);
 
         // Only append project_id and workbook_id if they actually exist and are not fallback strings
         if (project_id && project_id !== "Unknown Project" && project_id !== "Unknown") {

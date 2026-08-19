@@ -19,16 +19,18 @@ export type Env = {
 
     // Backend Services
     TABLEAU_API_URL: string;
+    TABLEAU_MONGO_DB_URL?: string;
     SEMANTIC_KERNEL_URL: string;
     LOGS_API_BASE: string;
     FABRIC_API_BASE_URL: string;
     API_BASE_URL?: string;
     QLIK_URL?: string;
+    QLIK_MONGO_DB_URL?: string;
     SQL_BASE_URL?: string;
     ASSESSMENT_API?: string;
     PARSING_API?: string;
-    MAPPING_API?: string;
-    REPORT_GENERATION_API?: string;
+    /** Qlik Cloud API key for the engine at QLIK_URL. Server-side only. */
+    QLIK_API_KEY?: string;
     AGENTVARIABLE?: string;
     DEFAULT_CONNECTION_ID?: string;
 };
@@ -71,16 +73,20 @@ export function getEnv(): Env {
 
         // Backend Services
         TABLEAU_API_URL: requireEnv("TABLEAU_API_URL"),
+        TABLEAU_MONGO_DB_URL: get("TABLEAU_MONGO_DB_URL"),
         SEMANTIC_KERNEL_URL: requireEnv("SEMANTIC_KERNEL_URL"),
         LOGS_API_BASE: requireEnv("LOGS_API_BASE"),
         FABRIC_API_BASE_URL: requireEnv("FABRIC_API_BASE_URL"),
         API_BASE_URL: get("API_BASE_URL"),
         QLIK_URL: get("QLIK_URL"),
-        SQL_BASE_URL: get("SQL_BASE_URL") || get("NEXT_PUBLIC_SQL_BASE_URL"),
-        ASSESSMENT_API: get("ASSESSMENT_API") || get("NEXT_PUBLIC_ASSESSMENT_API"),
-        PARSING_API: get("PARSING_API") || get("NEXT_PUBLIC_PARSING_API"),
-        MAPPING_API: get("MAPPING_API") || get("NEXT_PUBLIC_MAPPING_API"),
-        REPORT_GENERATION_API: get("REPORT_GENERATION_API") || get("NEXT_PUBLIC_REPORT_GENERATION_API"),
+        QLIK_MONGO_DB_URL: get("QLIK_MONGO_DB_URL"),
+        // No NEXT_PUBLIC_* fallbacks here. These are server-only backends, and a
+        // NEXT_PUBLIC_ duplicate would inline the value into the client bundle --
+        // the exact hazard lib/publicConfig.ts documents.
+        SQL_BASE_URL: get("SQL_BASE_URL"),
+        ASSESSMENT_API: get("ASSESSMENT_API"),
+        PARSING_API: get("PARSING_API"),
+        QLIK_API_KEY: get("QLIK_API_KEY"),
         AGENTVARIABLE: get("AGENTVARIABLE") || MIGRATION_MODE.STANDARD,
         DEFAULT_CONNECTION_ID: get("DEFAULT_CONNECTION_ID"),
     };

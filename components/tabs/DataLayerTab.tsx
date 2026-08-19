@@ -1,32 +1,16 @@
 "use client"
 
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Spinner } from "@/components/ui/spinner"
 import {
-  Card,
-  Text,
-  Badge,
-  Table,
-  TableHeader,
-  TableHeaderCell,
-  TableBody,
-  TableRow,
-  TableCell,
-  tokens,
-  Spinner,
-  Popover,
-  PopoverTrigger,
-  PopoverSurface,
-  Button
-} from "@fluentui/react-components"
-import {
-  CheckmarkCircle20Regular,
-  Database20Regular,
-  Settings20Regular,
-  ArrowRight20Regular,
-  Info20Regular,
-  ChevronDownRegular,
-  ChevronRightRegular,
-  Info24Regular
-} from "@fluentui/react-icons"
+  CheckCircle2,
+  Database,
+  Settings,
+  ArrowRight,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react"
 import React, { useMemo, useState, useEffect } from 'react'
 import { useDatalayerStore } from "@/stores/datalayer.store"
 import { useAgentStore } from "@/stores/agent.store"
@@ -262,7 +246,7 @@ export function DataLayerTab({ workbookId, projectId: propProjectId, runId: prop
       <div className={styles.grid2}>
         {/* ── SECTION 2: MEDALLION ARCHITECTURE ── */}
         <Card className={styles.sectionCard}>
-          <div className={styles.sectionHeader}><Database20Regular /> Medallion Architecture Summary</div>
+          <div className={styles.sectionHeader}><Database size={20} /> Medallion Architecture Summary</div>
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
@@ -303,7 +287,7 @@ export function DataLayerTab({ workbookId, projectId: propProjectId, runId: prop
 
         {/* ── SECTION 3: FABRIC ENVIRONMENT ── */}
         <Card className={styles.sectionCard}>
-          <div className={styles.sectionHeader}><Settings20Regular /> Fabric Workspace Environment</div>
+          <div className={styles.sectionHeader}><Settings size={20} /> Fabric Workspace Environment</div>
           <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "16px" }}>
             {lakehouses.map((lh, idx) => (
               <div key={idx} style={{ padding: "20px", backgroundColor: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -311,7 +295,7 @@ export function DataLayerTab({ workbookId, projectId: propProjectId, runId: prop
                 {/* Title & Badge */}
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "12px" }}>
                   <div style={{ fontWeight: 500, color: "#0f172a", fontSize: "16px", wordBreak: "break-all" }}>{lh.name}</div>
-                  <Badge appearance="outline" color="success">Active Status</Badge>
+                  <Badge variant="success">Active Status</Badge>
                 </div>
 
                 {/* Divider */}
@@ -350,7 +334,7 @@ export function DataLayerTab({ workbookId, projectId: propProjectId, runId: prop
 
       {/* ── SECTION 4: DATA ASSETS ── */}
       <Card className={styles.sectionCard}>
-        <div className={styles.sectionHeader}><ArrowRight20Regular /> Target Data Assets (Delta Tables)</div>
+        <div className={styles.sectionHeader}><ArrowRight size={20} /> Target Data Assets (Delta Tables)</div>
 
         <div className="vl-flex-col-mobile" style={{ padding: "12px 16px", background: "#f1f5f9", borderRadius: "8px", marginTop: "16px", marginBottom: "16px" }}>
            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -386,42 +370,41 @@ export function DataLayerTab({ workbookId, projectId: propProjectId, runId: prop
         </div>
 
         <div className={styles.tableContainer}>
-          <Table style={{ tableLayout: "fixed", width: "100%", minWidth: "650px" }}>
-            <TableHeader>
-              <TableRow style={{ background: "#f8fafc" }}>
-                <TableHeaderCell style={{ width: "45%", fontWeight: 600, color: "#475569" }}>Table Name</TableHeaderCell>
-                <TableHeaderCell style={{ width: "20%", fontWeight: 600, color: "#475569" }}>Fabric Layer</TableHeaderCell>
-                <TableHeaderCell style={{ width: "35%", fontWeight: 600, color: "#475569" }}>Migration Result</TableHeaderCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <table style={{ tableLayout: "fixed", width: "100%", minWidth: "650px", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#f8fafc" }}>
+                <th style={{ width: "45%", fontWeight: 600, color: "#475569", textAlign: "left", padding: "10px 12px" }}>Table Name</th>
+                <th style={{ width: "20%", fontWeight: 600, color: "#475569", textAlign: "left", padding: "10px 12px" }}>Fabric Layer</th>
+                <th style={{ width: "35%", fontWeight: 600, color: "#475569", textAlign: "left", padding: "10px 12px" }}>Migration Result</th>
+              </tr>
+            </thead>
+            <tbody>
               {assetsPagination.pageItems.map((tbl, idx) => (
-                <TableRow key={idx} style={{ background: idx % 2 === 0 ? "#ffffff" : "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                  <TableCell>
+                <tr key={idx} style={{ background: idx % 2 === 0 ? "#ffffff" : "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                  <td style={{ padding: "10px 12px" }}>
                     <div style={{ fontWeight: 500, color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tbl.name}</div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge 
-                      appearance="tint" 
-                      color={tbl.layer === "Gold" ? "warning" : tbl.layer === "Silver" ? "informative" : "brand"}
+                  </td>
+                  <td style={{ padding: "10px 12px" }}>
+                    <Badge
+                      variant={tbl.layer === "Gold" ? "warning" : tbl.layer === "Silver" ? "secondary" : "default"}
                     >
                       {tbl.layer}
                     </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge color="success" appearance="tint" style={{ whiteSpace: "nowrap" }}>Migrated Successfully</Badge>
-                  </TableCell>
-                </TableRow>
+                  </td>
+                  <td style={{ padding: "10px 12px" }}>
+                    <Badge variant="success" style={{ whiteSpace: "nowrap" }}>Migrated Successfully</Badge>
+                  </td>
+                </tr>
               ))}
               {tableData.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={3} style={{ textAlign: 'center', padding: '30px', color: "#64748b", fontSize: "14px" }}>
+                <tr>
+                  <td colSpan={3} style={{ textAlign: 'center', padding: '30px', color: "#64748b", fontSize: "14px" }}>
                     No delta tables processed yet.
-                  </TableCell>
-                </TableRow>
+                  </td>
+                </tr>
               )}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         </div>
 
         {assetsPagination.needsPagination && (
@@ -441,7 +424,7 @@ export function DataLayerTab({ workbookId, projectId: propProjectId, runId: prop
           onClick={() => toggleSection("techSpec")}
           style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
         >
-          {openSections.techSpec ? <ChevronDownRegular fontSize={20} color="#475569" /> : <ChevronRightRegular fontSize={20} color="#475569" />}
+          {openSections.techSpec ? <ChevronDown size={20} color="#475569" /> : <ChevronRight size={20} color="#475569" />}
           <div className={styles.sectionHeader} style={{ margin: 0 }}>
              Agent Internal Logic & Conversion Rules
           </div>
@@ -457,7 +440,7 @@ export function DataLayerTab({ workbookId, projectId: propProjectId, runId: prop
               </div>
               {requirements.map((req, idx) => (
                 <div key={idx} style={{ display: "flex", gap: "12px", alignItems: "flex-start", padding: "12px 16px", backgroundColor: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-                  <CheckmarkCircle20Regular style={{ color: "#10b981", flexShrink: 0, marginTop: "2px" }} />
+                  <CheckCircle2 size={20} style={{ color: "#10b981", flexShrink: 0, marginTop: "2px" }} />
                   <div style={{ fontSize: "13px", color: "#334155", lineHeight: "1.5" }}>{req}</div>
                 </div>
               ))}

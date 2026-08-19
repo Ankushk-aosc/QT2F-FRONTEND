@@ -7,13 +7,11 @@ export type AgentType = "Assessment" | "Parsing" | "Mapping" | "Data Layer" | "G
 
 export type AppStatus = "Idle" | "Running" | "Success" | "Failed"
 
-export interface TableauConfig {
-  serverUrl: string
-  siteId: string
-  authType: "PAT" | "Username"
-  tokenName: string
-  tokenValue: string
-}
+// `TableauConfig` was removed here. It described a Tableau credential —
+// including a bare `tokenValue` — as a client state shape, and the store that
+// held it is gone. Tableau credentials live in the migration backend's Key
+// Vault and are referenced from the browser only by `connection_id`; keeping a
+// type that models the secret invites somebody to populate it again.
 
 export interface Application {
   id: string

@@ -1,49 +1,29 @@
 "use client"
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectItem } from "@/components/ui/select";
 import {
-    Badge,
-    Breadcrumb,
-    BreadcrumbButton,
-    BreadcrumbDivider,
-    BreadcrumbItem,
-    Button,
-    Card,
-    Dialog,
-    DialogActions,
-    DialogBody,
-    DialogContent,
-    DialogSurface,
-    DialogTitle,
-    Input,
-    MessageBar,
-    MessageBarBody,
-    MessageBarTitle,
-    Spinner,
-    Tab,
-    TabList,
-    Text,
-    Dropdown,
-    Option,
-    tokens
-} from "@fluentui/react-components";
-import {
-    ArrowClockwise20Regular,
-    BookOpen20Regular,
-    CheckmarkCircle16Regular,
-    CheckmarkCircle20Regular,
-    ChevronLeft20Regular,
-    ChevronRight20Regular,
-    ChevronDown20Regular,
-    Clock20Regular,
-    DeveloperBoard24Regular,
-    ErrorCircle16Regular,
-    ErrorCircle20Regular,
-    Folder20Regular,
-    History20Regular,
-    Info16Regular,
-    Play20Regular,
-    Warning16Regular
-} from "@fluentui/react-icons";
+    RefreshCw,
+    BookOpen,
+    CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
+    ChevronDown,
+    Clock,
+    Cpu,
+    XCircle,
+    Folder,
+    History,
+    Info,
+    Play,
+    AlertTriangle
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatDBTimestamp, formatDuration } from "@/lib/utils";
 import { normalizeLogEntry } from "@/services/monitoring.service";
@@ -150,7 +130,7 @@ const parseRawStatus = (rawStatus: string): string => {
         const failedMatch = rawStatus.match(/Failed:\s*([1-9]\d*)/i);
         const cancelledMatch = rawStatus.match(/Cancelled:\s*([1-9]\d*)/i);
         const pendingMatch = rawStatus.match(/Pending:\s*([1-9]\d*)/i);
-        
+
         if (failedMatch) return "failed";
         if (cancelledMatch) return "cancelled";
         if (pendingMatch) return "pending";
@@ -226,7 +206,7 @@ const formatStatusText = (status: string): string => {
     return (status || "pending").split(/[_\s]/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 };
 
-const statusBadgeColor = (s: string): "success" | "brand" | "danger" | "informative" => {
+const statusBadgeColor = (s: string): "success" | "default" | "destructive" | "secondary" => {
     let val = s.toLowerCase();
     if (val.startsWith("(")) {
         const match = val.match(/^\(([^)]+)\)/);
@@ -234,15 +214,15 @@ const statusBadgeColor = (s: string): "success" | "brand" | "danger" | "informat
             val = match[1].toLowerCase();
         }
     }
-    if (val === "stopped" || val === "cancelled" || val === "halted") return "danger";
-    if (val === "parsing_completed" || val === "mapping_completed" || val === "datalayer_completed" || val === "assessment_completed") return "brand";
+    if (val === "stopped" || val === "cancelled" || val === "halted") return "destructive";
+    if (val === "parsing_completed" || val === "mapping_completed" || val === "datalayer_completed" || val === "assessment_completed") return "default";
     if (val.includes("paused") || (val.includes("parsing") && val !== "parsing_completed")) return "success";
-    if (val === "generation_completed" || val === "generation_done" || val === "validation_pending") return "informative";
-    if (val === "validation_failed") return "danger";
+    if (val === "generation_completed" || val === "generation_done" || val === "validation_pending") return "secondary";
+    if (val === "validation_failed") return "destructive";
     if (val.includes("completed") || val.includes("success") || val.includes("done")) return "success";
-    if (val === "processing" || val === "running") return "brand";
-    if (val === "failed" || val === "error") return "danger";
-    return "informative";
+    if (val === "processing" || val === "running") return "default";
+    if (val === "failed" || val === "error") return "destructive";
+    return "secondary";
 };
 
 const getStatusIcon = (s: string) => {
@@ -253,28 +233,28 @@ const getStatusIcon = (s: string) => {
             val = match[1].toLowerCase();
         }
     }
-    if (val === "stopped" || val === "cancelled" || val === "halted") return <ErrorCircle20Regular style={{ color: tokens.colorPaletteRedForeground1 }} />;
-    if (val.includes("paused") || val.includes("parsing")) return <CheckmarkCircle20Regular style={{ color: tokens.colorPaletteGreenForeground1 }} />;
-    if (val.includes("completed") || val.includes("success") || val.includes("done")) return <CheckmarkCircle20Regular style={{ color: tokens.colorPaletteGreenForeground1 }} />;
-    if (val === "processing" || val === "running") return <Play20Regular style={{ color: tokens.colorBrandForeground1 }} />;
-    if (val === "failed" || val === "error") return <ErrorCircle20Regular style={{ color: tokens.colorPaletteRedForeground1 }} />;
-    return <Clock20Regular style={{ color: tokens.colorNeutralForeground4 }} />;
+    if (val === "stopped" || val === "cancelled" || val === "halted") return <XCircle size={20} style={{ color: "var(--danger)" }} />;
+    if (val.includes("paused") || val.includes("parsing")) return <CheckCircle2 size={20} style={{ color: "var(--success)" }} />;
+    if (val.includes("completed") || val.includes("success") || val.includes("done")) return <CheckCircle2 size={20} style={{ color: "var(--success)" }} />;
+    if (val === "processing" || val === "running") return <Play size={20} style={{ color: "var(--primary)" }} />;
+    if (val === "failed" || val === "error") return <XCircle size={20} style={{ color: "var(--danger)" }} />;
+    return <Clock size={20} style={{ color: "var(--text-muted)" }} />;
 };
 
-const getLogBadgeColor = (s: string): "success" | "danger" | "warning" | "informative" => {
+const getLogBadgeColor = (s: string): "success" | "destructive" | "warning" | "secondary" => {
     const val = s.toLowerCase();
     if (val === "success") return "success";
-    if (val === "error") return "danger";
+    if (val === "error") return "destructive";
     if (val === "warn") return "warning";
-    return "informative";
+    return "secondary";
 };
 
 const getLogStatusIcon = (s: string) => {
     const val = s.toLowerCase();
-    if (val === "success") return <CheckmarkCircle16Regular style={{ color: tokens.colorPaletteGreenForeground1 }} />;
-    if (val === "error") return <ErrorCircle16Regular style={{ color: tokens.colorPaletteRedForeground1 }} />;
-    if (val === "warn") return <Warning16Regular style={{ color: tokens.colorPaletteYellowForeground1 }} />;
-    return <Info16Regular style={{ color: tokens.colorBrandForeground1 }} />;
+    if (val === "success") return <CheckCircle2 size={16} style={{ color: "var(--success)" }} />;
+    if (val === "error") return <XCircle size={16} style={{ color: "var(--danger)" }} />;
+    if (val === "warn") return <AlertTriangle size={16} style={{ color: "var(--warning)" }} />;
+    return <Info size={16} style={{ color: "var(--primary)" }} />;
 };
 
 const formatTimestamp = (ts?: any) => {
@@ -290,19 +270,19 @@ const formatTimestamp = (ts?: any) => {
         let failedStepName = "";
         let processingStepName = "";
         let highestCompleted = "";
-        
+
         if (Object.keys(steps).length > 0) {
             let lastCompletedName = "";
             for (const [key, val] of Object.entries(steps)) {
                 const statusStr = typeof val === 'string' ? val : ((val as any)?.status || (val as any)?.final_status || "");
                 if (!statusStr) continue;
-                
+
                 let formattedKey = key;
                 if (key.toLowerCase().includes("agent")) {
                     formattedKey = key.replace(/Agent/i, "").trim();
                 }
                 formattedKey = formattedKey.split(/[_\s]/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-    
+
                 const upperStatus = statusStr.toUpperCase();
                 if (upperStatus === "COMPLETED") {
                     lastCompletedName = formattedKey;
@@ -352,51 +332,51 @@ const formatTimestamp = (ts?: any) => {
         else if (assessment === "COMPLETED") tempHighest = "Assessment";
 
         if (tempHighest && !highestCompleted) highestCompleted = tempHighest;
-        
+
         if (storeHighestCompleted) {
             const order = ["", "Assessment", "Parsing", "Mapping", "Data Layer", "Generation", "Validation"];
             if (order.indexOf(storeHighestCompleted) > order.indexOf(highestCompleted)) {
                 highestCompleted = storeHighestCompleted;
             }
         }
-    
+
         if (highestCompleted) {
-            badges.push(<Badge key="highest" appearance="tint" color="success">{highestCompleted} Completed</Badge>);
+            badges.push(<Badge key="highest" variant="success">{highestCompleted} Completed</Badge>);
         }
-    
+
         if (wbStatus === "failed" || wbStatus === "error") {
             if (failedStepName) {
-                badges.push(<Badge key="fail" appearance="tint" color="danger">{failedStepName} Failed</Badge>);
+                badges.push(<Badge key="fail" variant="destructive">{failedStepName} Failed</Badge>);
             } else {
-                badges.push(<Badge key="fail" appearance="tint" color="danger">Failed</Badge>);
+                badges.push(<Badge key="fail" variant="destructive">Failed</Badge>);
             }
         } else if (wbStatus === "stopped" || wbStatus === "cancelled" || wbStatus === "halted") {
-            badges.push(<Badge key="cancel" appearance="tint" color="danger">Cancelled</Badge>);
+            badges.push(<Badge key="cancel" variant="destructive">Cancelled</Badge>);
         } else if (wbStatus === "processing" || wbStatus === "running" || wbStatus === "pending") {
             if (processingStepName && processingStepName !== highestCompleted) {
-                badges.push(<Badge key="proc" appearance="tint" color="brand">{processingStepName} Processing</Badge>);
+                badges.push(<Badge key="proc" variant="default">{processingStepName} Processing</Badge>);
             } else {
-                badges.push(<Badge key="proc" appearance="tint" color="brand">Processing</Badge>);
+                badges.push(<Badge key="proc" variant="default">Processing</Badge>);
             }
         } else if (highestCompleted === "Generation" || highestCompleted === "Validation" || highestCompleted === "Data Layer" || highestCompleted === "Mapping") {
             if (highestCompleted !== "Validation") {
                 if (validation === "PENDING") {
-                    badges.push(<Badge key="val" appearance="tint" color="informative">Validation Pending</Badge>);
+                    badges.push(<Badge key="val" variant="secondary">Validation Pending</Badge>);
                 } else if (validation && validation !== "COMPLETED" && validation !== "SKIPPED") {
                     const vText = validation.charAt(0) + validation.slice(1).toLowerCase();
-                    badges.push(<Badge key="val" appearance="tint" color="informative">Validation {vText}</Badge>);
+                    badges.push(<Badge key="val" variant="secondary">Validation {vText}</Badge>);
                 }
             }
         }
-    
+
         if (badges.length === 0) {
             badges.push(
-                <Badge key="fallback" appearance="tint" color={statusBadgeColor(wbStatus)}>
+                <Badge key="fallback" variant={statusBadgeColor(wbStatus)}>
                     {formatStatusText(wbStatus)}
                 </Badge>
             );
         }
-    
+
         return (
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                 {badges}
@@ -501,7 +481,7 @@ export function MonitoringTab() {
         // Try to resolve the run number dynamically from multiple sources to show it immediately
         const getRunNo = (rid: string) => {
             if (rid === dashboardRunId && dashboardRunNo) return dashboardRunNo;
-            
+
             // Try assessment data
             const assessForRun = assessmentData[rid];
             if (assessForRun) {
@@ -512,18 +492,18 @@ export function MonitoringTab() {
                     if (num) return String(num);
                 }
             }
-            
+
             // Try historical runs
             const hr = historicalRuns.find(r => r.run_id === rid);
             if (hr?.run_no) return String(hr.run_no);
             if (hr?.payload?.run_no) return String(hr.payload.run_no);
             if (hr?.runNo) return String(hr.runNo);
-            
+
             // Try backend active runs
             const ba = backendActive.find(r => r.run_id === rid);
             const num = ba?.run_no || ba?.runNo || ba?.payload?.run_no || ba?.payload?.runNo;
             if (num) return String(num);
-            
+
             return undefined;
         };
 
@@ -542,7 +522,7 @@ export function MonitoringTab() {
             }
             return r;
         });
-        
+
         if (localActiveId) {
             const alreadyExists = updatedBackendActive.some(r => r.run_id === localActiveId);
             if (!alreadyExists) {
@@ -598,7 +578,7 @@ export function MonitoringTab() {
                 if (!seen.has(wid)) {
                     seen.add(wid);
                     let computedStatus = parseRawStatus(item.final_status || item.status || r.status || "completed");
-                    
+
                     if (computedStatus.toLowerCase() === "pending" || computedStatus.toLowerCase() === "unknown") {
                         if (r.status && r.status.toLowerCase().includes("paused")) {
                             computedStatus = r.status;
@@ -758,7 +738,7 @@ export function MonitoringTab() {
                     if (!seen.has(wid)) {
                         seen.add(wid);
                         let computedStatus = parseRawStatus(item.final_status || item.status || r.status || "completed");
-                        
+
                         if (computedStatus.toLowerCase() === "pending" || computedStatus.toLowerCase() === "unknown") {
                             if (r.status && r.status.toLowerCase().includes("paused")) {
                                 computedStatus = r.status;
@@ -789,7 +769,7 @@ export function MonitoringTab() {
                     if (!seen.has(wid)) {
                         seen.add(wid);
                         let computedStatus = parseRawStatus(r.status || "completed");
-                        
+
                         wbs.push({
                             workbookId: wid,
                             workbookName: wname,
@@ -844,9 +824,9 @@ export function MonitoringTab() {
         }
         const isRunStopped = targetRunId ? stoppedRunIdsList.includes(targetRunId) : false;
 
-        const isHalted = 
-            baseStatus === "cancelled" || 
-            baseStatus === "stopped" || 
+        const isHalted =
+            baseStatus === "cancelled" ||
+            baseStatus === "stopped" ||
             baseStatus === "halted" ||
             runStatus === "cancelled" ||
             runStatus === "stopped" ||
@@ -874,7 +854,7 @@ export function MonitoringTab() {
 
         const steps = app.steps || app._raw?.steps || {};
         const stepValues = Object.entries(steps);
-        
+
         const hasFailedStep = stepValues.some(([key, step]: [string, any]) => {
             if (!step || typeof step !== 'object') {
                 const s = String(step).toLowerCase();
@@ -956,7 +936,7 @@ export function MonitoringTab() {
         };
 
         const isParsingDone = hasParsing || checkStepCompleted(steps.parsing) || checkStepCompleted(steps["Parsing Agent"]) || checkStepCompleted(app.parsing_status) || checkStepCompleted(app._raw?.parsing_status) || baseStatus.includes("paused");
-        
+
         if (!hasDownstream) {
             if (isParsingDone || isBaseCompleted) {
                 return "lite_migration_completed";
@@ -981,7 +961,7 @@ export function MonitoringTab() {
         if (isBaseCompleted) {
             return hasDownstream ? "full_migration_completed" : "lite_migration_completed";
         }
-        
+
         if (baseStatus.includes("paused")) {
             return "paused_at_parsing";
         }
@@ -1110,7 +1090,7 @@ export function MonitoringTab() {
             ? currentLogs.filter(log => {
                 const agentName = log.agent_name || (log as any)._raw?.agent_name;
                 const isOrchestrator = agentName?.toLowerCase() === "orchestrator";
-                
+
                 if (isLiteMode() && !isOrchestrator) {
                     const normalized = getNormalizedAgentName(agentName);
                     if (normalized !== "Assessment Agent" && normalized !== "Parsing Agent") return false;
@@ -1233,7 +1213,7 @@ export function MonitoringTab() {
 
     const uniqueHistoricalRuns = useMemo(() => {
         const seen = new Set<string>();
-        
+
         // Filter out active runs so they don't duplicate in the history tab
         storeActiveRuns?.forEach(r => {
             if (r.run_id) seen.add(r.run_id);
@@ -1348,14 +1328,14 @@ export function MonitoringTab() {
                                         }
                                         return null;
                                     };
-                                    
+
                                     const val = getStepStatus(["validation", "Validation Agent", "Validation"]);
                                     const gen = getStepStatus(["generation", "report_generation", "Generation Agent", "Report Generation"]);
                                     const map = getStepStatus(["mapping", "Mapping Agent", "Mapping"]);
                                     const dat = getStepStatus(["datalayer", "Data Layer Agent", "Data Layer", "DataLayerAgent", "data_layer"]);
                                     const par = getStepStatus(["parsing", "Parsing Agent", "Parsing"]);
                                     const ass = getStepStatus(["assessment", "Assessment Agent", "Assessment"]);
-                                    
+
                                     if (val === "COMPLETED") runStatus = "validation_completed";
                                     else if (gen === "COMPLETED") runStatus = "generation_completed";
                                     else if (map === "COMPLETED") runStatus = "mapping_completed";
@@ -1437,13 +1417,12 @@ export function MonitoringTab() {
         return (
             <div className="vl-section-card" style={{ display: "flex", flexDirection: "column", gap: "16px", flexGrow: 1, padding: "20px 24px", minHeight: "500px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                    <span style={{ fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>
-                        Past Runs <span style={{ color: "#64748b" }}>({totalRunsCount || uniqueHistoricalRuns.length})</span>
+                    <span style={{ fontSize: "16px", fontWeight: 700, color: "var(--text)" }}>
+                        Past Runs <span style={{ color: "var(--text-muted)" }}>({totalRunsCount || uniqueHistoricalRuns.length})</span>
                     </span>
                     <Button
-                        appearance="subtle"
-                        size="small"
-                        icon={<ArrowClockwise20Regular />}
+                        variant="ghost"
+                        size="sm"
                         onClick={() => {
                             setHistoricalRunsPage(1);
                             fetchHistoricalRuns(undefined, user?.email || undefined, {
@@ -1454,7 +1433,9 @@ export function MonitoringTab() {
                         }}
                         disabled={loadingRuns}
                         title="Refresh Run History"
-                    />
+                    >
+                        <RefreshCw size={20} />
+                    </Button>
                 </div>
 
                 <div
@@ -1471,18 +1452,18 @@ export function MonitoringTab() {
                         alignItems: "center",
                         gap: "10px",
                         padding: "10px 14px",
-                        backgroundColor: tokens.colorNeutralBackground2,
-                        border: `1px solid ${tokens.colorNeutralStroke2}`,
-                        borderLeft: `4px solid ${tokens.colorBrandStroke1}`,
+                        backgroundColor: "var(--surface-subtle)",
+                        border: "1px solid var(--border)",
+                        borderLeft: "4px solid var(--primary)",
                         borderRadius: "6px",
                         fontSize: "12px",
-                        color: tokens.colorNeutralForeground2,
+                        color: "var(--text-secondary)",
                         cursor: "pointer",
-                        boxShadow: tokens.shadow2,
+                        boxShadow: "var(--shadow-sm)",
                     }}
                     title="Click to refresh history"
                 >
-                    <Info16Regular style={{ color: tokens.colorBrandForeground1, flexShrink: 0 }} />
+                    <Info size={16} style={{ color: "var(--primary)", flexShrink: 0 }} />
                     <span style={{ lineHeight: "1.4" }}>
                         <strong>Click here</strong> or use the refresh button above to see the logs of the latest migration process.
                     </span>
@@ -1496,43 +1477,41 @@ export function MonitoringTab() {
                             alignItems: "center",
                             gap: "16px",
                             padding: "14px 16px",
-                            border: "1px solid #dbe4f0",
+                            border: "1px solid var(--border)",
                             borderRadius: "12px",
-                            background: "linear-gradient(180deg, #f8fbff 0%, #f3f7fc 100%)",
-                            boxShadow: "inset 0 1px 0 #ffffff",
+                            background: "var(--surface-subtle)",
                         }}
                     >
                         <Button
-                            appearance="subtle"
-                            icon={<ChevronLeft20Regular />}
-                            size="small"
+                            variant="ghost"
+                            size="sm"
                             disabled={historicalRunsPage <= 1}
                             onClick={() => setHistoricalRunsPage((p) => Math.max(1, p - 1))}
                             aria-label="Go to previous history page"
-                        />
+                        >
+                            <ChevronLeft size={20} />
+                        </Button>
                         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "10px", minWidth: 0 }}>
-                            <span style={{ fontSize: "14px", color: "#0f172a", fontWeight: 600 }}>
+                            <span style={{ fontSize: "14px", color: "var(--text)", fontWeight: 600 }}>
                                 {historicalRunsPage} of {totalPages}
                             </span>
-                            <span style={{ fontSize: "12px", color: "#64748b", whiteSpace: "nowrap" }}>
+                            <span style={{ fontSize: "12px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
                                 {`${totalRunsCount} runs`}
                             </span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                             <Input
-                                size="small"
                                 value={historyPageInput}
-                                onChange={(_, data) => setHistoryPageInput(data.value.replace(/[^0-9]/g, ""))}
+                                onChange={(e) => setHistoryPageInput(e.target.value.replace(/[^0-9]/g, ""))}
                                 onKeyDown={(e) => {
                                     if (e.key === "Enter") handleHistoryPageJump();
                                 }}
-                                contentBefore={<span style={{ fontSize: "12px", color: "#64748b" }}>Page</span>}
-                                style={{ width: "112px" }}
+                                style={{ width: "112px", height: "30px" }}
                                 aria-label="Jump to history page"
                             />
                             <Button
-                                appearance="subtle"
-                                size="small"
+                                variant="ghost"
+                                size="sm"
                                 onClick={handleHistoryPageJump}
                                 disabled={loadingRuns}
                                 aria-label="Go to selected history page"
@@ -1541,18 +1520,19 @@ export function MonitoringTab() {
                             </Button>
                         </div>
                         <Button
-                            appearance="subtle"
-                            icon={<ChevronRight20Regular />}
-                            size="small"
+                            variant="ghost"
+                            size="sm"
                             disabled={historicalRunsPage >= totalPages}
                             onClick={() => setHistoricalRunsPage((p) => Math.min(totalPages, p + 1))}
                             aria-label="Go to next history page"
-                        />
+                        >
+                            <ChevronRight size={20} />
+                        </Button>
                     </div>
                 )}
 
                 {isHistoryPageTransitionLoading && (
-                    <div style={{ padding: "24px", display: "flex", justifyContent: "center", alignItems: "center", gap: "10px", color: "#64748b" }}>
+                    <div style={{ padding: "24px", display: "flex", justifyContent: "center", alignItems: "center", gap: "10px", color: "var(--text-muted)" }}>
                         <Spinner size="tiny" />
                         <span style={{ fontSize: "13px" }}>Loading page {historicalRunsPage}...</span>
                     </div>
@@ -1566,13 +1546,13 @@ export function MonitoringTab() {
 
                 {!loadingRuns && !isHistoryPageTransitionLoading && uniqueHistoricalRuns.length === 0 && (
                     <div className="vl-empty-state">
-                        <History20Regular style={{ fontSize: "28px", opacity: 0.3 }} />
-                        <span style={{ color: "#64748b", fontSize: "14px" }}>No historical runs found.</span>
+                        <History size={28} style={{ opacity: 0.3 }} />
+                        <span style={{ color: "var(--text-muted)", fontSize: "14px" }}>No historical runs found.</span>
                     </div>
                 )}
 
                 {visibleRuns.length > 0 && (
-                    <div className="vl-table-container" style={{ border: "none", borderRadius: 0, marginTop: "12px", borderTop: "1px solid #e2e8f0" }}>
+                    <div className="vl-table-container" style={{ border: "none", borderRadius: 0, marginTop: "12px", borderTop: "1px solid var(--border)" }}>
                         <table style={{ width: "100%", borderCollapse: "collapse" }}>
                             <thead>
                                 <tr>
@@ -1586,7 +1566,7 @@ export function MonitoringTab() {
                                 {visibleRuns.map(run => (
                                     <tr
                                         key={run.runId}
-                                        style={{ cursor: "pointer", borderBottom: "1px solid #e2e8f0", transition: "background 0.15s" }}
+                                        style={{ cursor: "pointer", borderBottom: "1px solid var(--border)", transition: "background 0.15s" }}
                                         onClick={() => {
                                             setSelectedHistoricalRunId(run.runId);
                                             setHistoryLevel("workbooks");
@@ -1595,12 +1575,12 @@ export function MonitoringTab() {
                                     >
                                         <td style={{ padding: "14px 16px", verticalAlign: "top" }}>
                                             <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
-                                                <Folder20Regular style={{ color: "#94a3b8", flexShrink: 0, marginTop: "2px" }} />
+                                                <Folder size={20} style={{ color: "var(--text-muted)", flexShrink: 0, marginTop: "2px" }} />
                                                 <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                                                    <span style={{ fontSize: "15px", fontWeight: 600, color: "#0f172a" }}>
+                                                    <span style={{ fontSize: "15px", fontWeight: 600, color: "var(--text)" }}>
                                                         {run.runNo ? `Run #${run.runNo}` : run.runId}
                                                     </span>
-                                                    <span style={{ fontSize: "12px", color: "#64748b" }}>
+                                                    <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                                                         {formatTime(run.rawTimestamp || run.timestamp.toString(), true)}
                                                     </span>
                                                 </div>
@@ -1608,20 +1588,20 @@ export function MonitoringTab() {
                                         </td>
                                         <td style={{ padding: "14px 16px", verticalAlign: "top" }}>
                                             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                                                {run.execution_level && <Badge appearance="filled" color="informative" style={{ fontSize: "10px", padding: "2px 6px" }}>EX: {run.execution_level}</Badge>}
-                                                {run.project_type && <Badge appearance="filled" color="informative" style={{ fontSize: "10px", padding: "2px 6px" }}>PR: {run.project_type}</Badge>}
-                                                {run.workbook_type && <Badge appearance="filled" color="informative" style={{ fontSize: "10px", padding: "2px 6px" }}>WB: {run.workbook_type}</Badge>}
-                                                {run.site_type && <Badge appearance="filled" color="informative" style={{ fontSize: "10px", padding: "2px 6px" }}>SI: {run.site_type}</Badge>}
-                                                {!run.execution_level && !run.project_type && !run.workbook_type && !run.site_type && <span style={{ fontSize: "12px", color: "#94a3b8" }}>—</span>}
+                                                {run.execution_level && <Badge variant="secondary" style={{ fontSize: "10px", padding: "2px 6px" }}>EX: {run.execution_level}</Badge>}
+                                                {run.project_type && <Badge variant="secondary" style={{ fontSize: "10px", padding: "2px 6px" }}>PR: {run.project_type}</Badge>}
+                                                {run.workbook_type && <Badge variant="secondary" style={{ fontSize: "10px", padding: "2px 6px" }}>WB: {run.workbook_type}</Badge>}
+                                                {run.site_type && <Badge variant="secondary" style={{ fontSize: "10px", padding: "2px 6px" }}>SI: {run.site_type}</Badge>}
+                                                {!run.execution_level && !run.project_type && !run.workbook_type && !run.site_type && <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>—</span>}
                                             </div>
                                         </td>
                                         <td style={{ padding: "14px 16px", verticalAlign: "top" }}>
-                                            <Badge appearance="tint" color={statusBadgeColor(run.status)}>
+                                            <Badge variant={statusBadgeColor(run.status)}>
                                                 {formatStatusText(run.status)}
                                             </Badge>
                                         </td>
                                         <td style={{ padding: "14px 16px", textAlign: "right", verticalAlign: "top" }}>
-                                            <ChevronRight20Regular style={{ color: "#94a3b8" }} />
+                                            <ChevronRight size={20} style={{ color: "var(--text-muted)" }} />
                                         </td>
                                     </tr>
                                 ))}
@@ -1640,7 +1620,7 @@ export function MonitoringTab() {
         const workbooksForRun = extractWorkbooksFromRun(run);
         const isCollapsed = collapsedRuns[runId] || false;
         const isStopped = stoppedRunIds.includes(runId);
-        
+
         // In active mode, show all workbooks in the active run.
         // We respect lite mode if active, but we don't filter out completed/failed workbooks.
         const filteredWbs = workbooksForRun.filter(app => {
@@ -1657,24 +1637,24 @@ export function MonitoringTab() {
         const computedRunStatus = (() => {
             if (isStopped) return "stopped";
             if (filteredWbs.length === 0) return "completed";
-            
+
             const wbStatuses = filteredWbs.map(app => getComputedStatus(app, runId).toLowerCase());
-            
+
             // Check if there are any active (non-final) workbooks
-            const isAnyActive = wbStatuses.some(status => 
-                status === "running" || 
-                status === "processing" || 
+            const isAnyActive = wbStatuses.some(status =>
+                status === "running" ||
+                status === "processing" ||
                 status === "pending" ||
                 status === "parsing"
             );
-            
+
             if (isAnyActive) return "processing";
 
             // If any workbook is paused, the run is paused
             if (wbStatuses.some(status => status.includes("paused"))) {
                 return "paused";
             }
-            
+
             // If all are final:
             if (wbStatuses.some(status => status === "failed" || status === "error")) {
                 return "failed";
@@ -1687,38 +1667,39 @@ export function MonitoringTab() {
 
         return (
             <div key={runId} className={styles.sectionCard} style={{ display: "flex", flexDirection: "column", padding: 0, marginBottom: "20px" }}>
-                <div 
-                    style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: isCollapsed ? "none" : "1px solid #e2e8f0", backgroundColor: "#f8fafc", flexShrink: 0, cursor: "pointer", userSelect: "none" }}
+                <div
+                    style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: isCollapsed ? "none" : "1px solid var(--border)", backgroundColor: "var(--surface-subtle)", flexShrink: 0, cursor: "pointer", userSelect: "none" }}
                     onClick={() => setCollapsedRuns(prev => ({ ...prev, [runId]: !isCollapsed }))}
                 >
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        {isCollapsed ? <ChevronRight20Regular style={{ color: "#64748b" }} /> : <ChevronDown20Regular style={{ color: "#64748b" }} />}
-                        <span style={{ fontWeight: 600, fontSize: "16px", color: "#0f172a" }}>
+                        {isCollapsed ? <ChevronRight size={20} style={{ color: "var(--text-muted)" }} /> : <ChevronDown size={20} style={{ color: "var(--text-muted)" }} />}
+                        <span style={{ fontWeight: 600, fontSize: "16px", color: "var(--text)" }}>
                             Active Run: {runNo ? `Run #${runNo}` : runId}
                         </span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "12px" }} onClick={(e) => e.stopPropagation()}>
-                        <span style={{ fontSize: "12px", color: "#64748b" }}>{filteredWbs.length} workbooks</span>
-                        <Badge appearance="tint" color={statusBadgeColor(computedRunStatus)}>
+                        <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>{filteredWbs.length} workbooks</span>
+                        <Badge variant={statusBadgeColor(computedRunStatus)}>
                             {formatStatusText(computedRunStatus)}
                         </Badge>
                         <Button
-                            appearance="subtle"
-                            size="small"
-                            icon={<ArrowClockwise20Regular />}
+                            variant="ghost"
+                            size="sm"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 fetchActiveRuns(user?.email || "");
                             }}
                             title="Refresh Active Run"
-                        />
+                        >
+                            <RefreshCw size={20} />
+                        </Button>
                         {computedRunStatus === "processing" && (
                             <Button
-                                size="small"
-                                style={{ 
-                                    backgroundColor: "#ef4444", 
-                                    color: "#ffffff",
-                                    borderColor: "#dc2626"
+                                size="sm"
+                                style={{
+                                    backgroundColor: "var(--danger)",
+                                    color: "var(--text-on-primary)",
+                                    borderColor: "var(--danger)"
                                 }}
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -1746,7 +1727,7 @@ export function MonitoringTab() {
                             <tbody>
                                 {filteredWbs.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} style={{ padding: "20px", textAlign: "center", color: "#64748b" }}>
+                                        <td colSpan={5} style={{ padding: "20px", textAlign: "center", color: "var(--text-muted)" }}>
                                             No workbooks found for this active run.
                                         </td>
                                     </tr>
@@ -1755,18 +1736,18 @@ export function MonitoringTab() {
                                         const wbStatus = isStopped ? "stopped" : getComputedStatus(app, runId);
 
                                         return (
-                                            <tr key={app.workbookId} style={{ cursor: "pointer", borderBottom: "1px solid #e2e8f0", transition: "background 0.15s" }} onClick={() => { setSelectedActiveRunId(runId); goToLogs(app.workbookId, app.workbookName || app.workbookId); }}>
+                                            <tr key={app.workbookId} style={{ cursor: "pointer", borderBottom: "1px solid var(--border)", transition: "background 0.15s" }} onClick={() => { setSelectedActiveRunId(runId); goToLogs(app.workbookId, app.workbookName || app.workbookId); }}>
                                                 <td style={{ padding: "14px 16px" }}>
                                                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                                                         {getStatusIcon(wbStatus)}
                                                         <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                                                             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                                                <span style={{ fontWeight: 600, wordBreak: "break-all", overflowWrap: "break-word", display: "inline-block", color: "#2563eb", fontSize: "14px" }}>
+                                                                <span style={{ fontWeight: 600, wordBreak: "break-all", overflowWrap: "break-word", display: "inline-block", color: "var(--primary)", fontSize: "14px" }}>
                                                                     {app.workbookName || app.workbookId || "Unknown Workbook"}
                                                                 </span>
                                                             </div>
                                                             {app.timestamp && (
-                                                                <span style={{ fontSize: "12px", color: "#94a3b8" }}>
+                                                                <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                                                                     {formatTime(app.timestamp, true)}
                                                                 </span>
                                                             )}
@@ -1774,7 +1755,7 @@ export function MonitoringTab() {
                                                     </div>
                                                 </td>
                                                 <td style={{ padding: "14px 16px" }}>
-                                                    <span style={{ fontWeight: 600, color: "#0f172a", fontSize: "14px" }}>
+                                                    <span style={{ fontWeight: 600, color: "var(--text)", fontSize: "14px" }}>
                                                         {app.projectName || app.projectId || "—"}
                                                     </span>
                                                 </td>
@@ -1785,14 +1766,14 @@ export function MonitoringTab() {
                                                         const hasGeneration = !!useGenerationStore.getState().generationData[app.workbookId];
                                                         const hasValidation = !!useValidationStore.getState().validationData[app.workbookId];
                                                         const hasAssessment = !!(runId && useAgentStore.getState().assessmentData[runId]?.[app.workbookId]);
-                                                        
+
                                                         let storeHighest = "";
                                                         if (hasValidation) storeHighest = "Validation";
                                                         else if (hasGeneration) storeHighest = "Generation";
                                                         else if (hasMapping) storeHighest = "Mapping";
                                                         else if (hasParsing) storeHighest = "Parsing";
                                                         else if (hasAssessment) storeHighest = "Assessment";
-                                                        
+
                                                         return renderStatusBadges(app, wbStatus, storeHighest);
                                                     })()}
                                                 </td>
@@ -1810,11 +1791,10 @@ export function MonitoringTab() {
                                                 </td>
                                                 <td style={{ padding: "14px 16px", textAlign: "center", width: "120px" }}>
                                                     <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-                                                        <Button size="small" onClick={(e) => { e.stopPropagation(); setSelectedActiveRunId(runId); goToLogs(app.workbookId, app.workbookName || app.workbookId); }}>Details</Button>
+                                                        <Button size="sm" onClick={(e) => { e.stopPropagation(); setSelectedActiveRunId(runId); goToLogs(app.workbookId, app.workbookName || app.workbookId); }}>Details</Button>
                                                         {(wbStatus === "completed" || wbStatus === "failed") && (
                                                             <Button
-                                                                size="small"
-                                                                icon={<ArrowClockwise20Regular />}
+                                                                size="sm"
                                                                 onClick={async (e) => {
                                                                     e.stopPropagation();
                                                                     const projectId = app.projectId || selectedProject || "";
@@ -1825,7 +1805,9 @@ export function MonitoringTab() {
                                                                     }
                                                                 }}
                                                                 title="Re-run Validation"
-                                                            />
+                                                            >
+                                                                <RefreshCw size={16} />
+                                                            </Button>
                                                         )}
                                                     </div>
                                                 </td>
@@ -1855,9 +1837,9 @@ export function MonitoringTab() {
             if (activeRunsList.length === 0) {
                 return (
                     <div className="vl-empty-state" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-                        <DeveloperBoard24Regular style={{ fontSize: "40px", opacity: 0.3 }} />
-                        <span style={{ fontWeight: 700, color: "#0f172a", fontSize: "15px" }}>No active migration run</span>
-                        <span style={{ color: "#64748b", fontSize: "14px" }}>Start a migration from the Migration tab to monitor agent logs here.</span>
+                        <Cpu size={40} style={{ opacity: 0.3 }} />
+                        <span style={{ fontWeight: 700, color: "var(--text)", fontSize: "15px" }}>No active migration run</span>
+                        <span style={{ color: "var(--text-muted)", fontSize: "14px" }}>Start a migration from the Migration tab to monitor agent logs here.</span>
                     </div>
                 );
             }
@@ -1866,9 +1848,9 @@ export function MonitoringTab() {
             if (containers.length === 0) {
                 return (
                     <div className="vl-empty-state" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-                        <DeveloperBoard24Regular style={{ fontSize: "40px", opacity: 0.3 }} />
-                        <span style={{ fontWeight: 700, color: "#0f172a", fontSize: "15px" }}>No active workbooks processing</span>
-                        <span style={{ color: "#64748b", fontSize: "14px" }}>All active runs have finished processing workbooks.</span>
+                        <Cpu size={40} style={{ opacity: 0.3 }} />
+                        <span style={{ fontWeight: 700, color: "var(--text)", fontSize: "15px" }}>No active workbooks processing</span>
+                        <span style={{ color: "var(--text-muted)", fontSize: "14px" }}>All active runs have finished processing workbooks.</span>
                     </div>
                 );
             }
@@ -1883,18 +1865,18 @@ export function MonitoringTab() {
                             alignItems: "center",
                             gap: "10px",
                             padding: "10px 14px",
-                            backgroundColor: tokens.colorNeutralBackground2,
-                            border: `1px solid ${tokens.colorNeutralStroke2}`,
-                            borderLeft: `4px solid ${tokens.colorBrandStroke1}`,
+                            backgroundColor: "var(--surface-subtle)",
+                            border: "1px solid var(--border)",
+                            borderLeft: "4px solid var(--primary)",
                             borderRadius: "6px",
                             fontSize: "12px",
-                            color: tokens.colorNeutralForeground2,
+                            color: "var(--text-secondary)",
                             cursor: "pointer",
-                            boxShadow: tokens.shadow2,
+                            boxShadow: "var(--shadow-sm)",
                         }}
                         title="Click to refresh active runs"
                     >
-                        <Info16Regular style={{ color: tokens.colorBrandForeground1, flexShrink: 0 }} />
+                        <Info size={16} style={{ color: "var(--primary)", flexShrink: 0 }} />
                         <span style={{ lineHeight: "1.4" }}>
                             <strong>Click here</strong> or use the refresh button above to see the logs of the latest migration process.
                         </span>
@@ -1907,9 +1889,9 @@ export function MonitoringTab() {
         if (viewMode === "history" && !effectiveRunId) {
             return (
                 <div className="vl-empty-state" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-                    <Folder20Regular style={{ fontSize: "40px", opacity: 0.3 }} />
-                    <span style={{ fontWeight: 700, color: "#0f172a", fontSize: "15px" }}>Select a historical run</span>
-                    <span style={{ color: "#64748b", fontSize: "14px" }}>Choose a run from the sidebar to view its workbooks and projects.</span>
+                    <Folder size={40} style={{ opacity: 0.3 }} />
+                    <span style={{ fontWeight: 700, color: "var(--text)", fontSize: "15px" }}>Select a historical run</span>
+                    <span style={{ color: "var(--text-muted)", fontSize: "14px" }}>Choose a run from the sidebar to view its workbooks and projects.</span>
                 </div>
             );
         }
@@ -1917,8 +1899,8 @@ export function MonitoringTab() {
         if (displayWorkbooks.length === 0) {
             return (
                 <div className="vl-empty-state" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-                    <BookOpen20Regular style={{ fontSize: "36px", opacity: 0.35 }} />
-                    <span style={{ color: "#64748b", fontSize: "14px" }}>No workbooks found for the selected run.</span>
+                    <BookOpen size={36} style={{ opacity: 0.35 }} />
+                    <span style={{ color: "var(--text-muted)", fontSize: "14px" }}>No workbooks found for the selected run.</span>
                 </div>
             );
         }
@@ -1926,9 +1908,12 @@ export function MonitoringTab() {
         return (
             <div className={styles.sectionCard} style={{ display: "flex", flexDirection: "column", padding: 0 }}>
                 {viewMode === "history" && (
-                    <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: "10px", borderBottom: "1px solid #e2e8f0", backgroundColor: "#f8fafc", flexShrink: 0 }}>
-                        <Button appearance="subtle" icon={<ChevronLeft20Regular />} onClick={() => setHistoryLevel("runs")}>Back to Runs</Button>
-                        <span style={{ fontWeight: 600, fontSize: "16px", color: "#0f172a" }}>Historical Run Details</span>
+                    <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: "10px", borderBottom: "1px solid var(--border)", backgroundColor: "var(--surface-subtle)", flexShrink: 0 }}>
+                        <Button variant="ghost" onClick={() => setHistoryLevel("runs")}>
+                            <ChevronLeft size={20} />
+                            Back to Runs
+                        </Button>
+                        <span style={{ fontWeight: 600, fontSize: "16px", color: "var(--text)" }}>Historical Run Details</span>
                     </div>
                 )}
                 <div className={styles.tableContainer} style={{ border: "none", borderRadius: viewMode === "history" ? "0 0 8px 8px" : undefined }}>
@@ -1947,20 +1932,19 @@ export function MonitoringTab() {
                                 const wbStatus = getComputedStatus(app, effectiveRunId);
 
                                 return (
-                                    <tr key={app.workbookId} style={{ cursor: "pointer", borderBottom: "1px solid #e2e8f0", transition: "background 0.15s" }} onClick={() => goToLogs(app.workbookId, app.workbookName || app.workbookId)}>
+                                    <tr key={app.workbookId} style={{ cursor: "pointer", borderBottom: "1px solid var(--border)", transition: "background 0.15s" }} onClick={() => goToLogs(app.workbookId, app.workbookName || app.workbookId)}>
                                         <td style={{ padding: "14px 16px" }}>
                                             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                                                 {getStatusIcon(wbStatus)}
                                                 <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                                                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                                        <span style={{ fontWeight: 600, wordBreak: "break-all", overflowWrap: "break-word", display: "inline-block", color: "#2563eb", fontSize: "14px" }}>
+                                                        <span style={{ fontWeight: 600, wordBreak: "break-all", overflowWrap: "break-word", display: "inline-block", color: "var(--primary)", fontSize: "14px" }}>
                                                             {app.workbookName || app.workbookId || "Unknown Workbook"}
                                                         </span>
                                                         {(app as any).workbookId === "Unknown" && (app as any)._raw && (
                                                             <Button
-                                                                size="small"
-                                                                appearance="subtle"
-                                                                icon={<Info16Regular />}
+                                                                size="sm"
+                                                                variant="ghost"
                                                                 style={{ padding: 0, height: "20px", minWidth: "20px" }}
                                                                 title="View raw data from Cosmo"
                                                                 onClick={(e) => {
@@ -1968,11 +1952,13 @@ export function MonitoringTab() {
                                                                     alert("Cosmo Data (Raw Payload):\n\n" + JSON.stringify((app as any)._raw, null, 2).slice(0, 1000) + "...");
                                                                     console.log("Full COSMO Data:", (app as any)._raw);
                                                                 }}
-                                                            />
+                                                            >
+                                                                <Info size={16} />
+                                                            </Button>
                                                         )}
                                                     </div>
                                                     {(app as any).timestamp && (
-                                                        <span style={{ fontSize: "12px", color: "#94a3b8" }}>
+                                                        <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                                                             {formatTime((app as any).timestamp, true)}
                                                         </span>
                                                     )}
@@ -1980,7 +1966,7 @@ export function MonitoringTab() {
                                             </div>
                                         </td>
                                         <td style={{ padding: "14px 16px" }}>
-                                            <span style={{ fontWeight: 600, color: "#0f172a", fontSize: "14px" }}>
+                                            <span style={{ fontWeight: 600, color: "var(--text)", fontSize: "14px" }}>
                                                 {app.projectName || app.projectId || "—"}
                                             </span>
                                         </td>
@@ -2001,11 +1987,10 @@ export function MonitoringTab() {
                                         </td>
                                         <td style={{ padding: "14px 16px", textAlign: "center", width: "120px" }}>
                                             <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-                                                <Button size="small" onClick={(e) => { e.stopPropagation(); goToLogs(app.workbookId, app.workbookName || app.workbookId); }}>Details</Button>
+                                                <Button size="sm" onClick={(e) => { e.stopPropagation(); goToLogs(app.workbookId, app.workbookName || app.workbookId); }}>Details</Button>
                                                 {(wbStatus === "completed" || wbStatus === "failed") && (
                                                     <Button
-                                                        size="small"
-                                                        icon={<ArrowClockwise20Regular />}
+                                                        size="sm"
                                                         onClick={async (e) => {
                                                             e.stopPropagation();
                                                             const projectId = app.projectId || selectedProject || "";
@@ -2016,7 +2001,9 @@ export function MonitoringTab() {
                                                             }
                                                         }}
                                                         title="Re-run Validation"
-                                                    />
+                                                    >
+                                                        <RefreshCw size={16} />
+                                                    </Button>
                                                 )}
                                             </div>
                                         </td>
@@ -2032,83 +2019,80 @@ export function MonitoringTab() {
 
     const renderLogsView = () => (
         <div ref={logsRef} className="vl-section-card" style={{ display: "flex", flexDirection: "column", padding: 0, overflow: "hidden", height: viewMode === "history" ? "80vh" : "auto", minHeight: "600px" }}>
-            <div style={{ flexShrink: 0, padding: "16px 20px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: "#f8fafc" }}>
+            <div style={{ flexShrink: 0, padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: "var(--surface-subtle)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     {viewMode === "active" && (
-                        <Button appearance="subtle" icon={<ChevronLeft20Regular />} onClick={goToWorkbooks}>
+                        <Button variant="ghost" onClick={goToWorkbooks}>
+                            <ChevronLeft size={20} />
                             Back
                         </Button>
                     )}
-                    <span style={{ fontWeight: 700, fontSize: "16px", color: "#0f172a" }}>Execution Logs</span>
+                    <span style={{ fontWeight: 700, fontSize: "16px", color: "var(--text)" }}>Execution Logs</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     {!isLoadingLogs && (
                         <div style={{ display: "flex", gap: "8px" }}>
-                            <Badge appearance="tint" color={currentLogs.length > 0 ? "success" : "informative"}>
+                            <Badge variant={currentLogs.length > 0 ? "success" : "secondary"}>
                                 {currentLogs.length} total events
                             </Badge>
                             {selectedAgentTab !== "All" && (
-                                <Badge appearance="filled" color="brand">
+                                <Badge variant="default">
                                     {filteredLogs.length} {selectedAgentTab.replace(/Agent/gi, "").trim()}
                                 </Badge>
                             )}
                         </div>
                     )}
-                    <Button appearance="subtle" size="small" icon={<ArrowClockwise20Regular />} onClick={handleRefresh} disabled={isLoadingLogs}>
+                    <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={isLoadingLogs}>
+                        <RefreshCw size={20} />
                         Refresh Logs
                     </Button>
                 </div>
             </div>
 
-            <div style={{ flexShrink: 0, padding: "0 20px", borderBottom: "1px solid #e2e8f0", backgroundColor: "#f8fafc", overflowX: "auto", scrollbarWidth: "none" }}>
+            <div style={{ flexShrink: 0, padding: "0 20px", borderBottom: "1px solid var(--border)", backgroundColor: "var(--surface-subtle)", overflowX: "auto", scrollbarWidth: "none" }}>
                 <style>{`
                     .vl-monitoring-tabs::-webkit-scrollbar {
                         display: none;
                     }
                 `}</style>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <TabList className="vl-monitoring-tabs" selectedValue={selectedAgentTab} onTabSelect={(_, data) => setSelectedAgentTab(data.value as string)} style={{ minWidth: "max-content", borderBottom: "none" }}>
-                        {LOG_TABS.filter(tab => dataLayerEnabled ? true : tab.value !== "DataLayerAgent").map(tab => (
-                            <Tab key={tab.value} value={tab.value}>
-                                {tab.label}
-                            </Tab>
-                        ))}
-                    </TabList>
+                    <Tabs value={selectedAgentTab} onValueChange={setSelectedAgentTab}>
+                        <TabsList className="vl-monitoring-tabs" style={{ minWidth: "max-content", border: "none" }}>
+                            {LOG_TABS.filter(tab => dataLayerEnabled ? true : tab.value !== "DataLayerAgent").map(tab => (
+                                <TabsTrigger key={tab.value} value={tab.value}>
+                                    {tab.label}
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+                    </Tabs>
                     <div style={{ display: "flex", gap: "8px", alignItems: "center", paddingRight: "4px", paddingBottom: "4px", paddingTop: "4px" }}>
-                        <Dropdown 
-                            value={statusFilter === "All" ? "All Statuses" : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
-                            selectedOptions={[statusFilter]}
-                            onOptionSelect={(_, data) => {
-                                if (data.optionValue) {
-                                    setStatusFilter(data.optionValue);
-                                }
-                            }}
+                        <Select
+                            value={statusFilter}
+                            onValueChange={(value: string) => setStatusFilter(value)}
                             style={{ minWidth: "150px" }}
                         >
-                            <Option value="All">All</Option>
-                            <Option value="success">Success</Option>
-                            <Option value="error">Error</Option>
-                            <Option value="warning">Warning</Option>
-                            <Option value="info">Info</Option>
-                        </Dropdown>
+                            <SelectItem value="All">All</SelectItem>
+                            <SelectItem value="success">Success</SelectItem>
+                            <SelectItem value="error">Error</SelectItem>
+                            <SelectItem value="warning">Warning</SelectItem>
+                            <SelectItem value="info">Info</SelectItem>
+                        </Select>
                     </div>
                 </div>
             </div>
 
-            <div className="scroll-container" style={{ flexGrow: 1, minHeight: "400px", maxHeight: "600px", backgroundColor: "#ffffff" }}>
+            <div className="scroll-container" style={{ flexGrow: 1, minHeight: "400px", maxHeight: "600px", backgroundColor: "var(--surface)" }}>
                 {logsError && (
                     <div style={{ padding: "20px" }}>
-                        <MessageBar intent="error">
-                            <MessageBarBody>
-                                <MessageBarTitle>Failed to load logs</MessageBarTitle>
-                                {logsError}
-                            </MessageBarBody>
-                        </MessageBar>
+                        <Alert variant="destructive">
+                            <AlertTitle>Failed to load logs</AlertTitle>
+                            <AlertDescription>{logsError}</AlertDescription>
+                        </Alert>
                     </div>
                 )}
 
                 {isLoadingLogs && (
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: "200px", gap: "12px", flexDirection: "column", color: "#64748b", fontSize: "14px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: "200px", gap: "12px", flexDirection: "column", color: "var(--text-muted)", fontSize: "14px" }}>
                         <Spinner size="large" />
                         <span>Fetching execution logs...</span>
                     </div>
@@ -2116,8 +2100,8 @@ export function MonitoringTab() {
 
                 {!isLoadingLogs && !logsError && filteredLogs.length === 0 && (
                     <div className="vl-empty-state" style={{ margin: "40px", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-                        <DeveloperBoard24Regular style={{ fontSize: "40px", opacity: 0.3 }} />
-                        <span style={{ color: "#64748b", fontSize: "14px" }}>{currentLogs.length === 0 ? "No logs found." : `No logs found for ${selectedAgentTab}.`}</span>
+                        <Cpu size={40} style={{ opacity: 0.3 }} />
+                        <span style={{ color: "var(--text-muted)", fontSize: "14px" }}>{currentLogs.length === 0 ? "No logs found." : `No logs found for ${selectedAgentTab}.`}</span>
                     </div>
                 )}
 
@@ -2135,19 +2119,19 @@ export function MonitoringTab() {
                             </thead>
                             <tbody>
                                 {filteredLogs.map((log, idx) => (
-                                    <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                                        <td style={{ padding: "14px 16px", fontFamily: "'Cascadia Code','Fira Code',Consolas,monospace", whiteSpace: "pre-wrap", fontSize: "12px", color: "#64748b" }}>
+                                    <tr key={idx} style={{ borderBottom: "1px solid var(--border)" }}>
+                                        <td style={{ padding: "14px 16px", fontFamily: "'Cascadia Code','Fira Code',Consolas,monospace", whiteSpace: "pre-wrap", fontSize: "12px", color: "var(--text-muted)" }}>
                                             {formatTimestampFunc(log.timestamp || log.time)}
                                         </td>
                                         <td style={{ padding: "14px 16px" }}>
                                             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                                                 {getLogStatusIcon(log.status ?? "info")}
-                                                <Badge appearance="tint" color={getLogBadgeColor(log.status ?? "info")} size="small">
+                                                <Badge variant={getLogBadgeColor(log.status ?? "info")}>
                                                     {(log.status ?? "INFO").toUpperCase()}
                                                 </Badge>
                                             </div>
                                         </td>
-                                        <td style={{ padding: "14px 16px", fontFamily: "monospace", fontSize: "12px", color: tokens.colorBrandForeground1, fontWeight: 600 }}>
+                                        <td style={{ padding: "14px 16px", fontFamily: "monospace", fontSize: "12px", color: "var(--primary)", fontWeight: 600 }}>
                                             {(() => {
                                                 const currentTs = log.timestamp || log.time;
                                                 if (!runStartTime || !currentTs) return "0s";
@@ -2160,7 +2144,6 @@ export function MonitoringTab() {
                                         </td>
                                         <td style={{ padding: "14px 16px" }}>
                                             <Badge
-                                                appearance="filled"
                                                 style={{
                                                     fontSize: "11px",
                                                     fontWeight: 600,
@@ -2192,7 +2175,7 @@ export function MonitoringTab() {
                                                     .trim()}
                                             </Badge>
                                         </td>
-                                        <td style={{ padding: "14px 16px", color: "#0f172a", fontSize: "13px", lineHeight: "1.5", wordBreak: "break-word", overflowWrap: "anywhere" }}>
+                                        <td style={{ padding: "14px 16px", color: "var(--text)", fontSize: "13px", lineHeight: "1.5", wordBreak: "break-word", overflowWrap: "anywhere" }}>
                                             {log.message || log.msg || JSON.stringify(log._raw)}
                                         </td>
                                     </tr>
@@ -2210,7 +2193,7 @@ export function MonitoringTab() {
             <div className="vl-header">
                 <div>
                     <h1 className="vl-title" style={{ display: "flex", alignItems: "center", gap: "12px", margin: 0 }}>
-                        <DeveloperBoard24Regular style={{ fontSize: "28px", color: "#2563eb" }} />
+                        <Cpu size={28} style={{ color: "var(--primary)" }} />
                         Monitoring Details
                     </h1>
                     <p className="vl-subtitle" style={{ display: "block", marginTop: "8px" }}>
@@ -2219,40 +2202,42 @@ export function MonitoringTab() {
                 </div>
 
                 {level === "logs" && (
-                    <Breadcrumb>
-                        <BreadcrumbItem><BreadcrumbButton onClick={goToWorkbooks}>Workbooks</BreadcrumbButton></BreadcrumbItem>
-                        <BreadcrumbDivider />
-                        <BreadcrumbItem><BreadcrumbButton current>{selectedWorkbookName}</BreadcrumbButton></BreadcrumbItem>
-                    </Breadcrumb>
+                    <nav aria-label="Breadcrumb" style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "var(--text-sm)" }}>
+                        <button type="button" onClick={goToWorkbooks} style={{ background: "none", border: "none", padding: 0, color: "var(--primary)", cursor: "pointer", fontSize: "inherit" }}>
+                            Workbooks
+                        </button>
+                        <span style={{ color: "var(--text-muted)" }}>/</span>
+                        <span style={{ color: "var(--text)", fontWeight: 600 }}>{selectedWorkbookName}</span>
+                    </nav>
                 )}
 
                 {stats.totalWorkbooks > 0 && (
                     <div className="vl-metrics-grid">
-                        <Card className="vl-metric-card">
+                        <div className="vl-metric-card">
                             <span className="vl-metric-value">{stats.totalRuns}</span>
                             <span className="vl-metric-label">TOTAL RUNS</span>
-                        </Card>
-                        <Card className="vl-metric-card">
+                        </div>
+                        <div className="vl-metric-card">
                             <span className="vl-metric-value">{stats.totalWorkbooks}</span>
                             <span className="vl-metric-label">TOTAL WORKBOOKS</span>
-                        </Card>
-                        <Card className="vl-metric-card">
+                        </div>
+                        <div className="vl-metric-card">
                             <span className="vl-metric-value">{stats.completed}</span>
                             <span className="vl-metric-label">COMPLETED</span>
-                        </Card>
-                        <Card className="vl-metric-card">
+                        </div>
+                        <div className="vl-metric-card">
                             <span className="vl-metric-value">{stats.failed}</span>
                             <span className="vl-metric-label">FAILED</span>
-                        </Card>
-                        <Card className="vl-metric-card">
+                        </div>
+                        <div className="vl-metric-card">
                             <span className="vl-metric-value">{stats.inProgress}</span>
                             <span className="vl-metric-label">IN PROGRESS</span>
-                        </Card>
+                        </div>
                         {stats.pending > 0 && (
-                            <Card className="vl-metric-card">
+                            <div className="vl-metric-card">
                                 <span className="vl-metric-value">{stats.pending}</span>
                                 <span className="vl-metric-label">PENDING</span>
-                            </Card>
+                            </div>
                         )}
                     </div>
                 )}
@@ -2260,13 +2245,12 @@ export function MonitoringTab() {
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                 <div style={{ display: "flex", gap: "12px" }}>
-                    <Button appearance={viewMode === "active" ? "primary" : "outline"} onClick={() => { setViewMode("active"); setLevel("workbooks"); }}>Active Run</Button>
-                    <Button appearance={viewMode === "history" ? "primary" : "outline"} onClick={() => { setViewMode("history"); setHistoryLevel("runs"); setLevel("workbooks"); setHistoricalRunsPage(1); }}>History</Button>
+                    <Button variant={viewMode === "active" ? "default" : "outline"} onClick={() => { setViewMode("active"); setLevel("workbooks"); }}>Active Run</Button>
+                    <Button variant={viewMode === "history" ? "default" : "outline"} onClick={() => { setViewMode("history"); setHistoryLevel("runs"); setLevel("workbooks"); setHistoricalRunsPage(1); }}>History</Button>
                 </div>
                 {viewMode === "active" && (
                     <Button
-                        appearance="subtle"
-                        icon={<ArrowClockwise20Regular />}
+                        variant="ghost"
                         onClick={() => {
                             if (user?.email) {
                                 fetchActiveRuns(user.email);
@@ -2275,6 +2259,7 @@ export function MonitoringTab() {
                         disabled={loadingActiveRuns}
                         title="Refresh Active Runs"
                     >
+                        <RefreshCw size={20} />
                         Refresh
                     </Button>
                 )}
@@ -2295,84 +2280,73 @@ export function MonitoringTab() {
             </div>
 
             {viewMode === "history" && (
-                                                <Dialog open={isLogDialogOpen} onOpenChange={(_, data) => setIsLogDialogOpen(data.open)}>
-                                                    <DialogSurface style={{ minWidth: "80vw", maxWidth: "90vw", padding: 0, overflow: "hidden", borderRadius: "12px" }}>
-                                                        <DialogBody>
-                                                            <DialogContent style={{ padding: 0, overflow: 'hidden' }}>
-                                                                {isLogDialogOpen && renderLogsView()}
-                                                            </DialogContent>
-                                                        </DialogBody>
-                                                    </DialogSurface>
-                                                </Dialog>
-                                            )}
+                <Dialog open={isLogDialogOpen} onOpenChange={setIsLogDialogOpen}>
+                    <DialogContent className="monitoring-log-dialog">
+                        {isLogDialogOpen && renderLogsView()}
+                    </DialogContent>
+                </Dialog>
+            )}
 
-                                            {/* Custom Dialog: Confirm Stop Run */}
-                                            <Dialog open={confirmStopRunId !== null} onOpenChange={() => setConfirmStopRunId(null)}>
-                                                <DialogSurface style={{ maxWidth: "450px" }}>
-                                                    <DialogBody>
-                                                        <DialogTitle>Confirm Stop Run</DialogTitle>
-                                                        <DialogContent>
-                                                            Are you sure you want to stop active {confirmStopRunNo ? `Run #${confirmStopRunNo}` : `Run ${confirmStopRunId}`}?
-                                                        </DialogContent>
-                                                        <DialogActions>
-                                                            <Button appearance="secondary" onClick={() => setConfirmStopRunId(null)}>Cancel</Button>
-                                                            <Button
-                                                                appearance="primary"
-                                                                style={{ backgroundColor: "#ef4444", color: "#ffffff" }}
-                                                                onClick={async () => {
-                                                                    const runIdToStop = confirmStopRunId!;
-                                                                    const runNoToStop = confirmStopRunNo;
-                                                                    setConfirmStopRunId(null);
-                                                                    setConfirmStopRunNo(null);
-                                                                    try {
-                                                                        await useMonitoringStore.getState().stopRun(runIdToStop);
-                                                                        setShowStopSuccessMessage(`processing stopped for this run`);
-                                                                    } catch (err: any) {
-                                                                        setAlertMessage({
-                                                                            title: "Failed to Stop Run",
-                                                                            message: err.message || String(err)
-                                                                        });
-                                                                    }
-                                                                }}
-                                                            >
-                                                                Stop Run
-                                                            </Button>
-                                                        </DialogActions>
-                                                    </DialogBody>
-                                                </DialogSurface>
-                                            </Dialog>
-
-                                            {/* Custom Dialog: Stop Success Message */}
-                                            <Dialog open={showStopSuccessMessage !== null} onOpenChange={() => setShowStopSuccessMessage(null)}>
-                                                <DialogSurface style={{ maxWidth: "400px" }}>
-                                                    <DialogBody>
-                                                        <DialogContent style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", paddingTop: "20px" }}>
-                                                            <CheckmarkCircle20Regular style={{ fontSize: "48px", color: tokens.colorPaletteGreenForeground1 }} />
-                                                            <span style={{ fontSize: "16px", fontWeight: 600, color: tokens.colorNeutralForeground1, textAlign: "center" }}>
-                                                                {showStopSuccessMessage}
-                                                            </span>
-                                                        </DialogContent>
-                                                        <DialogActions style={{ justifyContent: "center", paddingBottom: "12px" }}>
-                                                            <Button appearance="primary" onClick={() => setShowStopSuccessMessage(null)}>OK</Button>
-                                                        </DialogActions>
-                                                    </DialogBody>
-                                                </DialogSurface>
-                                            </Dialog>
-
-                                            {/* Custom Dialog: Alert Message */}
-                                            <Dialog open={alertMessage !== null} onOpenChange={() => setAlertMessage(null)}>
-                                                <DialogSurface style={{ maxWidth: "450px" }}>
-                                                    <DialogBody>
-                                                        <DialogTitle>{alertMessage?.title}</DialogTitle>
-                                                        <DialogContent>
-                                                            {alertMessage?.message}
-                                                        </DialogContent>
-                                                        <DialogActions>
-                                                            <Button appearance="primary" onClick={() => setAlertMessage(null)}>OK</Button>
-                                                        </DialogActions>
-                                                    </DialogBody>
-                                                </DialogSurface>
-                                            </Dialog>
-                                        </div>
-                                    );
+            {/* Custom Dialog: Confirm Stop Run */}
+            <Dialog open={confirmStopRunId !== null} onOpenChange={() => setConfirmStopRunId(null)}>
+                <DialogContent style={{ maxWidth: "450px" }}>
+                    <DialogTitle>Confirm Stop Run</DialogTitle>
+                    <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+                        Are you sure you want to stop active {confirmStopRunNo ? `Run #${confirmStopRunNo}` : `Run ${confirmStopRunId}`}?
+                    </p>
+                    <DialogFooter>
+                        <Button variant="secondary" onClick={() => setConfirmStopRunId(null)}>Cancel</Button>
+                        <Button
+                            style={{ backgroundColor: "var(--danger)", color: "var(--text-on-primary)", borderColor: "var(--danger)" }}
+                            onClick={async () => {
+                                const runIdToStop = confirmStopRunId!;
+                                const runNoToStop = confirmStopRunNo;
+                                setConfirmStopRunId(null);
+                                setConfirmStopRunNo(null);
+                                try {
+                                    await useMonitoringStore.getState().stopRun(runIdToStop);
+                                    setShowStopSuccessMessage(`processing stopped for this run`);
+                                } catch (err: any) {
+                                    setAlertMessage({
+                                        title: "Failed to Stop Run",
+                                        message: err.message || String(err)
+                                    });
                                 }
+                            }}
+                        >
+                            Stop Run
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Custom Dialog: Stop Success Message */}
+            <Dialog open={showStopSuccessMessage !== null} onOpenChange={() => setShowStopSuccessMessage(null)}>
+                <DialogContent style={{ maxWidth: "400px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", paddingTop: "20px" }}>
+                        <CheckCircle2 size={48} style={{ color: "var(--success)" }} />
+                        <span style={{ fontSize: "16px", fontWeight: 600, color: "var(--text)", textAlign: "center" }}>
+                            {showStopSuccessMessage}
+                        </span>
+                    </div>
+                    <DialogFooter style={{ justifyContent: "center", paddingBottom: "12px" }}>
+                        <Button onClick={() => setShowStopSuccessMessage(null)}>OK</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Custom Dialog: Alert Message */}
+            <Dialog open={alertMessage !== null} onOpenChange={() => setAlertMessage(null)}>
+                <DialogContent style={{ maxWidth: "450px" }}>
+                    <DialogTitle>{alertMessage?.title}</DialogTitle>
+                    <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+                        {alertMessage?.message}
+                    </p>
+                    <DialogFooter>
+                        <Button onClick={() => setAlertMessage(null)}>OK</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+}

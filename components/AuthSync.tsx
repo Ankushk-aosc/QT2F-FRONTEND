@@ -5,39 +5,41 @@ import { useEffect } from "react"
 import { useMsal } from "@azure/msal-react"
 import { useAuthStore } from "@/stores/auth.store"
 
+/**
+ * Projects the active MSAL account into `auth.store`.
+ *
+ * This is the only writer of the auth store, which is what keeps MSAL the
+ * single source of identity. Mounted once, in the protected layout.
+ */
 export function AuthSync() {
   const { accounts } = useMsal()
 
   useEffect(() => {
     const account = accounts[0]
+    const { isAuthenticated, user, login, logout } = useAuthStore.getState()
 
+    // No account — the session ended (sign-out, expiry, or another tab).
+    // Clearing here stops a stale user lingering in the UI after MSAL has
+    // already dropped the session.
     if (!account) {
-      // Optional: clear store when no account is active
-      // useAuthStore.getState().logout()
+      if (isAuthenticated) logout()
       return
     }
 
-    // Try different places where email might be stored
-    let email =
+    const email = (
       (account.idTokenClaims?.email as string | undefined) ||
       (account.idTokenClaims?.preferred_username as string | undefined) ||
       account.username ||
       ""
-
-    email = typeof email === 'string' ? email.trim() : "";
+    ).trim()
 
     if (!email) {
-      console.warn("[AuthSync] No email found in MSAL account", account)
+      console.warn("[AuthSync] MSAL account carries no email claim")
       return
     }
 
-    const current = useAuthStore.getState()
-
-    // Avoid unnecessary updates
-    if (!current.isAuthenticated || current.user?.email !== email) {
-      console.log("[AuthSync] Syncing user from MSAL →", email)
-
-      current.login(email, account.name || undefined)
+    if (!isAuthenticated || user?.email !== email) {
+      login(email, account.name || undefined)
     }
   }, [accounts])
 

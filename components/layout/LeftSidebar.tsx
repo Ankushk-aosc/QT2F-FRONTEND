@@ -1,28 +1,22 @@
 "use client"
 import React, { useState, useEffect, useMemo, useRef } from "react"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
+import { Tooltip } from "@/components/ui/tooltip"
 import {
-  Text,
-  Badge,
-  makeStyles,
-  Button,
-  tokens,
-  mergeClasses,
-  Spinner,
-  Tooltip,
-} from "@fluentui/react-components"
-import {
-  Dismiss24Regular,
-  List20Regular,
-  Play24Regular,
-  CheckmarkCircle24Regular,
-  ErrorCircle24Regular,
-  Clock24Regular,
-  Sparkle20Regular,
-  ChevronDown20Regular,
-  ChevronRight20Regular,
-  PanelLeftContract24Regular,
-  PanelLeftExpand24Regular,
-} from "@fluentui/react-icons"
+  X,
+  List,
+  Play,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Sparkles,
+  ChevronDown,
+  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from "lucide-react"
 
 import { useUIStore } from "@/stores/ui.store"
 import { useQlikStore } from "@/stores/qlikStore"
@@ -37,184 +31,37 @@ import { useMonitoringStore } from "@/stores/monitoring.store"
 import { matchesAgent } from "@/lib/agentNames"
 import { isLiteMode } from "@/lib/config"
 
-const useStyles = makeStyles({
-  sidebar: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: tokens.colorNeutralBackground1,
-    padding: "16px 12px 24px 12px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-    overflowY: "auto",
-    position: "relative",
-    boxSizing: "border-box",
-    borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
-    boxShadow: tokens.shadow16, // Add strong shadow for mobile visibility
-    transition: "padding 0.3s ease-in-out",
-  },
-  sidebarCollapsed: {
-    padding: "16px 8px",
-    alignItems: "center",
-  },
-  sidebarToggleButton: {
-    marginLeft: "auto",
-  },
-  header: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    fontSize: "16px",
-    fontWeight: 600,
-    color: tokens.colorNeutralForeground1,
-    cursor: "pointer",
-    userSelect: "none",
-  },
-  summaryContent: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-    padding: "0 0 12px 4px",
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-  },
-  statusRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    fontSize: "14px",
-    color: tokens.colorNeutralForeground2,
-  },
-  statusLabel: {
-    flex: 1,
-  },
-  statusValue: {
-    fontWeight: 600,
-    minWidth: "32px",
-    textAlign: "right",
-    color: tokens.colorNeutralForeground1,
-  },
-  introContainer: {
-    fontSize: "13.5px",
-    lineHeight: "1.55",
-    color: tokens.colorNeutralForeground2,
-    minHeight: "80px",
-    padding: "8px 0",
-  },
-  introText: {
-    whiteSpace: "pre-wrap",
-  },
-  appSectionTitle: {
-    fontSize: "13px",
-    fontWeight: 600,
-    color: tokens.colorNeutralForeground3,
-    textTransform: "uppercase",
-    letterSpacing: "0.4px",
-    marginTop: "8px",
-  },
-  appCard: {
-    padding: "12px",
-    backgroundColor: tokens.colorNeutralBackground1,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusMedium,
-  },
-  appHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: "8px",
-    marginBottom: "6px",
-    flexWrap: "wrap",
-  },
-  appName: {
-    fontSize: "14px",
-    fontWeight: 600,
-    flex: 1,
-    wordBreak: "break-word",
-    whiteSpace: "normal",
-    lineHeight: "1.4",
-  },
-  levelHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "10px 12px",
-    borderRadius: tokens.borderRadiusMedium,
-    cursor: "pointer",
-    userSelect: "none",
-    transitionProperty: "background-color, box-shadow",
-    transitionDuration: tokens.durationNormal,
-  },
-  levelHeaderSite: {
-    backgroundColor: "#eaf4ff",
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    fontSize: "15px",
-    fontWeight: 600,
-  },
-  levelHeaderProject: {
-    backgroundColor: "#f5faff",
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    fontSize: "14px",
-    fontWeight: 600,
-  },
-  levelHeaderProjectPromoted: {
-    backgroundColor: "#eaf4ff",
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    fontSize: "15px",
-    fontWeight: 600,
-  },
-  levelHeaderHover: {
-    ":hover": {
-      backgroundColor: tokens.colorSubtleBackgroundHover,
-      boxShadow: tokens.shadow2,
-    },
-  },
-  countText: {
-    fontSize: "13px",
-    fontWeight: 400,
-    color: tokens.colorNeutralForeground2,
-  },
-  workbookActions: {
-    marginTop: "8px",
-    marginLeft: "12px",
-    padding: "10px",
-    backgroundColor: tokens.colorNeutralBackground2,
-    borderRadius: tokens.borderRadiusMedium,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    fontSize: "12.5px",
-  },
-  actionsHeader: {
-    fontWeight: 600,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    cursor: "pointer",
-    userSelect: "none",
-  },
-  waitingContainer: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "8px 0",
-    color: tokens.colorNeutralForeground3,
-    fontStyle: "italic",
-  },
-  workbookHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    cursor: "pointer",
-    flex: 1,
-  },
-  activityItem: {
-    padding: "6px 10px",
-    backgroundColor: tokens.colorNeutralBackground3,
-    borderRadius: tokens.borderRadiusSmall,
-    marginTop: "4px",
-    borderLeft: `4px solid ${tokens.colorBrandForeground1}`,
-    wordBreak: "break-word",
-    overflowWrap: "anywhere",
-  },
-})
+function cx(...parts: Array<string | undefined | false>) {
+  return parts.filter(Boolean).join(" ")
+}
+
+const styles = {
+  sidebar: "ls-sidebar",
+  sidebarCollapsed: "ls-sidebar-collapsed",
+  sidebarToggleButton: "ls-sidebar-toggle-button",
+  header: "ls-header",
+  summaryContent: "ls-summary-content",
+  statusRow: "ls-status-row",
+  statusLabel: "ls-status-label",
+  statusValue: "ls-status-value",
+  introContainer: "ls-intro-container",
+  introText: "ls-intro-text",
+  appSectionTitle: "ls-app-section-title",
+  appCard: "ls-app-card",
+  appHeader: "ls-app-header",
+  appName: "ls-app-name",
+  levelHeader: "ls-level-header",
+  levelHeaderSite: "ls-level-header-site",
+  levelHeaderProject: "ls-level-header-project",
+  levelHeaderProjectPromoted: "ls-level-header-project-promoted",
+  levelHeaderHover: "ls-level-header-hover",
+  countText: "ls-count-text",
+  workbookActions: "ls-workbook-actions",
+  actionsHeader: "ls-actions-header",
+  waitingContainer: "ls-waiting-container",
+  workbookHeader: "ls-workbook-header",
+  activityItem: "ls-activity-item",
+}
 
 interface Application {
   id: string
@@ -245,7 +92,7 @@ interface LeftSidebarProps {
   onClose?: () => void
 }
 
-const getStatusColor = (status: string | undefined) => {
+const getStatusColor = (status: string | undefined): "warning" | "success" | "destructive" | "secondary" => {
   const s = status?.toLowerCase() || ""
   if (s === "running" || s.includes("processing")) {
     return "warning"
@@ -263,9 +110,9 @@ const getStatusColor = (status: string | undefined) => {
     return "success"
   }
   if (s === "failed" || s.includes("validation failed")) {
-    return "danger"
+    return "destructive"
   }
-  return "subtle"
+  return "secondary"
 }
 
 const checkAssessmentExists = (app: Application, runId: string | null | undefined, activities: any) => {
@@ -342,7 +189,7 @@ const getDisplayedStatus = (
   ) {
     return "Processing..."
   }
-  
+
   if (app.final_status?.toLowerCase().includes("completed") || app.status?.toLowerCase().includes("completed")) {
     return "Completed"
   }
@@ -400,7 +247,6 @@ function AgentActionsBlock({
   isCompleted?: boolean
   isFailed?: boolean
 }) {
-  const styles = useStyles()
   const { getActivitiesForWorkbook, datalayerActivitiesDone, assessmentActivitiesDone, parsingActivitiesDone, mappingActivitiesDone, generationActivitiesDone, validationActivitiesDone } = useAgentStore()
 
   const stoppedRunIds = useMonitoringStore(s => s.stoppedRunIds) || []
@@ -469,13 +315,13 @@ function AgentActionsBlock({
     <div className={styles.workbookActions}>
       <div className={styles.actionsHeader} onClick={() => setIsOpen(!isOpen)}>
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <Sparkle20Regular fontSize={14} primaryFill={iconColor || tokens.colorBrandForeground1} />
-          <span style={{ color: tokens.colorNeutralForeground1 }}>{title}</span>
+          <Sparkles size={14} color={iconColor || "var(--primary)"} />
+          <span style={{ color: "var(--text)" }}>{title}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          {isCompleted && <CheckmarkCircle24Regular fontSize={16} primaryFill={tokens.colorStatusSuccessForeground1} />}
-          {isFailed && <ErrorCircle24Regular fontSize={16} primaryFill={tokens.colorPaletteRedForeground1} />}
-          {isOpen ? <ChevronDown20Regular fontSize={14} /> : <ChevronRight20Regular fontSize={14} />}
+          {isCompleted && <CheckCircle2 size={16} color="var(--success)" />}
+          {isFailed && <XCircle size={16} color="var(--danger)" />}
+          {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </div>
       </div>
 
@@ -483,18 +329,18 @@ function AgentActionsBlock({
         <div style={{ marginTop: "10px" }}>
           {activities.length === 0 ? (
             isStageDone ? (
-              <div className={styles.waitingContainer} style={{ fontStyle: "normal", color: tokens.colorNeutralForeground2 }}>
-                <CheckmarkCircle24Regular fontSize={16} primaryFill={tokens.colorStatusSuccessForeground1} />
+              <div className={styles.waitingContainer} style={{ fontStyle: "normal", color: "var(--text-secondary)" }}>
+                <CheckCircle2 size={16} color="var(--success)" />
                 <span>{title.replace(" Agent", "")} completed.</span>
               </div>
             ) : isRunStopped ? (
-              <div className={styles.waitingContainer} style={{ fontStyle: "normal", color: tokens.colorPaletteRedForeground1 }}>
-                <Dismiss24Regular fontSize={16} />
+              <div className={styles.waitingContainer} style={{ fontStyle: "normal", color: "var(--danger)" }}>
+                <X size={16} />
                 <span>processing terminated</span>
               </div>
             ) : (
               <div className={styles.waitingContainer}>
-                <Clock24Regular fontSize={16} />
+                <Clock size={16} />
                 <span>Waiting for {title.toLowerCase()}...</span>
                 <Spinner size="tiny" />
               </div>
@@ -549,7 +395,6 @@ function WorkbookLevel({
   app: Application
   runId: string | null
 }) {
-  const styles = useStyles()
   const { activities, parsingTriggered, datalayerTriggered, mappingTriggered, generationTriggered, validationTriggered, shouldSkipDataLayer, assessmentData, currentRunId, manualValidationStarted } = useAgentStore()
   const { migrationPhase } = useDashboardStore()
   const { mode, hasContinued, dataLayerEnabled } = useUIStore()
@@ -675,8 +520,7 @@ function WorkbookLevel({
       >
         <div className={styles.workbookHeader}>
           <Badge
-            appearance="filled"
-            color={statusColor}
+            variant={statusColor}
             style={(displayedStatus === "Migration Completed" || displayedStatus === "Extraction Completed") ? { height: "auto", padding: "4px 8px", lineHeight: "1.2" } : undefined}
           >
             {(displayedStatus === "Migration Completed" || displayedStatus === "Extraction Completed") ? (
@@ -688,9 +532,9 @@ function WorkbookLevel({
               displayedStatus
             )}
           </Badge>
-          <Text className={styles.appName}>{app.workbookName}</Text>
+          <span className={styles.appName}>{app.workbookName}</span>
         </div>
-        {open ? <ChevronDown20Regular fontSize={16} /> : <ChevronRight20Regular fontSize={16} />}
+        {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
       </div>
 
       <div style={{ display: open ? "block" : "none" }}>
@@ -771,7 +615,6 @@ function ProjectLevel({
   isPromoted?: boolean
   runId: string | null
 }) {
-  const styles = useStyles()
   const [open, setOpen] = useState(true)
 
   const totalWorkbooks = project.workbooks.length
@@ -780,7 +623,7 @@ function ProjectLevel({
   return (
     <div>
       <div
-        className={mergeClasses(
+        className={cx(
           styles.levelHeader,
           isPromoted ? styles.levelHeaderProjectPromoted : styles.levelHeaderProject,
           styles.levelHeaderHover
@@ -788,10 +631,10 @@ function ProjectLevel({
         onClick={() => setOpen(!open)}
       >
         <span>{project.name || "Default Project"}</span>
-        <Text className={styles.countText}>
+        <span className={styles.countText}>
           {totalRunning} / {totalWorkbooks}
-        </Text>
-        {open ? <ChevronDown20Regular fontSize={16} /> : <ChevronRight20Regular fontSize={16} />}
+        </span>
+        {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
       </div>
 
       <div
@@ -817,7 +660,6 @@ function SiteLevel({
   site: SiteGroup
   runId: string | null
 }) {
-  const styles = useStyles()
   const [open, setOpen] = useState(true)
 
   const totalWorkbooks = site.projects.reduce((sum, p) => sum + p.workbooks.length, 0)
@@ -829,14 +671,14 @@ function SiteLevel({
   return (
     <div>
       <div
-        className={mergeClasses(styles.levelHeader, styles.levelHeaderSite, styles.levelHeaderHover)}
+        className={cx(styles.levelHeader, styles.levelHeaderSite, styles.levelHeaderHover)}
         onClick={() => setOpen(!open)}
       >
         <span>{site.name || "Default Site"}</span>
-        <Text className={styles.countText}>
+        <span className={styles.countText}>
           {totalRunning} / {totalWorkbooks}
-        </Text>
-        {open ? <ChevronDown20Regular fontSize={16} /> : <ChevronRight20Regular fontSize={16} />}
+        </span>
+        {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
       </div>
 
       <div
@@ -856,7 +698,6 @@ function SiteLevel({
 }
 
 function TableauSidebarContent({ onClose }: LeftSidebarProps) {
-  const styles = useStyles()
   const { setSidebarOpen, mode, hasContinued } = useUIStore()
   const {
     applications,
@@ -870,27 +711,8 @@ function TableauSidebarContent({ onClose }: LeftSidebarProps) {
 
 
   const runId = agentRunId || dashboardRunId
-  const [displayedIntro, setDisplayedIntro] = useState("")
-
   const introMessage =
     "This agent automatically fetches Tableau Projects & Workbooks and loads them into the system for further processing."
-
-  useEffect(() => {
-    setDisplayedIntro("")
-    let i = 0
-    const interval = setInterval(() => {
-      setDisplayedIntro((prev) => {
-        if (i < introMessage.length) {
-          i++
-          return introMessage.slice(0, i)
-        }
-        clearInterval(interval)
-        return prev
-      })
-    }, 35)
-
-    return () => clearInterval(interval)
-  }, [])
 
   const parsingData = useParsingStore(s => s.parsingData)
   const mappingData = useMappingStore(s => s.mappingData)
@@ -948,10 +770,10 @@ function TableauSidebarContent({ onClose }: LeftSidebarProps) {
     const success = activeRunStats ? Math.max((activeRunStats.total_generation_completed ?? activeRunStats.total_migrated) || 0, dynamicCounters.success) : dynamicCounters.success;
     const failed = activeRunStats ? Math.max(activeRunStats.total_failed || 0, dynamicCounters.failed) : dynamicCounters.failed;
     const cancelled = activeRunStats ? activeRunStats.total_cancelled || 0 : 0;
-    
+
     let running = total - success - failed - cancelled;
     if (running < 0) running = 0;
-    
+
     return {
       total, running, success, failed, cancelled
     };
@@ -1021,52 +843,51 @@ function TableauSidebarContent({ onClose }: LeftSidebarProps) {
   return (
     <>
       <div className={styles.header}>
-        <Sparkle20Regular fontSize={20} />
+        <Sparkles size={20} />
         <span>Migration Summary</span>
         <Tooltip content="Collapse" relationship="label">
           <Button
-            appearance="subtle"
-            icon={<PanelLeftContract24Regular />}
+            variant="ghost"
+            size="icon"
             onClick={() => setSidebarOpen(false)}
             aria-label="Collapse Sidebar"
             className={styles.sidebarToggleButton}
-          />
+          >
+            <PanelLeftClose size={20} />
+          </Button>
         </Tooltip>
       </div>
 
       <div className={styles.summaryContent}>
         <div className={styles.statusRow}>
-          <List20Regular fontSize={20} primaryFill={tokens.colorBrandForeground1} />
-          <Text className={styles.statusLabel}>Total Queue Size:</Text>
-          <Text className={styles.statusValue}>{stats.total}</Text>
+          <List size={20} color="var(--primary)" />
+          <span className={styles.statusLabel}>Total Queue Size:</span>
+          <span className={styles.statusValue}>{stats.total}</span>
         </div>
         <div className={styles.statusRow}>
-          <Play24Regular primaryFill={tokens.colorStatusWarningForeground1} />
-          <Text className={styles.statusLabel}>Pending Migrations:</Text>
-          <Text className={styles.statusValue}>{stats.running}</Text>
+          <Play size={20} color="var(--warning)" />
+          <span className={styles.statusLabel}>Pending Migrations:</span>
+          <span className={styles.statusValue}>{stats.running}</span>
         </div>
         <div className={styles.statusRow}>
-          <CheckmarkCircle24Regular primaryFill={tokens.colorStatusSuccessForeground1} />
-          <Text className={styles.statusLabel}>Processed Workbooks:</Text>
-          <Text className={styles.statusValue}>{stats.success}</Text>
+          <CheckCircle2 size={20} color="var(--success)" />
+          <span className={styles.statusLabel}>Processed Workbooks:</span>
+          <span className={styles.statusValue}>{stats.success}</span>
         </div>
         <div className={styles.statusRow}>
-          <ErrorCircle24Regular primaryFill={tokens.colorStatusDangerForeground1} />
-          <Text className={styles.statusLabel}>Failed Migrations:</Text>
-          <Text className={styles.statusValue}>{stats.failed}</Text>
+          <XCircle size={20} color="var(--danger)" />
+          <span className={styles.statusLabel}>Failed Migrations:</span>
+          <span className={styles.statusValue}>{stats.failed}</span>
         </div>
         <div className={styles.statusRow}>
-          <Dismiss24Regular fontSize={20} primaryFill={tokens.colorNeutralForeground2} />
-          <Text className={styles.statusLabel}>Cancelled Migrations:</Text>
-          <Text className={styles.statusValue}>{stats.cancelled}</Text>
+          <X size={20} color="var(--text-secondary)" />
+          <span className={styles.statusLabel}>Cancelled Migrations:</span>
+          <span className={styles.statusValue}>{stats.cancelled}</span>
         </div>
       </div>
       <div className={styles.introContainer}>
         <div className={styles.introText}>
-          {displayedIntro}
-          {displayedIntro.length < introMessage.length && (
-            <span style={{ animation: "blink 1s step-end infinite", marginLeft: "2px" }}>|</span>
-          )}
+          {introMessage}
         </div>
       </div>
 
@@ -1091,13 +912,13 @@ function TableauSidebarContent({ onClose }: LeftSidebarProps) {
 
       {applications.length > 0 ? (
         <>
-          <Text className={styles.appSectionTitle}>Selected Workbooks</Text>
+          <span className={styles.appSectionTitle}>Selected Workbooks</span>
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>{content}</div>
         </>
       ) : runId ? (
-        <Text style={{ color: tokens.colorNeutralForeground3, textAlign: "center", padding: "20px 0" }}>
+        <span style={{ color: "var(--text-muted)", textAlign: "center", padding: "20px 0" }}>
           Loading applications...
-        </Text>
+        </span>
       ) : null}
     </>
   )
@@ -1111,7 +932,7 @@ function QlikAppLevel({
   processStatus: any
 }) {
   const [open, setOpen] = useState(false)
-  const activities = useQlikStore((s) => s.activities[app.id] || {})
+  const activities = useQlikStore((s) => s.activities[app.id]) || {}
 
   const steps = ["assessment", "parsing", "mapping", "reportGeneration"] as const
   const completedCount = steps.filter((step) => {
@@ -1126,10 +947,10 @@ function QlikAppLevel({
 
   const progress = (completedCount / steps.length) * 100
 
-  let statusColor: "success" | "warning" | "danger" | "subtle" = "subtle"
+  let statusColor: "success" | "warning" | "destructive" | "secondary" = "secondary"
   let statusText = "Pending"
   if (hasFailed) {
-    statusColor = "danger"
+    statusColor = "destructive"
     statusText = "Failed"
   } else if (completedCount === steps.length) {
     statusColor = "success"
@@ -1141,27 +962,27 @@ function QlikAppLevel({
 
   return (
     <div style={{ marginBottom: "12px", borderBottom: "1px solid #f0f1f3", paddingBottom: "12px" }}>
-      <div 
+      <div
         style={{ display: "flex", alignItems: "center", cursor: "pointer", gap: "8px" }}
         onClick={() => setOpen(!open)}
       >
-        {open ? <ChevronDown20Regular /> : <ChevronRight20Regular />}
-        <Text style={{ fontWeight: 600, fontSize: "14px", flex: 1 }} truncate>
+        {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        <span style={{ fontWeight: 600, fontSize: "14px", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {app.name}
-        </Text>
-        <Badge appearance="filled" color={statusColor as any}>
+        </span>
+        <Badge variant={statusColor}>
           {statusText}
         </Badge>
       </div>
 
       <div style={{ width: "95%", backgroundColor: "#e2e8f0", borderRadius: "9999px", height: "6px", marginTop: "8px", overflow: "hidden" }}>
-        <div 
-          style={{ 
-            backgroundColor: hasFailed ? "#ef4444" : completedCount === steps.length ? "#22c55e" : "#3b82f6", 
-            width: `${progress}%`, 
-            height: "100%", 
-            transition: "width 0.3s ease" 
-          }} 
+        <div
+          style={{
+            backgroundColor: hasFailed ? "#ef4444" : completedCount === steps.length ? "#22c55e" : "#3b82f6",
+            width: `${progress}%`,
+            height: "100%",
+            transition: "width 0.3s ease"
+          }}
         />
       </div>
 
@@ -1172,7 +993,7 @@ function QlikAppLevel({
             const stepStatus = stepData.status?.toLowerCase()
             const stepLogs = activities[step] || []
 
-            let stepColor = "subtle"
+            let stepColor: "success" | "warning" | "destructive" | "secondary" = "secondary"
             let stepLabel = "Pending"
             if (stepStatus === "completed" || stepStatus === "success" || stepStatus === "done") {
               stepColor = "success"
@@ -1181,7 +1002,7 @@ function QlikAppLevel({
               stepColor = "warning"
               stepLabel = "Processing"
             } else if (stepStatus === "failed" || stepStatus === "error") {
-              stepColor = "danger"
+              stepColor = "destructive"
               stepLabel = "Failed"
             }
 
@@ -1190,10 +1011,10 @@ function QlikAppLevel({
             return (
               <div key={step} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <Text style={{ fontSize: "13px", color: "#475569", fontWeight: 500 }}>
+                  <span style={{ fontSize: "13px", color: "#475569", fontWeight: 500 }}>
                     {stepDisplayName} Agent
-                  </Text>
-                  <Badge appearance="tint" color={stepColor as any}>
+                  </span>
+                  <Badge variant={stepColor}>
                     {stepLabel}
                   </Badge>
                 </div>
@@ -1214,37 +1035,27 @@ function QlikAppLevel({
 }
 
 function QlikSidebarContent({ onClose }: LeftSidebarProps) {
-  const styles = useStyles()
-  const { apps, processStates } = useQlikStore()
+  const { apps, selectedApps, processStates } = useQlikStore()
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen)
-  
-  const [displayedIntro, setDisplayedIntro] = useState("")
+
   const introMessage = "This agent automatically fetches Qlik Sense spaces and unbuilds applications for migration."
 
-  useEffect(() => {
-    setDisplayedIntro("")
-    let i = 0
-    const interval = setInterval(() => {
-      setDisplayedIntro((prev) => {
-        if (i < introMessage.length) {
-          i++
-          return introMessage.slice(0, i)
-        }
-        clearInterval(interval)
-        return prev
-      })
-    }, 35)
-    return () => clearInterval(interval)
-  }, [])
+  const targetApps = useMemo(() => {
+    if (selectedApps.length > 0) {
+      return apps.filter((app) => selectedApps.includes(app.id))
+    }
+    return []
+  }, [apps, selectedApps])
 
   const stats = useMemo(() => {
-    const total = apps.length
+    const activeList = targetApps.length > 0 ? targetApps : apps
+    const total = activeList.length
     let running = 0
     let success = 0
     let failed = 0
     let pending = 0
 
-    apps.forEach((app) => {
+    activeList.forEach((app) => {
       const states = processStates[app.id] || {}
       const statuses = Object.values(states).map((s: any) => s.status?.toLowerCase())
       if (statuses.includes("failed") || statuses.includes("error")) {
@@ -1259,90 +1070,101 @@ function QlikSidebarContent({ onClose }: LeftSidebarProps) {
     })
 
     return { total, running, success, failed, pending }
-  }, [apps, processStates])
+  }, [targetApps, apps, processStates])
 
   return (
     <>
       <div className={styles.header}>
-        <Sparkle20Regular fontSize={20} />
-        <span>Qlik Migration Summary</span>
+        <Sparkles size={20} className="text-blue-600" />
+        <span className="font-bold text-sm tracking-tight">Qlik Migration Summary</span>
         <Tooltip content="Collapse" relationship="label">
           <Button
-            appearance="subtle"
-            icon={<PanelLeftContract24Regular />}
+            variant="ghost"
+            size="icon"
             onClick={() => setSidebarOpen(false)}
             aria-label="Collapse Sidebar"
             className={styles.sidebarToggleButton}
-          />
+          >
+            <PanelLeftClose size={18} />
+          </Button>
         </Tooltip>
       </div>
 
-      <div className={styles.summaryContent}>
-        <div className={styles.statusRow}>
-          <List20Regular fontSize={20} primaryFill={tokens.colorBrandForeground1} />
-          <Text className={styles.statusLabel}>Total Apps Size:</Text>
-          <Text className={styles.statusValue}>{stats.total}</Text>
+      <div className="grid grid-cols-2 gap-2 p-1">
+        <div className="p-2.5 bg-blue-50/70 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60 rounded-xl space-y-1">
+          <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+            <List size={14} />
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Total Apps</span>
+          </div>
+          <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{stats.total}</div>
         </div>
-        <div className={styles.statusRow}>
-          <Play24Regular primaryFill={tokens.colorStatusWarningForeground1} />
-          <Text className={styles.statusLabel}>Pending/Running:</Text>
-          <Text className={styles.statusValue}>{stats.running + stats.pending}</Text>
+
+        <div className="p-2.5 bg-amber-50/70 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/60 rounded-xl space-y-1">
+          <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+            <Clock size={14} />
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Pending</span>
+          </div>
+          <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{stats.running + stats.pending}</div>
         </div>
-        <div className={styles.statusRow}>
-          <CheckmarkCircle24Regular primaryFill={tokens.colorStatusSuccessForeground1} />
-          <Text className={styles.statusLabel}>Processed Apps:</Text>
-          <Text className={styles.statusValue}>{stats.success}</Text>
+
+        <div className="p-2.5 bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/60 rounded-xl space-y-1">
+          <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+            <CheckCircle2 size={14} />
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Processed</span>
+          </div>
+          <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{stats.success}</div>
         </div>
-        <div className={styles.statusRow}>
-          <ErrorCircle24Regular primaryFill={tokens.colorStatusDangerForeground1} />
-          <Text className={styles.statusLabel}>Failed Migrations:</Text>
-          <Text className={styles.statusValue}>{stats.failed}</Text>
+
+        <div className="p-2.5 bg-rose-50/70 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/60 rounded-xl space-y-1">
+          <div className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+            <XCircle size={14} />
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Failed</span>
+          </div>
+          <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{stats.failed}</div>
         </div>
       </div>
 
-      <div className={styles.introContainer}>
-        <div className={styles.introText}>
-          {displayedIntro}
-          {displayedIntro.length < introMessage.length && (
-            <span style={{ animation: "blink 1s step-end infinite", marginLeft: "2px" }}>|</span>
-          )}
-        </div>
+      <div className="px-1 py-1.5 text-xs text-slate-500 dark:text-slate-400 leading-relaxed border-b border-slate-100 dark:border-slate-800">
+        {introMessage}
       </div>
 
-      {apps.length > 0 ? (
+      {targetApps.length > 0 ? (
         <>
-          <Text className={styles.appSectionTitle}>Selected Apps</Text>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "0 16px" }}>
-            {apps.map((app) => (
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1 pt-2">
+            Selected Apps ({targetApps.length})
+          </span>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "0 4px" }}>
+            {targetApps.map((app) => (
               <QlikAppLevel key={app.id} app={app} processStatus={processStates[app.id]} />
             ))}
           </div>
         </>
       ) : (
-        <Text style={{ color: tokens.colorNeutralForeground3, textAlign: "center", padding: "20px 0" }}>
-          No applications loaded.
-        </Text>
+        <div className="text-center py-6 px-4 text-xs text-slate-400 bg-slate-50/60 dark:bg-slate-800/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+          No applications selected. Choose one or more applications from the dropdown to monitor migration steps.
+        </div>
       )}
     </>
   )
 }
 
 export function LeftSidebar({ onClose }: LeftSidebarProps) {
-  const styles = useStyles()
   const workspace = useUIStore((s) => s.workspace)
   const isSidebarOpen = useUIStore((s) => s.isSidebarOpen)
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen)
 
   return (
-    <div className={mergeClasses(styles.sidebar, !isSidebarOpen && styles.sidebarCollapsed)}>
+    <div className={cx(styles.sidebar, !isSidebarOpen && styles.sidebarCollapsed)}>
       {!isSidebarOpen ? (
         <Tooltip content="Expand" relationship="label">
           <Button
-            appearance="subtle"
-            icon={<PanelLeftExpand24Regular />}
+            variant="ghost"
+            size="icon"
             onClick={() => setSidebarOpen(true)}
             aria-label="Expand Sidebar"
-          />
+          >
+            <PanelLeftOpen size={20} />
+          </Button>
         </Tooltip>
       ) : workspace === "qlik" ? (
         <QlikSidebarContent onClose={onClose} />
@@ -1352,4 +1174,3 @@ export function LeftSidebar({ onClose }: LeftSidebarProps) {
     </div>
   )
 }
-

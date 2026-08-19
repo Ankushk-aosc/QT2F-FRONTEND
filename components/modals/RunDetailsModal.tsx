@@ -1,10 +1,12 @@
 "use client"
 
 import React, { useState, useEffect, useMemo } from "react"
-import {
-  makeStyles, tokens, shorthands, Text, Button, Dialog, DialogSurface, DialogBody, TabList, Tab, Badge, Spinner,
-} from "@fluentui/react-components"
-import { Dismiss24Regular, CheckmarkCircle16Regular, DismissCircle16Regular, Hourglass16Regular } from "@fluentui/react-icons"
+import { X, CheckCircle2, XCircle, Hourglass } from "lucide-react"
+
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 // Import your existing components
 import { AssessmentTab } from "@/components/tabs/AssessmentTab"
@@ -24,59 +26,6 @@ import { useDatalayerStore } from "@/stores/datalayer.store"
 
 import { isLiteMode } from "@/lib/config"
 
-const useStyles = makeStyles({
-    surface: { 
-        maxWidth: "1100px", 
-        width: "90vw", 
-        height: "90vh", 
-        display: "flex", 
-        flexDirection: "column", 
-        padding: "0", 
-        backgroundColor: tokens.colorNeutralBackground2 
-    },
-    dialogBody: { 
-        height: "100%", 
-        display: "flex", 
-        flexDirection: "column", 
-        ...shorthands.padding(0), 
-        ...shorthands.margin(0), 
-        overflowY: "hidden" 
-    },
-    header: { 
-        display: "flex", 
-        justifyContent: "space-between", 
-        alignItems: "center", 
-        padding: "16px 24px", 
-        ...shorthands.borderBottom("1px", "solid", tokens.colorNeutralStroke2), 
-        backgroundColor: tokens.colorNeutralBackground1, 
-        flexShrink: 0 
-    },
-    title: { 
-        fontSize: "20px", 
-        fontWeight: tokens.fontWeightRegular, 
-        color: tokens.colorNeutralForeground1 
-    },
-    topTabsWrapper: { 
-        backgroundColor: tokens.colorNeutralBackground2, 
-        padding: "8px 24px", 
-        display: "flex", 
-        justifyContent: "center", 
-        ...shorthands.borderBottom("1px", "solid", tokens.colorNeutralStroke2), 
-        flexShrink: 0 
-    },
-    tabWithStatus: { 
-        display: "flex", 
-        alignItems: "center", 
-        gap: "8px" 
-    },
-    content: { 
-        flex: 1, 
-        overflowY: "auto", 
-        padding: "0", 
-        backgroundColor: tokens.colorNeutralBackground2 
-    },
-});
-
 interface RunDetailsModalProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
@@ -84,7 +33,6 @@ interface RunDetailsModalProps {
 }
 
 export function RunDetailsModal({ isOpen, onOpenChange, runData }: RunDetailsModalProps) {
-  const styles = useStyles()
   const [activeTopTab, setActiveTopTab] = useState("Assessment")
 
   // Determine which tabs to show based on step statuses
@@ -135,14 +83,14 @@ export function RunDetailsModal({ isOpen, onOpenChange, runData }: RunDetailsMod
       fetchAssessmentData(projectId, workbookId, runId),
     ]
     if (showParsing) fetches.push(fetchParsingResult(projectId, workbookId, runId))
-    
+
     // Only try DL if it shouldn't be skipped globally via the agent store configuration
     const skipDL = lite || useAgentStore.getState().shouldSkipDataLayer(workbookId)
     if (!skipDL) fetches.push(fetchDataLayerResult(projectId, workbookId, runId))
 
     if (showMapping) fetches.push(fetchMappingResult(projectId, workbookId, runId))
     if (showGeneration) fetches.push(fetchGenerationResult(projectId, workbookId, runId))
-    
+
     // Only pre-fetch validation if it has actually run (not just because generation finished)
     const didValidationRun = !lite && hasStep(runData?.validation_status);
     if (didValidationRun) fetches.push(fetchValidationResult(projectId, workbookId, runId))
@@ -163,167 +111,159 @@ export function RunDetailsModal({ isOpen, onOpenChange, runData }: RunDetailsMod
     if (lite || !runData) return false
     const workbookId = runData.workbook_id
     const runId = runData.run_id
-    
+
     // Check connection type from assessment data
     const assessment = assessmentData[runId]?.[workbookId]
     const connType = (assessment?.connection_type || assessment?.payload?.connection_type || "").toLowerCase()
     const isExtract = connType.includes("extract")
-    
+
     // Check if Data Layer has results
     const hasDL = !!datalayerData[workbookId]
-    
+
     return isExtract && hasDL
   }, [lite, runData, assessmentData, datalayerData])
 
   if (!runData) return null
 
   const getStatusIcon = (status: string, overrideCompleted?: boolean) => {
-    if (overrideCompleted) return <CheckmarkCircle16Regular style={{ color: tokens.colorPaletteGreenForeground1 }} />
-    
+    if (overrideCompleted) return <CheckCircle2 size={16} style={{ color: "var(--success)" }} />
+
     switch (status?.toString().trim().toLowerCase()) {
       case "completed":
       case "success":
       case "done":
       case "generated":
       case "validated":
-      case "passed": return <CheckmarkCircle16Regular style={{ color: tokens.colorPaletteGreenForeground1 }} />
+      case "passed": return <CheckCircle2 size={16} style={{ color: "var(--success)" }} />
       case "failed":
       case "error":
       case "cancelled":
-      case "stopped": return <DismissCircle16Regular style={{ color: tokens.colorPaletteRedForeground1 }} />
+      case "stopped": return <XCircle size={16} style={{ color: "var(--danger)" }} />
       case "running":
       case "processing":
       case "in-progress":
-      case "pending": return <Hourglass16Regular style={{ color: tokens.colorPaletteYellowForeground1 }} />
+      case "pending": return <Hourglass size={16} style={{ color: "var(--warning)" }} />
       default: return null
     }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(_, data) => onOpenChange(data.open)}>
-      <DialogSurface className={styles.surface}>
-        <DialogBody className={styles.dialogBody}>
-          <div className={styles.header}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <Text className={styles.title}>
-                {runData.workbook_name ? `${runData.workbook_name} (${runData.project_name || 'Unknown Project'})` : (runData.workbook_id || "Run Details")}
-              </Text>
-              {(runData.execution_level || runData.project_type || runData.workbook_type || runData.site_type) && (
-                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "2px" }}>
-                  {runData.execution_level && <Badge appearance="outline" color="informative" size="small" style={{ fontSize: "11px" }}>Execution: {runData.execution_level}</Badge>}
-                  {runData.project_type && <Badge appearance="outline" color="informative" size="small" style={{ fontSize: "11px" }}>Project: {runData.project_type}</Badge>}
-                  {runData.workbook_type && <Badge appearance="outline" color="informative" size="small" style={{ fontSize: "11px" }}>Workbook: {runData.workbook_type}</Badge>}
-                  {runData.site_type && <Badge appearance="outline" color="informative" size="small" style={{ fontSize: "11px" }}>Site: {runData.site_type}</Badge>}
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="run-details-surface">
+        <div className="run-details-header">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span className="run-details-title">
+              {runData.workbook_name ? `${runData.workbook_name} (${runData.project_name || 'Unknown Project'})` : (runData.workbook_id || "Run Details")}
+            </span>
+            {(runData.execution_level || runData.project_type || runData.workbook_type || runData.site_type) && (
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "2px" }}>
+                {runData.execution_level && <Badge variant="outline" style={{ fontSize: "11px" }}>Execution: {runData.execution_level}</Badge>}
+                {runData.project_type && <Badge variant="outline" style={{ fontSize: "11px" }}>Project: {runData.project_type}</Badge>}
+                {runData.workbook_type && <Badge variant="outline" style={{ fontSize: "11px" }}>Workbook: {runData.workbook_type}</Badge>}
+                {runData.site_type && <Badge variant="outline" style={{ fontSize: "11px" }}>Site: {runData.site_type}</Badge>}
 
-                  {/* Validation Status Badge */}
-                  {!lite && (() => {
-                    // First check live validation store for automatic updates without refresh
-                    const rawLiveValidationData = validationDataMap[runData?.workbook_id];
-                    // IMPORTANT: Prevent validation state bleeding from other runs! 
-                    const liveValidationData = (rawLiveValidationData && rawLiveValidationData.run_id === runData?.run_id) 
-                        ? rawLiveValidationData : undefined;
-                        
-                    if (liveValidationData) {
-                      const liveStatus = (liveValidationData.status || "completed").toLowerCase();
-                      if (liveStatus === "failed" || liveStatus === "error") {
-                        return <Badge appearance="filled" color="danger" size="small" style={{ fontSize: "11px" }}>Validation: Failed</Badge>;
-                      }
-                      return <Badge appearance="filled" color="success" size="small" style={{ fontSize: "11px" }}>Validation: Passed</Badge>;
-                    }
-                    
-                    const hasGenerationStep = hasStep(runData.generation_status);
-                    
-                    if (liveValidationData === null) {
-                       // If explicitly null, it means we definitely know it hasn't run
-                       if (hasGenerationStep) {
-                           return <Badge appearance="filled" color="warning" size="small" style={{ fontSize: "11px" }}>Validation: Pending</Badge>;
-                       }
-                       return null;
-                    }
+                {/* Validation Status Badge */}
+                {!lite && (() => {
+                  // First check live validation store for automatic updates without refresh
+                  const rawLiveValidationData = validationDataMap[runData?.workbook_id];
+                  // IMPORTANT: Prevent validation state bleeding from other runs!
+                  const liveValidationData = (rawLiveValidationData && rawLiveValidationData.run_id === runData?.run_id)
+                      ? rawLiveValidationData : undefined;
 
-                    // Fallback to static runData if store is undefined (still loading or hasn't fetched yet)
-                    const valStep = runData.steps?.validation || runData.steps?.["Validation Agent"];
-                    const valStatusRaw = (runData.validation_status || (typeof valStep === 'object' ? (valStep.status || valStep.final_status) : valStep) || "").toLowerCase();
-                    const hasValidationStep = hasStep(runData.validation_status) || hasStep(typeof valStep === 'string' ? valStep : (valStep?.status || valStep?.final_status));
-                    if (hasValidationStep && (valStatusRaw === "failed" || valStatusRaw === "error" || valStatusRaw.includes("fail"))) {
-                      return <Badge appearance="filled" color="danger" size="small" style={{ fontSize: "11px" }}>Validation: Failed</Badge>;
+                  if (liveValidationData) {
+                    const liveStatus = (liveValidationData.status || "completed").toLowerCase();
+                    if (liveStatus === "failed" || liveStatus === "error") {
+                      return <Badge variant="destructive" style={{ fontSize: "11px" }}>Validation: Failed</Badge>;
                     }
-                    if (hasValidationStep && (valStatusRaw === "passed" || valStatusRaw === "success" || valStatusRaw === "completed")) {
-                      return <Badge appearance="filled" color="success" size="small" style={{ fontSize: "11px" }}>Validation: Passed</Badge>;
-                    }
-                    if (hasGenerationStep) {
-                      return <Badge appearance="filled" color="warning" size="small" style={{ fontSize: "11px" }}>Validation: Pending</Badge>;
-                    }
-                    return null;
-                  })()}
-                </div>
-              )}
-            </div>
-            <Button appearance="transparent" icon={<Dismiss24Regular />} onClick={() => onOpenChange(false)} />
+                    return <Badge variant="success" style={{ fontSize: "11px" }}>Validation: Passed</Badge>;
+                  }
+
+                  const hasGenerationStep = hasStep(runData.generation_status);
+
+                  if (liveValidationData === null) {
+                     // If explicitly null, it means we definitely know it hasn't run
+                     if (hasGenerationStep) {
+                         return <Badge variant="warning" style={{ fontSize: "11px" }}>Validation: Pending</Badge>;
+                     }
+                     return null;
+                  }
+
+                  // Fallback to static runData if store is undefined (still loading or hasn't fetched yet)
+                  const valStep = runData.steps?.validation || runData.steps?.["Validation Agent"];
+                  const valStatusRaw = (runData.validation_status || (typeof valStep === 'object' ? (valStep.status || valStep.final_status) : valStep) || "").toLowerCase();
+                  const hasValidationStep = hasStep(runData.validation_status) || hasStep(typeof valStep === 'string' ? valStep : (valStep?.status || valStep?.final_status));
+                  if (hasValidationStep && (valStatusRaw === "failed" || valStatusRaw === "error" || valStatusRaw.includes("fail"))) {
+                    return <Badge variant="destructive" style={{ fontSize: "11px" }}>Validation: Failed</Badge>;
+                  }
+                  if (hasValidationStep && (valStatusRaw === "passed" || valStatusRaw === "success" || valStatusRaw === "completed")) {
+                    return <Badge variant="success" style={{ fontSize: "11px" }}>Validation: Passed</Badge>;
+                  }
+                  if (hasGenerationStep) {
+                    return <Badge variant="warning" style={{ fontSize: "11px" }}>Validation: Pending</Badge>;
+                  }
+                  return null;
+                })()}
+              </div>
+            )}
           </div>
+          <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} aria-label="Close">
+            <X size={24} />
+          </Button>
+        </div>
 
-          <div className={styles.topTabsWrapper} style={{ overflowX: "auto", whiteSpace: "nowrap", scrollbarWidth: "none", msOverflowStyle: "none" }}>
-            <style dangerouslySetInnerHTML={{__html: `
-              .hide-scrollbar::-webkit-scrollbar { display: none; }
-              .hide-scrollbar [role="tab"]:focus,
-              .hide-scrollbar [role="tab"]:focus-visible,
-              .hide-scrollbar button:focus,
-              .hide-scrollbar button:focus-visible { 
-                  outline: none !important; 
-                  border: none !important; 
-                  box-shadow: none !important; 
-              }
-              .hide-scrollbar [role="tab"]::after,
-              .hide-scrollbar button::after { 
-                  display: none !important;
-                  border: none !important;
-                  outline: none !important;
-                  opacity: 0 !important;
-              }
-            `}} />
-            <TabList className="hide-scrollbar" selectedValue={activeTopTab} onTabSelect={(_, data) => setActiveTopTab(data.value as string)} appearance="subtle">
-              <Tab value="Assessment"><div className={styles.tabWithStatus}>{getStatusIcon(runData.assessment_status)}Assessment</div></Tab>
+        <div className="run-details-tabs-wrapper hide-scrollbar" style={{ overflowX: "auto", whiteSpace: "nowrap", scrollbarWidth: "none" }}>
+          <style dangerouslySetInnerHTML={{__html: `
+            .hide-scrollbar::-webkit-scrollbar { display: none; }
+            .hide-scrollbar [role="tab"]:focus,
+            .hide-scrollbar [role="tab"]:focus-visible {
+                outline: none !important;
+                box-shadow: none !important;
+            }
+          `}} />
+          <Tabs value={activeTopTab} onValueChange={setActiveTopTab}>
+            <TabsList>
+              <TabsTrigger value="Assessment"><span className="run-details-tab-status">{getStatusIcon(runData.assessment_status)}Assessment</span></TabsTrigger>
               {showParsing && (
-                <Tab value="Parsing"><div className={styles.tabWithStatus}>{getStatusIcon(runData.parsing_status)}Parsing</div></Tab>
+                <TabsTrigger value="Parsing"><span className="run-details-tab-status">{getStatusIcon(runData.parsing_status)}Parsing</span></TabsTrigger>
               )}
               {showDataLayerTab && (
-                <Tab value="DataLayer">
-                  <div className={styles.tabWithStatus}>
+                <TabsTrigger value="DataLayer">
+                  <span className="run-details-tab-status">
                     {getStatusIcon(runData.datalayer_status, !!datalayerData[runData.workbook_id])}Data Layer
-                  </div>
-                </Tab>
+                  </span>
+                </TabsTrigger>
               )}
               {showMapping && (
-                <Tab value="Mapping"><div className={styles.tabWithStatus}>{getStatusIcon(runData.mapping_status)}Mapping</div></Tab>
+                <TabsTrigger value="Mapping"><span className="run-details-tab-status">{getStatusIcon(runData.mapping_status)}Mapping</span></TabsTrigger>
               )}
               {showGeneration && (
-                <Tab value="Generation"><div className={styles.tabWithStatus}>{getStatusIcon(runData.generation_status)}Report Generation</div></Tab>
+                <TabsTrigger value="Generation"><span className="run-details-tab-status">{getStatusIcon(runData.generation_status)}Report Generation</span></TabsTrigger>
               )}
               {showValidation && (
-                <Tab value="Validation"><div className={styles.tabWithStatus}>{getStatusIcon(runData.validation_status, !!validationDataMap[runData.workbook_id]?.metrics)}Validation</div></Tab>
+                <TabsTrigger value="Validation"><span className="run-details-tab-status">{getStatusIcon(runData.validation_status, !!validationDataMap[runData.workbook_id]?.metrics)}Validation</span></TabsTrigger>
               )}
-            </TabList>
-          </div>
+            </TabsList>
+          </Tabs>
+        </div>
 
-          <div className={styles.content}>
-            {/* Contextual routing to existing tabs — only render tabs that exist in this run */}
-            {activeTopTab === "Assessment" && <AssessmentTab selectedWorkbookId={runData.workbook_id} runId={runData.run_id} projectId={runData.project_id} />}
-            {activeTopTab === "Parsing" && showParsing && <ParsingTab workbookId={runData.workbook_id} runId={runData.run_id} projectId={runData.project_id} />}
-            {activeTopTab === "DataLayer" && <DataLayerTab workbookId={runData.workbook_id} projectId={runData.project_id} runId={runData.run_id} />}
-            {activeTopTab === "Mapping" && showMapping && <MappingTab workbookId={runData.workbook_id} runId={runData.run_id} projectId={runData.project_id} />}
-            {activeTopTab === "Generation" && showGeneration && (
-              <ReportGenerationTab 
-                workbookId={runData.workbook_id} 
-                workbookName={runData.workbook_name} 
-                projectId={runData.project_id} 
-                runId={runData.run_id} 
-                workspaceName={runData.folder_name || runData.workspace_name || runData.payload?.folder_name || runData.payload?.workspace_name}
-              />
-            )}
-            {activeTopTab === "Validation" && showValidation && <ValidationTab workbookId={runData.workbook_id} workbookName={runData.workbook_name} runId={runData.run_id} projectId={runData.project_id} />}
-          </div>
-        </DialogBody>
-      </DialogSurface>
+        <div className="run-details-content">
+          {/* Contextual routing to existing tabs — only render tabs that exist in this run */}
+          {activeTopTab === "Assessment" && <AssessmentTab selectedWorkbookId={runData.workbook_id} runId={runData.run_id} projectId={runData.project_id} />}
+          {activeTopTab === "Parsing" && showParsing && <ParsingTab workbookId={runData.workbook_id} runId={runData.run_id} projectId={runData.project_id} />}
+          {activeTopTab === "DataLayer" && <DataLayerTab workbookId={runData.workbook_id} projectId={runData.project_id} runId={runData.run_id} />}
+          {activeTopTab === "Mapping" && showMapping && <MappingTab workbookId={runData.workbook_id} runId={runData.run_id} projectId={runData.project_id} />}
+          {activeTopTab === "Generation" && showGeneration && (
+            <ReportGenerationTab
+              workbookId={runData.workbook_id}
+              workbookName={runData.workbook_name}
+              projectId={runData.project_id}
+              runId={runData.run_id}
+              workspaceName={runData.folder_name || runData.workspace_name || runData.payload?.folder_name || runData.payload?.workspace_name}
+            />
+          )}
+          {activeTopTab === "Validation" && showValidation && <ValidationTab workbookId={runData.workbook_id} workbookName={runData.workbook_name} runId={runData.run_id} projectId={runData.project_id} />}
+        </div>
+      </DialogContent>
     </Dialog>
   )
 }

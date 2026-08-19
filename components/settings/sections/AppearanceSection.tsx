@@ -1,7 +1,6 @@
 "use client"
 
 import React from "react"
-import { Dropdown, Option, Switch, Tooltip, makeStyles, tokens } from "@fluentui/react-components"
 
 import {
   ACCENT_COLOR_OPTIONS,
@@ -11,7 +10,6 @@ import {
   FONT_SIZE_OPTIONS,
   SIDEBAR_STYLE_OPTIONS,
   THEME_MODE_OPTIONS,
-  type SettingOption,
 } from "@/lib/settings/defaults"
 import { useSettingsStore } from "@/stores/settings.store"
 import type {
@@ -23,42 +21,17 @@ import type {
   SidebarStyle,
   ThemeMode,
 } from "@/types/settings"
+import { Select, SelectItem } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import { Tooltip } from "@/components/ui/tooltip"
 
 import { SettingRow, SettingsGroup, SettingsPanel } from "../SettingsPrimitives"
 
-const useStyles = makeStyles({
-  fullWidth: { width: "100%" },
-  swatches: {
-    display: "flex",
-    gap: "8px",
-    flexWrap: "wrap",
-  },
-  swatch: {
-    width: "32px",
-    height: "32px",
-    borderRadius: tokens.borderRadiusMedium,
-    border: `2px solid transparent`,
-    cursor: "pointer",
-    padding: 0,
-    outlineOffset: "2px",
-    ":hover": {
-      transform: "scale(1.08)",
-    },
-  },
-  swatchSelected: {
-    border: `2px solid ${tokens.colorNeutralForeground1}`,
-  },
-})
-
 export function AppearanceSection() {
-  const styles = useStyles()
   const appearance = useSettingsStore((state) => state.settings.appearance)
   const updateSettings = useSettingsStore((state) => state.updateSettings)
 
   const patch = (change: Partial<AppearanceSettings>) => void updateSettings({ appearance: change })
-
-  const labelFor = <T extends string>(options: readonly SettingOption<T>[], value: T): string =>
-    options.find((option) => option.value === value)?.label ?? value
 
   return (
     <SettingsPanel
@@ -67,24 +40,20 @@ export function AppearanceSection() {
     >
       <SettingsGroup title="Theme">
         <SettingRow label="Colour scheme" hint="System follows your operating system setting.">
-          <Dropdown
-            className={styles.fullWidth}
-            value={labelFor(THEME_MODE_OPTIONS, appearance.themeMode)}
-            selectedOptions={[appearance.themeMode]}
-            onOptionSelect={(_, data) =>
-              data.optionValue && patch({ themeMode: data.optionValue as ThemeMode })
-            }
+          <Select
+            value={appearance.themeMode}
+            onValueChange={(value: string) => patch({ themeMode: value as ThemeMode })}
           >
             {THEME_MODE_OPTIONS.map((option) => (
-              <Option key={option.value} value={option.value} text={option.label}>
+              <SelectItem key={option.value} value={option.value}>
                 {option.label}
-              </Option>
+              </SelectItem>
             ))}
-          </Dropdown>
+          </Select>
         </SettingRow>
 
         <SettingRow label="Accent colour" hint="Used for primary actions and highlights." stacked>
-          <div className={styles.swatches} role="radiogroup" aria-label="Accent colour">
+          <div className="appearance-swatches" role="radiogroup" aria-label="Accent colour">
             {ACCENT_COLOR_OPTIONS.map((option) => {
               const selected = appearance.accentColor === option.value
               return (
@@ -94,7 +63,7 @@ export function AppearanceSection() {
                     role="radio"
                     aria-checked={selected}
                     aria-label={option.label}
-                    className={`${styles.swatch} ${selected ? styles.swatchSelected : ""}`}
+                    className={`appearance-swatch${selected ? " appearance-swatch-selected" : ""}`}
                     style={{ backgroundColor: ACCENT_COLOR_SWATCHES[option.value as AccentColor] }}
                     onClick={() => patch({ accentColor: option.value as AccentColor })}
                   />
@@ -107,80 +76,55 @@ export function AppearanceSection() {
 
       <SettingsGroup title="Layout">
         <SettingRow label="Font size" hint="Scales text across the whole platform.">
-          <Dropdown
-            className={styles.fullWidth}
-            value={labelFor(FONT_SIZE_OPTIONS, appearance.fontSize)}
-            selectedOptions={[appearance.fontSize]}
-            onOptionSelect={(_, data) =>
-              data.optionValue && patch({ fontSize: data.optionValue as FontSize })
-            }
-          >
+          <Select value={appearance.fontSize} onValueChange={(value: string) => patch({ fontSize: value as FontSize })}>
             {FONT_SIZE_OPTIONS.map((option) => (
-              <Option key={option.value} value={option.value} text={option.label}>
+              <SelectItem key={option.value} value={option.value}>
                 {option.label}
-              </Option>
+              </SelectItem>
             ))}
-          </Dropdown>
+          </Select>
         </SettingRow>
 
         <SettingRow label="Sidebar style" hint="How the left navigation is presented.">
-          <Dropdown
-            className={styles.fullWidth}
-            value={labelFor(SIDEBAR_STYLE_OPTIONS, appearance.sidebarStyle)}
-            selectedOptions={[appearance.sidebarStyle]}
-            onOptionSelect={(_, data) =>
-              data.optionValue && patch({ sidebarStyle: data.optionValue as SidebarStyle })
-            }
+          <Select
+            value={appearance.sidebarStyle}
+            onValueChange={(value: string) => patch({ sidebarStyle: value as SidebarStyle })}
           >
             {SIDEBAR_STYLE_OPTIONS.map((option) => (
-              <Option key={option.value} value={option.value} text={option.label}>
+              <SelectItem key={option.value} value={option.value}>
                 {option.label}
-              </Option>
+              </SelectItem>
             ))}
-          </Dropdown>
+          </Select>
         </SettingRow>
 
         <SettingRow label="Card style" hint="Applies to dashboard and result cards.">
-          <Dropdown
-            className={styles.fullWidth}
-            value={labelFor(CARD_STYLE_OPTIONS, appearance.cardStyle)}
-            selectedOptions={[appearance.cardStyle]}
-            onOptionSelect={(_, data) =>
-              data.optionValue && patch({ cardStyle: data.optionValue as CardStyle })
-            }
-          >
+          <Select value={appearance.cardStyle} onValueChange={(value: string) => patch({ cardStyle: value as CardStyle })}>
             {CARD_STYLE_OPTIONS.map((option) => (
-              <Option key={option.value} value={option.value} text={option.label}>
+              <SelectItem key={option.value} value={option.value}>
                 {option.label}
-              </Option>
+              </SelectItem>
             ))}
-          </Dropdown>
+          </Select>
         </SettingRow>
 
         <SettingRow label="Dashboard density" hint="Controls spacing between dashboard items.">
-          <Dropdown
-            className={styles.fullWidth}
-            value={labelFor(DASHBOARD_DENSITY_OPTIONS, appearance.dashboardDensity)}
-            selectedOptions={[appearance.dashboardDensity]}
-            onOptionSelect={(_, data) =>
-              data.optionValue && patch({ dashboardDensity: data.optionValue as DashboardDensity })
-            }
+          <Select
+            value={appearance.dashboardDensity}
+            onValueChange={(value: string) => patch({ dashboardDensity: value as DashboardDensity })}
           >
             {DASHBOARD_DENSITY_OPTIONS.map((option) => (
-              <Option key={option.value} value={option.value} text={option.label}>
+              <SelectItem key={option.value} value={option.value}>
                 {option.label}
-              </Option>
+              </SelectItem>
             ))}
-          </Dropdown>
+          </Select>
         </SettingRow>
       </SettingsGroup>
 
       <SettingsGroup title="Behaviour">
         <SettingRow label="Compact mode" hint="Reduces padding throughout the interface.">
-          <Switch
-            checked={appearance.compactMode}
-            onChange={(_, data) => patch({ compactMode: data.checked })}
-          />
+          <Switch checked={appearance.compactMode} onChange={(checked) => patch({ compactMode: checked })} />
         </SettingRow>
 
         <SettingRow
@@ -189,7 +133,7 @@ export function AppearanceSection() {
         >
           <Switch
             checked={appearance.animationsEnabled}
-            onChange={(_, data) => patch({ animationsEnabled: data.checked })}
+            onChange={(checked) => patch({ animationsEnabled: checked })}
           />
         </SettingRow>
       </SettingsGroup>

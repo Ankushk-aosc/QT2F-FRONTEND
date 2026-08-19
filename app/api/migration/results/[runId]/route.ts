@@ -18,13 +18,15 @@ export async function GET(
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        // Semantic Kernel exposes no /results/{run_id}; the persisted run record
+        // in the records store carries the outcome and per-stage counters.
         const data = await httpClient.get<unknown>(
-            `/results/${runId}`,
-            { apiType: "semantic" }
+            `/records/semantic-kernel?run_id=${encodeURIComponent(runId)}`,
+            { apiType: "logs", headers: { Authorization: authHeader } }
         );
         return NextResponse.json(data, { status: 200 });
     } catch (err: any) {
         console.error("[API /api/migration/results] Error:", err.message);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        return NextResponse.json({ error: err.message }, { status: err.status || 500 });
     }
 }

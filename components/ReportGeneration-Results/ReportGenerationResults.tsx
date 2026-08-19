@@ -9,20 +9,43 @@ import Transformation from "./Transformation";
 interface ResultsViewProps {
   isLoading: boolean;
   appId?: string;
-  backendToken: string;
+  backendToken?: string;
+  reportGenData?: any;
+  appName?: string;
+  folderName?: string;
+  workspaceName?: string;
 }
  
-export default function ReportGenerationResults({ isLoading, appId, backendToken  }: ResultsViewProps) {
+export default function ReportGenerationResults({
+  isLoading,
+  appId,
+  backendToken,
+  reportGenData: propReportGenData,
+  appName: propAppName,
+  folderName: propFolderName,
+  workspaceName: propWorkspaceName,
+}: ResultsViewProps) {
   const [activeTab, setActiveTab] = useState("summary");
-  const [appName, setAppName] = useState<string>("Unknown Application");
-  const [folderName, setFolderName] = useState<string>("Unknown Folder");
-  const [workspaceName, setWorkspaceName] = useState<string>("Workspace not available");
+  const [appName, setAppName] = useState<string>(propAppName || "Unknown Application");
+  const [folderName, setFolderName] = useState<string>(propFolderName || "Unknown Folder");
+  const [workspaceName, setWorkspaceName] = useState<string>(propWorkspaceName || "Fabric Workspace");
   const [reportMessage, setReportMessage] = useState<string>("Report Generated Successfully");
   const [reportLink, setReportLink] = useState<string>("");
-  const [Reportname, setReportname] = useState<string>("Unknown Report");
+  const [Reportname, setReportname] = useState<string>(propAppName || "Unknown Report");
  
   useEffect(() => {
-    if (!appId) return;
+    if (propAppName) setAppName(propAppName);
+    if (propFolderName) setFolderName(propFolderName);
+    if (propWorkspaceName) setWorkspaceName(propWorkspaceName);
+    if (propReportGenData) {
+      if (propReportGenData.output?.content_summary) {
+        setReportMessage(propReportGenData.output.content_summary);
+      }
+      if (propReportGenData.output?.file_name) {
+        setReportname(propReportGenData.output.file_name);
+      }
+    }
+    if (!appId && !propReportGenData) return;
  
     const stored = localStorage.getItem("api_results");
     let selectedApp: any = null;
@@ -149,7 +172,7 @@ export default function ReportGenerationResults({ isLoading, appId, backendToken
  
           {/* Transformation Tab */}
           <TabsContent value="transformation" className="space-y-6 pt-6">
-            <Transformation folderName={folderName} backendToken={backendToken} />
+            <Transformation folderName={folderName || ""} backendToken={backendToken || ""} />
           </TabsContent>
         </Tabs>
       </main>

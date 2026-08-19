@@ -12,7 +12,18 @@ export async function fetchWithAuth<T = any>(
   }
 
   // Dynamically import MSAL wrapper to avoid SSR bundling
-  const { getActiveToken } = await import("@/components/providers/MsalProviderWrapper");
+  const { getActiveToken, getFabricToken } = await import(
+    "@/components/providers/MsalProviderWrapper"
+  );
+
+  // The token has to match the audience the caller asked for. Acquiring is
+  // keyed off `tokenKey` because this used to call `getActiveToken()`
+  // unconditionally: a caller asking for "fabric_access_token" got an
+  // API_SCOPE token instead, which Fabric rejects — and the wrong token was
+  // then cached *under the Fabric key*, so every later call reused it and the
+  // workspace pickers never loaded.
+  const acquireToken =
+    tokenKey === "fabric_access_token" ? getFabricToken : getActiveToken;
 
   const attemptFetch = async (retryCount: number = 0): Promise<T> => {
     // Read token from sessionStorage (XSS-safer than localStorage)
@@ -20,7 +31,7 @@ export async function fetchWithAuth<T = any>(
 
     // Acquire fresh token if none stored
     if (!token) {
-      token = await getActiveToken();
+      token = await acquireToken();
       if (token) {
         sessionStorage.setItem(tokenKey, token);
       }
@@ -53,7 +64,9 @@ export async function fetchWithAuth<T = any>(
       sessionStorage.removeItem(tokenKey);
 
       try {
-        const freshToken = await getActiveToken();
+        // Force-refresh through the same audience-correct acquirer, otherwise a
+        // 401 retry re-fetches the wrong token and fails identically.
+        const freshToken = await acquireToken(true);
         if (freshToken) {
           sessionStorage.setItem(tokenKey, freshToken);
         }

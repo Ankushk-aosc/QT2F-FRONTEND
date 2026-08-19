@@ -1,37 +1,47 @@
 "use client"
 
 import { useAgentStore } from "@/stores/agent.store"
+import { Badge } from "@/components/ui/badge"
+import { Card } from "@/components/ui/card"
+import { Spinner } from "@/components/ui/spinner"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  Badge,
-  Card,
-  Spinner,
-  Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableHeader,
-  TableHeaderCell,
-  TableRow,
-  TabList,
-  Text,
-  tokens
-} from "@fluentui/react-components"
-import {
-  ChevronDown20Regular,
-  ChevronRight20Regular,
-  DeviceEq20Regular,
-  Database20Regular,
-  Board20Regular,
-  Table20Regular,
-  DataPie20Regular,
-  Calculator20Regular,
-  Flash20Regular,
-  Settings20Regular,
-  Shapes20Regular,
-  Warning24Regular,
-} from "@fluentui/react-icons"
+  ChevronDown,
+  ChevronRight,
+  Gauge,
+  Database,
+  LayoutDashboard,
+  Table as TableIcon,
+  PieChart,
+  Calculator,
+  Zap,
+  Settings,
+  Shapes,
+  AlertTriangle,
+} from "lucide-react"
 import React, { useState, useEffect } from "react"
 import { useUIStore } from "@/stores/ui.store"
+
+const WEIGHT_MAP: Record<string, number> = { regular: 400, medium: 500, semibold: 600, bold: 700 }
+const SIZE_MAP: Record<number, number> = { 100: 10, 200: 12, 300: 14, 400: 16, 500: 20, 600: 24, 700: 28, 800: 32, 900: 40, 1000: 68 }
+
+function Text({
+  weight,
+  size,
+  style,
+  ...props
+}: { weight?: "regular" | "medium" | "semibold" | "bold"; size?: number } & React.HTMLAttributes<HTMLSpanElement>) {
+  return (
+    <span
+      style={{
+        fontWeight: weight ? WEIGHT_MAP[weight] : undefined,
+        fontSize: size ? `${SIZE_MAP[size]}px` : undefined,
+        ...style,
+      }}
+      {...props}
+    />
+  )
+}
 
 /* ── Reusable pagination for AssessmentTab tables ── */
 function usePagination<T>(items: T[], pageSize = 5, isPdfMode = false) {
@@ -164,11 +174,11 @@ const FormattingOverviewCard = ({ formatting, styles, isPdfMode }: { formatting:
           <div className={styles.infoLabel}>Custom Fonts</div>
           <div className={styles.infoValue}>
             {summary.uses_custom_fonts ? (
-              <Badge appearance="tint" color="warning">
+              <Badge variant="warning">
                 Yes ({uniqueCustomFonts.length})
               </Badge>
             ) : (
-              <Badge appearance="tint" color="success">No</Badge>
+              <Badge variant="success">No</Badge>
             )}
           </div>
         </div>
@@ -177,11 +187,11 @@ const FormattingOverviewCard = ({ formatting, styles, isPdfMode }: { formatting:
           <div className={styles.infoLabel}>Custom Colors</div>
           <div className={styles.infoValue}>
             {summary.uses_custom_colors ? (
-              <Badge appearance="tint" color="warning">
+              <Badge variant="warning">
                 Yes ({uniqueCustomColors.length})
               </Badge>
             ) : (
-              <Badge appearance="tint" color="success">No</Badge>
+              <Badge variant="success">No</Badge>
             )}
           </div>
         </div>
@@ -190,11 +200,11 @@ const FormattingOverviewCard = ({ formatting, styles, isPdfMode }: { formatting:
           <div className={styles.infoLabel}>Custom Borders</div>
           <div className={styles.infoValue}>
             {summary.uses_custom_borders ? (
-              <Badge appearance="tint" color="warning">
+              <Badge variant="warning">
                 Yes ({uniqueBorderStyles.length} styles)
               </Badge>
             ) : (
-              <Badge appearance="tint" color="success">No</Badge>
+              <Badge variant="success">No</Badge>
             )}
           </div>
         </div>
@@ -402,9 +412,7 @@ const FormattingOverviewCard = ({ formatting, styles, isPdfMode }: { formatting:
             {uniqueBorderStyles.map((style: string, idx: number) => (
                 <Badge
                   key={idx}
-                  appearance="tint"
-                  color="informative"
-                  size="medium"
+                  variant="secondary"
                   style={{ textTransform: "capitalize", whiteSpace: "nowrap" }}
                 >
                 {style}
@@ -451,12 +459,10 @@ const FormattingOverviewCard = ({ formatting, styles, isPdfMode }: { formatting:
                       }}
                       onClick={() => toggleExpand(name)}
                     >
-                      {isExpanded ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+                      {isExpanded ? <ChevronDown fontSize={20} /> : <ChevronRight fontSize={20} />}
                       <div className={styles.sectionHeader} style={{ fontSize: "16px", margin: 0 }}>
                         <Badge
-                          appearance="outline"
-                          color="brand"
-                          size="medium"
+                          variant="default"
                           style={{ marginRight: "8px" }}
                         >
                           {item.type}
@@ -535,9 +541,7 @@ const FormattingOverviewCard = ({ formatting, styles, isPdfMode }: { formatting:
                                 {customBorders.map((borderStyle: string, bIdx: number) => (
                                   <Badge
                                     key={bIdx}
-                                    appearance="tint"
-                                    color="subtle"
-                                    size="medium"
+                                    variant="secondary"
                                     style={{
                                       textTransform: "capitalize",
                                       whiteSpace: "nowrap"
@@ -884,7 +888,7 @@ const VisualsTab = ({
     <>
       <Card className={styles.sectionCard}>
         <div className={styles.sectionHeaderRow} onClick={() => toggleSection("overview")}>
-          {openSections.overview ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+          {openSections.overview ? <ChevronDown fontSize={20} /> : <ChevronRight fontSize={20} />}
           <div className={styles.sectionHeader}>Visual Overview</div>
         </div>
         {openSections.overview && (
@@ -897,7 +901,7 @@ const VisualsTab = ({
       </Card>
       <Card className={styles.sectionCard}>
         <div className={styles.sectionHeaderRow} onClick={() => toggleSection("types")} style={{ cursor: "pointer" }}>
-          {openSections.types ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+          {openSections.types ? <ChevronDown fontSize={20} /> : <ChevronRight fontSize={20} />}
           <div className={styles.sectionHeader}>Visual Types<span style={{ fontSize: "14px", color: "#64748b", marginLeft: "12px" }}>({visualDetails.length} sheet{visualDetails.length !== 1 ? "s" : ""})</span></div>
         </div>
         {openSections.types && (
@@ -911,7 +915,7 @@ const VisualsTab = ({
               return (
                 <div key={idx} className={styles.infoItem} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px' }}>
                   <div style={{ fontSize: '15px', fontWeight: 500, color: '#1e293b', flex: 1 }}>{visual.sheet_name}</div>
-                  <Badge appearance="tint" color={isCustom ? "warning" : "informative"} size="medium" style={{ minWidth: '90px', textAlign: 'center', fontWeight: 500, whiteSpace: "nowrap" }}>{displayType}</Badge>
+                  <Badge variant={isCustom ? "warning" : "secondary"} style={{ minWidth: '90px', textAlign: 'center', fontWeight: 500, whiteSpace: "nowrap" }}>{displayType}</Badge>
                 </div>
               );
             })}
@@ -922,7 +926,7 @@ const VisualsTab = ({
       {actions?.length > 0 && (
         <Card className={styles.sectionCard}>
           <div className={styles.sectionHeaderRow} onClick={() => toggleSection("actions")} style={{ cursor: "pointer" }}>
-            {openSections.actions ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+            {openSections.actions ? <ChevronDown fontSize={20} /> : <ChevronRight fontSize={20} />}
             <div className={styles.sectionHeader}>Actions<span style={{ fontSize: "14px", color: "#64748b", marginLeft: "12px" }}>({actions.length})</span></div>
           </div>
           {openSections.actions && (
@@ -943,15 +947,15 @@ const VisualsTab = ({
                       else if (attr.caption === "Navigation" || attr.name === "Navigation") typeLabel = "Go to Sheet";
                       else typeLabel = typeLabel || "NA";
                     }
-                    let typeColor = "subtle";
+                    let typeColor = "secondary";
                     if (typeLabel === "Filter") typeColor = "success";
                     else if (typeLabel === "Highlight") typeColor = "warning";
-                    else if (typeLabel === "Go to URL" || typeLabel === "Go to Sheet") typeColor = "brand";
-                    else if (typeLabel === "Change Parameter" || typeLabel === "Change Set Values") typeColor = "informative";
+                    else if (typeLabel === "Go to URL" || typeLabel === "Go to Sheet") typeColor = "default";
+                    else if (typeLabel === "Change Parameter" || typeLabel === "Change Set Values") typeColor = "secondary";
                     return (
                       <tr key={idx} style={{ background: idx % 2 === 0 ? "#ffffff" : "#fafafa", borderBottom: "1px solid #e2e8f0" }}>
                         <td style={{ padding: "12px 16px", fontWeight: 500 }}>{attr.caption || attr.name || "Unnamed Action"}</td>
-                        <td style={{ padding: "12px 16px" }}><Badge appearance="outline" color={typeColor as any} size="medium" style={{ whiteSpace: "normal", wordBreak: "break-word", height: "auto", padding: "4px 8px", textAlign: "center" }}>{typeLabel}</Badge></td>
+                        <td style={{ padding: "12px 16px" }}><Badge variant={typeColor as any} style={{ whiteSpace: "normal", wordBreak: "break-word", height: "auto", padding: "4px 8px", textAlign: "center" }}>{typeLabel}</Badge></td>
                       </tr>
                     );
                   })}
@@ -964,7 +968,7 @@ const VisualsTab = ({
       )}
       <Card className={styles.sectionCard}>
         <div className={styles.sectionHeaderRow} onClick={() => toggleSection("objects")}>
-          {openSections.objects ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+          {openSections.objects ? <ChevronDown fontSize={20} /> : <ChevronRight fontSize={20} />}
           <div className={styles.sectionHeader}>Dashboard Objects</div>
         </div>
         {openSections.objects && (
@@ -976,18 +980,18 @@ const VisualsTab = ({
       </Card>
       {containers.length > 0 && (
         <Card className={styles.sectionCard}>
-          <div className={styles.sectionHeaderRow} onClick={() => toggleSection("containers")}>{openSections.containers ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}<div className={styles.sectionHeader}>Dashboard Containers</div></div>
+          <div className={styles.sectionHeaderRow} onClick={() => toggleSection("containers")}>{openSections.containers ? <ChevronDown fontSize={20} /> : <ChevronRight fontSize={20} />}<div className={styles.sectionHeader}>Dashboard Containers</div></div>
           {openSections.containers && (
             <div style={{ marginTop: "16px" }}>
               {(Object.entries(groupedContainers) as [string, any[]][]).map(([dashboardName, conts]) => (
                 <div key={dashboardName} style={{ marginBottom: "28px" }}>
-                  <div style={{ fontWeight: 600, fontSize: "16px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>{dashboardName}<Badge appearance="outline" color="brand" size="medium" style={{ whiteSpace: "nowrap" }}>{conts.length} container{conts.length !== 1 ? "s" : ""}</Badge></div>
+                  <div style={{ fontWeight: 600, fontSize: "16px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>{dashboardName}<Badge variant="default" style={{ whiteSpace: "nowrap" }}>{conts.length} container{conts.length !== 1 ? "s" : ""}</Badge></div>
                   <div className={styles.grid2} style={{ marginBottom: "16px" }}>
                     <div className={styles.infoItem}><div className={styles.infoLabel}>Floating</div><div className={styles.infoValue}>{conts.filter(c => c.layout_mode === "Floating").length}</div></div>
                     <div className={styles.infoItem}><div className={styles.infoLabel}>Tiled</div><div className={styles.infoValue}>{conts.filter(c => c.layout_mode === "Tiled").length}</div></div>
                   </div>
                   {conts.length > 0 ? (
-                    <div className={styles.tableContainer}><Table><TableHeader><TableRow><TableHeaderCell style={{ fontWeight: "bold" }}>Type</TableHeaderCell><TableHeaderCell style={{ fontWeight: "bold" }}>Layout Mode</TableHeaderCell><TableHeaderCell style={{ fontWeight: "bold" }}>Container ID</TableHeaderCell><TableHeaderCell style={{ fontWeight: "bold" }}>Name</TableHeaderCell></TableRow></TableHeader><TableBody>{conts.map((cont: any, idx: number) => (<TableRow key={idx}><TableCell>{cont.type || "NA"}</TableCell><TableCell><Badge appearance="tint" color={cont.layout_mode === "Floating" ? "warning" : "success"} style={{ whiteSpace: "nowrap" }}>{cont.layout_mode || "NA"}</Badge></TableCell><TableCell>{cont.container_id || "NA"}</TableCell><TableCell>{cont.name || "NA"}</TableCell></TableRow>))}</TableBody></Table></div>
+                    <div className={styles.tableContainer}><table><thead><tr><th style={{ fontWeight: "bold" }}>Type</th><th style={{ fontWeight: "bold" }}>Layout Mode</th><th style={{ fontWeight: "bold" }}>Container ID</th><th style={{ fontWeight: "bold" }}>Name</th></tr></thead><tbody>{conts.map((cont: any, idx: number) => (<tr key={idx}><td>{cont.type || "NA"}</td><td><Badge variant={cont.layout_mode === "Floating" ? "warning" : "success"} style={{ whiteSpace: "nowrap" }}>{cont.layout_mode || "NA"}</Badge></td><td>{cont.container_id || "NA"}</td><td>{cont.name || "NA"}</td></tr>))}</tbody></table></div>
                   ) : (<Text size={200} weight="regular" style={{ color: "#64748b", fontStyle: "italic" }}>No containers found for this dashboard.</Text>)}
                 </div>
               ))}
@@ -998,7 +1002,7 @@ const VisualsTab = ({
       {Object.keys(groupedDeviceLayouts).length > 0 && (
         <Card className={styles.sectionCard}>
           <div className={styles.sectionHeaderRow} onClick={() => toggleSection("deviceLayouts")} style={{ cursor: "pointer" }}>
-            {openSections.deviceLayouts ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+            {openSections.deviceLayouts ? <ChevronDown fontSize={20} /> : <ChevronRight fontSize={20} />}
             <div className={styles.sectionHeader}>
               Dashboard Device Layouts
             </div>
@@ -1007,40 +1011,39 @@ const VisualsTab = ({
             <div style={{ marginTop: "16px" }}>
               {(Object.entries(groupedDeviceLayouts) as [string, any[]][]).map(([dashboardName, layouts]: [string, any[]]) => (
                 <div key={dashboardName} style={{ marginBottom: "28px" }}>
-                  <div style={{ fontWeight: 600, fontSize: "16px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>{dashboardName}<Badge appearance="outline" color="brand" size="medium" style={{ whiteSpace: "nowrap" }}>{layouts.length} layout{layouts.length !== 1 ? "s" : ""}</Badge></div>
+                  <div style={{ fontWeight: 600, fontSize: "16px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>{dashboardName}<Badge variant="default" style={{ whiteSpace: "nowrap" }}>{layouts.length} layout{layouts.length !== 1 ? "s" : ""}</Badge></div>
                   {layouts.length > 0 ? (
                     <div className={styles.tableContainer}>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHeaderCell style={{ fontWeight: "bold" }}>Device</TableHeaderCell>
-                            <TableHeaderCell style={{ fontWeight: "bold" }}>Type</TableHeaderCell>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th style={{ fontWeight: "bold" }}>Device</th>
+                            <th style={{ fontWeight: "bold" }}>Type</th>
+                          </tr>
+                        </thead>
+                        <tbody>
                           {layouts.map((layout, idx) => {
                             const isAuto = layout.auto_generated === true;
                             return (
-                              <TableRow key={idx}>
-                                <TableCell>
+                              <tr key={idx}>
+                                <td>
                                   <span style={{ fontWeight: 500, color: "#1e293b" }}>{layout.device_type || "Unknown"}</span>
-                                </TableCell>
-                                <TableCell>
+                                </td>
+                                <td>
                                   <div style={{ width: "max-content" }}>
                                     <Badge
-                                      appearance="tint"
-                                      color={isAuto ? "subtle" : "brand"}
+                                      variant={isAuto ? "secondary" : "default"}
                                       style={{ whiteSpace: "nowrap" }}
                                     >
                                       {isAuto ? "Auto-Generated" : "Custom"}
                                     </Badge>
                                   </div>
-                                </TableCell>
-                              </TableRow>
+                                </td>
+                              </tr>
                             );
                           })}
-                        </TableBody>
-                      </Table>
+                        </tbody>
+                      </table>
                     </div>
                   ) : (
                     <Text
@@ -1112,7 +1115,7 @@ const SecurityTab = ({
           <div className={styles.infoItem}>
             <div className={styles.infoLabel}>ROW-LEVEL SECURITY (RLS)</div>
             <div className={styles.infoValue}>
-              <Badge appearance="tint" color={hasRLS ? "warning" : "success"}>
+              <Badge variant={hasRLS ? "warning" : "success"}>
                 {hasRLS ? "Yes" : "No"}
               </Badge>
             </div>
@@ -1130,7 +1133,7 @@ const SecurityTab = ({
 
       <Card className={styles.sectionCard}>
         <div className={styles.sectionHeaderRow} onClick={() => toggleSection("rlsFindings")} style={{ cursor: "pointer" }}>
-          {openSections.rlsFindings ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+          {openSections.rlsFindings ? <ChevronDown fontSize={20} /> : <ChevronRight fontSize={20} />}
           <div className={styles.sectionHeader}>Row-Level Security (RLS) Findings ({rlsFindings.length})</div>
         </div>
         {openSections.rlsFindings && (
@@ -1147,7 +1150,7 @@ const SecurityTab = ({
 
       <Card className={styles.sectionCard}>
         <div className={styles.sectionHeaderRow} onClick={() => toggleSection("embeddedCreds")} style={{ cursor: "pointer" }}>
-          {openSections.embeddedCreds ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+          {openSections.embeddedCreds ? <ChevronDown fontSize={20} /> : <ChevronRight fontSize={20} />}
           <div className={styles.sectionHeader}>Embedded Credentials ({embeddedCreds.length})</div>
         </div>
         {openSections.embeddedCreds && (
@@ -1180,7 +1183,7 @@ const SecurityTab = ({
                           </div>
                         </td>
                         <td style={{ padding: "14px" }}>
-                          <Badge appearance="tint" color="brand" style={{ fontSize: "12px", whiteSpace: "nowrap" }}>{typeVal}</Badge>
+                          <Badge variant="default" style={{ fontSize: "12px", whiteSpace: "nowrap" }}>{typeVal}</Badge>
                         </td>
                         <td style={{ padding: "14px", color: serverVal ? "#475569" : "#94a3b8" }}>{serverVal || "—"}</td>
                         <td style={{ padding: "14px", color: dbVal ? "#475569" : "#94a3b8" }}>{dbVal || "—"}</td>
@@ -1212,8 +1215,6 @@ const SecurityTab = ({
             <div className={styles.infoLabel}>LAST FULL REFRESH</div>
             <div className={styles.infoValue}>
               <Badge
-                appearance="outline"
-                shape="rounded"
                 style={{
                   fontSize: "11px",
                   height: "auto",
@@ -1230,7 +1231,7 @@ const SecurityTab = ({
           <div className={styles.infoItem}>
             <div className={styles.infoLabel}>REFRESH FREQUENCY</div>
             <div className={styles.infoValue}>
-              <Badge appearance="tint" color="warning" size="small" style={{ height: "auto", padding: "4px 8px", textAlign: "center", lineHeight: "1.2" }}>
+              <Badge variant="warning" style={{ height: "auto", padding: "4px 8px", textAlign: "center", lineHeight: "1.2" }}>
                 {refresh_schedule?.refresh_frequency || "Manual / None"}
               </Badge>
             </div>
@@ -1260,7 +1261,7 @@ const SecurityTab = ({
         ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", padding: "8px 0" }}>
             {tags.map((tag, i) => (
-              <Badge key={i} appearance="outline" color="brand" shape="rounded" size="medium">{tag}</Badge>
+              <Badge key={i} variant="default">{tag}</Badge>
             ))}
           </div>
         )}
@@ -1268,7 +1269,7 @@ const SecurityTab = ({
 
       <Card className={styles.sectionCard}>
         <div className={styles.sectionHeaderRow} onClick={() => toggleSection("permissions")} style={{ cursor: "pointer" }}>
-          {openSections.permissions ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+          {openSections.permissions ? <ChevronDown fontSize={20} /> : <ChevronRight fontSize={20} />}
           <div className={styles.sectionHeader}>
             Workbook Permissions
             <span style={{ fontSize: "14px", color: "#64748b", marginLeft: "12px" }}>({workbookPermissions.length} grantees)</span>
@@ -1286,7 +1287,7 @@ const SecurityTab = ({
                   return (
                     <div key={idx} style={{ padding: "16px", background: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px", fontWeight: 600, fontSize: "15px" }}>
-                        <Badge appearance="tint" color={perm.grantee_type === "User" ? "brand" : "subtle"} size="medium">{perm.grantee_type || "User"}</Badge>
+                        <Badge variant={perm.grantee_type === "User" ? "default" : "secondary"}>{perm.grantee_type || "User"}</Badge>
                         <span style={{ color: "#334155" }}>
                           <span style={{ fontWeight: 700 }}>ID:- </span>{perm.grantee_id || "Unnamed Grantee"}
                         </span>
@@ -1303,7 +1304,7 @@ const SecurityTab = ({
                             border: `1px solid ${cap.value === "Allow" ? "#bbf7d0" : "#fecaca"}` 
                           }}>
                             <span style={{ fontSize: "14px", color: "#1e293b" }}>{cap.name}</span>
-                            <Badge appearance="tint" color={cap.value === "Allow" ? "success" : "danger"} size="small">
+                            <Badge variant={cap.value === "Allow" ? "success" : "destructive"}>
                               {cap.value.toUpperCase()}
                             </Badge>
                           </div>
@@ -1489,22 +1490,22 @@ const FormattingTab = ({
     <Card className={styles.sectionCard}>
       {/* 1. Summary Overview */}
       <div className={styles.sectionHeaderRow} onClick={() => toggleSection("summary")} style={{ cursor: "pointer" }}>
-        {openSections.summary ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+        {openSections.summary ? <ChevronDown fontSize={20} /> : <ChevronRight fontSize={20} />}
         <div className={styles.sectionHeader}>Formatting Summary</div>
       </div>
       {openSections.summary && (
         <div style={{ marginTop: "16px" }}>
           <div className={styles.grid3} style={{ marginBottom: "24px" }}>
-            <div className={styles.infoItem}><div className={styles.infoLabel}>Custom Fonts</div><div className={styles.infoValue}>{summary.has_fonts ? <Badge appearance="tint" color="success">Yes ({uniqueCustomFonts.length})</Badge> : <Badge appearance="tint" color="warning">No</Badge>}</div></div>
-            <div className={styles.infoItem}><div className={styles.infoLabel}>Custom Colors</div><div className={styles.infoValue}>{summary.has_colors ? <Badge appearance="tint" color="success">Yes ({uniqueCustomColors.length})</Badge> : <Badge appearance="tint" color="warning">No</Badge>}</div></div>
-            <div className={styles.infoItem}><div className={styles.infoLabel}>Custom Borders</div><div className={styles.infoValue}>{summary.has_borders ? <Badge appearance="tint" color="success">Yes ({uniqueBorderStyles.length} styles)</Badge> : <Badge appearance="tint" color="warning">No</Badge>}</div></div>
+            <div className={styles.infoItem}><div className={styles.infoLabel}>Custom Fonts</div><div className={styles.infoValue}>{summary.has_fonts ? <Badge variant="success">Yes ({uniqueCustomFonts.length})</Badge> : <Badge variant="warning">No</Badge>}</div></div>
+            <div className={styles.infoItem}><div className={styles.infoLabel}>Custom Colors</div><div className={styles.infoValue}>{summary.has_colors ? <Badge variant="success">Yes ({uniqueCustomColors.length})</Badge> : <Badge variant="warning">No</Badge>}</div></div>
+            <div className={styles.infoItem}><div className={styles.infoLabel}>Custom Borders</div><div className={styles.infoValue}>{summary.has_borders ? <Badge variant="success">Yes ({uniqueBorderStyles.length} styles)</Badge> : <Badge variant="warning">No</Badge>}</div></div>
           </div>
           {uniqueBorderStyles.length > 0 && (
             <div style={{ marginBottom: "16px" }}>
               <div className={styles.infoLabel} style={{ marginBottom: "8px" }}>Unique Border Styles</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                 {uniqueBorderStyles.map((style: string, idx: number) => (
-                  <Badge key={idx} appearance="tint" color="informative" size="medium" style={{ textTransform: "capitalize", whiteSpace: "nowrap" }}>{style}</Badge>
+                  <Badge key={idx} variant="secondary" style={{ textTransform: "capitalize", whiteSpace: "nowrap" }}>{style}</Badge>
                 ))}
               </div>
             </div>
@@ -1514,8 +1515,8 @@ const FormattingTab = ({
       )}
 
       {/* 2. Global Color Palette */}
-      <div className={styles.sectionHeaderRow} onClick={() => toggleSection("colors")} style={{ cursor: "pointer", marginTop: "12px", borderTop: `1px solid ${tokens.colorNeutralStroke2}`, paddingTop: "12px" }}>
-        {openSections.colors ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+      <div className={styles.sectionHeaderRow} onClick={() => toggleSection("colors")} style={{ cursor: "pointer", marginTop: "12px", borderTop: `1px solid var(--border)`, paddingTop: "12px" }}>
+        {openSections.colors ? <ChevronDown fontSize={20} /> : <ChevronRight fontSize={20} />}
         <div className={styles.sectionHeader}>Global Color Palette & Usage</div>
       </div>
       {openSections.colors && (
@@ -1554,8 +1555,8 @@ const FormattingTab = ({
       )}
 
       {/* 3. Typography Usage */}
-      <div className={styles.sectionHeaderRow} onClick={() => toggleSection("fonts")} style={{ cursor: "pointer", marginTop: "12px", borderTop: `1px solid ${tokens.colorNeutralStroke2}`, paddingTop: "12px" }}>
-        {openSections.fonts ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+      <div className={styles.sectionHeaderRow} onClick={() => toggleSection("fonts")} style={{ cursor: "pointer", marginTop: "12px", borderTop: `1px solid var(--border)`, paddingTop: "12px" }}>
+        {openSections.fonts ? <ChevronDown fontSize={20} /> : <ChevronRight fontSize={20} />}
         <div className={styles.sectionHeader}>Typography Usage</div>
       </div>
       {openSections.fonts && (
@@ -1577,8 +1578,8 @@ const FormattingTab = ({
       )}
 
       {/* 4. Detailed Object Formatting */}
-      <div className={styles.sectionHeaderRow} onClick={() => toggleSection("details")} style={{ cursor: "pointer", marginTop: "12px", borderTop: `1px solid ${tokens.colorNeutralStroke2}`, paddingTop: "12px" }}>
-        {openSections.details ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
+      <div className={styles.sectionHeaderRow} onClick={() => toggleSection("details")} style={{ cursor: "pointer", marginTop: "12px", borderTop: `1px solid var(--border)`, paddingTop: "12px" }}>
+        {openSections.details ? <ChevronDown fontSize={20} /> : <ChevronRight fontSize={20} />}
         <div className={styles.sectionHeader}>Detailed Object Formatting<span style={{ fontSize: "14px", color: "#64748b", marginLeft: "12px" }}>({details.filter((item: any) => item.has_formatting || item.has_custom_formatting).length} objects)</span></div>
       </div>
       {openSections.details && (
@@ -1594,11 +1595,11 @@ const FormattingTab = ({
               return (
                 <div key={idx}>
                   <div className={styles.sectionHeaderRow} style={{ cursor: "pointer", background: "#f8fafc", borderRadius: "10px", padding: "12px 16px", border: "1px solid #e2e8f0", marginBottom: isExpanded ? 0 : "8px" }} onClick={() => toggleExpand(name)}>
-                    {isExpanded ? <ChevronDown20Regular fontSize={20} /> : <ChevronRight20Regular fontSize={20} />}
-                    <div className={styles.sectionHeader} style={{ fontSize: "16px", margin: 0 }}><Badge appearance="outline" color="brand" size="medium" style={{ marginRight: "8px" }}>{item.type}</Badge>{name}</div>
+                    {isExpanded ? <ChevronDown fontSize={20} /> : <ChevronRight fontSize={20} />}
+                    <div className={styles.sectionHeader} style={{ fontSize: "16px", margin: 0 }}><Badge variant="default" style={{ marginRight: "8px" }}>{item.type}</Badge>{name}</div>
                     <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                      {itemFonts.length > 0 && <Badge appearance="tint" color="subtle" size="medium" style={{ whiteSpace: "nowrap" }}>Fonts: {itemFonts.length}</Badge>}
-                      {itemColors.length > 0 && <Badge appearance="tint" color="subtle" size="medium" style={{ whiteSpace: "nowrap" }}>Colors: {itemColors.length}</Badge>}
+                      {itemFonts.length > 0 && <Badge variant="secondary" style={{ whiteSpace: "nowrap" }}>Fonts: {itemFonts.length}</Badge>}
+                      {itemColors.length > 0 && <Badge variant="secondary" style={{ whiteSpace: "nowrap" }}>Colors: {itemColors.length}</Badge>}
                     </div>
                   </div>
                   
@@ -1621,7 +1622,7 @@ const FormattingTab = ({
                           <div className={styles.infoLabel} style={{ marginBottom: "8px", fontSize: "12px" }}>CUSTOM FONTS</div>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                             {itemFonts.map((font: string, fidx: number) => (
-                              <Badge key={fidx} appearance="outline" color="brand" size="medium" style={{ whiteSpace: "nowrap" }}>{font}</Badge>
+                              <Badge key={fidx} variant="default" style={{ whiteSpace: "nowrap" }}>{font}</Badge>
                             ))}
                           </div>
                         </div>
@@ -1631,7 +1632,7 @@ const FormattingTab = ({
                           <div className={styles.infoLabel} style={{ marginBottom: "8px", fontSize: "12px" }}>CUSTOM BORDERS</div>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                             {itemBorders.map((style: string, bidx: number) => (
-                              <Badge key={bidx} appearance="tint" color="informative" size="medium" style={{ whiteSpace: "nowrap" }}>{style}</Badge>
+                              <Badge key={bidx} variant="secondary" style={{ whiteSpace: "nowrap" }}>{style}</Badge>
                             ))}
                           </div>
                         </div>
@@ -1641,7 +1642,7 @@ const FormattingTab = ({
                           <div className={styles.infoLabel} style={{ marginBottom: "8px", fontSize: "12px" }}>CUSTOM NUMBER FORMATS</div>
                           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                             {item.number_formats.map((format: string, nidx: number) => (
-                              <Badge key={nidx} appearance="outline" color="informative" size="medium" style={{ width: "max-content", fontFamily: "monospace" }}>{format}</Badge>
+                              <Badge key={nidx} variant="secondary" style={{ width: "max-content", fontFamily: "monospace" }}>{format}</Badge>
                             ))}
                           </div>
                         </div>
@@ -1693,11 +1694,11 @@ const OverviewTab = ({
     : (legacy_risks?.legacy_connections_count ?? 0);
 
   const summaryMetrics = [
-    { label: "TOTAL VISUALIZATIONS", value: visualization_count, color: "#db2777", icon: <DataPie20Regular /> },
-    { label: "TOTAL CALCULATIONS", value: total_calculations, color: "#ea580c", icon: <Calculator20Regular /> },
-    { label: "TOTAL ACTIONS", value: total_actions, color: "#16a34a", icon: <Flash20Regular /> },
-    { label: "TOTAL PARAMETERS", value: total_parameters, color: "#4f46e5", icon: <Settings20Regular /> },
-    { label: "TOTAL SETS", value: total_sets, color: "#9333ea", icon: <Shapes20Regular /> },
+    { label: "TOTAL VISUALIZATIONS", value: visualization_count, color: "#db2777", icon: <PieChart /> },
+    { label: "TOTAL CALCULATIONS", value: total_calculations, color: "#ea580c", icon: <Calculator /> },
+    { label: "TOTAL ACTIONS", value: total_actions, color: "#16a34a", icon: <Zap /> },
+    { label: "TOTAL PARAMETERS", value: total_parameters, color: "#4f46e5", icon: <Settings /> },
+    { label: "TOTAL SETS", value: total_sets, color: "#9333ea", icon: <Shapes /> },
   ];
 
   return (
@@ -1708,7 +1709,7 @@ const OverviewTab = ({
           <div className={styles.infoItem}><div className={styles.infoLabel}>Name</div><div className={styles.infoValue}>{workbook_name || "NA"}</div></div>
           <div className={styles.infoItem}><div className={styles.infoLabel}>Owner</div><div className={styles.infoValue}>{owner_name || "NA"}</div></div>
           <div className={styles.infoItem}><div className={styles.infoLabel}>Last Modified</div><div className={styles.infoValue}>{last_modified_at || "NA"}</div></div>
-          <div className={styles.infoItem}><div className={styles.infoLabel}>Status</div><div className={styles.infoValue}><Badge appearance="tint" color="success" size="large">{status || "Active"}</Badge></div></div>
+          <div className={styles.infoItem}><div className={styles.infoLabel}>Status</div><div className={styles.infoValue}><Badge variant="success">{status || "Active"}</Badge></div></div>
         </div>
       </Card>
 
@@ -1719,8 +1720,7 @@ const OverviewTab = ({
             <div className={styles.infoLabel}>LEGACY DETECTED</div>
             <div className={styles.infoValue}>
               <Badge
-                appearance="tint"
-                color={legacyDetected ? "warning" : "success"}
+                variant={legacyDetected ? "warning" : "success"}
                 style={{ height: "auto", padding: "4px 12px", textAlign: "center", fontWeight: 600 }}
               >
                 {legacyDetected ? "Yes" : "No"}
@@ -1798,8 +1798,8 @@ const DataSourcesTab = ({
         <div className={styles.sectionHeader}>Data Sources Summary</div>
         <div className={styles.grid2}>
           <div className={styles.infoItem}><div className={styles.infoLabel}>Total Sources</div><div className={styles.infoValue}>{(logical_datasources || []).length}</div></div>
-          <div className={styles.infoItem}><div className={styles.infoLabel}>Connection Type</div><div className={styles.infoValue}><Badge appearance="tint" color="brand">{connection_type || "NA"}</Badge></div></div>
-          <div className={styles.infoItem}><div className={styles.infoLabel}>Custom SQL</div><div className={styles.infoValue}>{hasCustomSQL ? <Badge appearance="tint" color="success">Yes</Badge> : <Badge appearance="tint" color="warning">No</Badge>}</div></div>
+          <div className={styles.infoItem}><div className={styles.infoLabel}>Connection Type</div><div className={styles.infoValue}><Badge variant="default">{connection_type || "NA"}</Badge></div></div>
+          <div className={styles.infoItem}><div className={styles.infoLabel}>Custom SQL</div><div className={styles.infoValue}>{hasCustomSQL ? <Badge variant="success">Yes</Badge> : <Badge variant="warning">No</Badge>}</div></div>
           <div className={styles.infoItem}><div className={styles.infoLabel}>Multidimensional</div><div className={styles.infoValue}>{hasCubes ? "Yes" : "No"}</div></div>
           <div className={styles.infoItem}>
             <div className={styles.infoLabel}>Published Datasources</div>
@@ -1831,10 +1831,10 @@ const DataSourcesTab = ({
                       <strong style={{ color: "#1e293b" }}>{ds.name || ds.caption || ds.Name || ds.Caption || "NA"}</strong>
                     </td>
                     <td style={{ padding: "14px 16px", verticalAlign: "middle" }}>
-                      <Badge appearance="tint" color={(ds.has_extract || ds.is_extract || ds.Extract) ? "success" : "subtle"}>{(ds.has_extract || ds.is_extract || ds.Extract) ? "Yes" : "No"}</Badge>
+                      <Badge variant={(ds.has_extract || ds.is_extract || ds.Extract) ? "success" : "secondary"}>{(ds.has_extract || ds.is_extract || ds.Extract) ? "Yes" : "No"}</Badge>
                     </td>
                     <td style={{ padding: "14px 16px", verticalAlign: "middle" }}>
-                      <Badge appearance="tint" color={(ds.is_published_datasource || ds.published || ds.Published) ? "brand" : "subtle"}>{(ds.is_published_datasource || ds.published || ds.Published) ? "Published" : "Embedded"}</Badge>
+                      <Badge variant={(ds.is_published_datasource || ds.published || ds.Published) ? "default" : "secondary"}>{(ds.is_published_datasource || ds.published || ds.Published) ? "Published" : "Embedded"}</Badge>
                     </td>
                   </tr>
                 ))}
@@ -1874,19 +1874,19 @@ const DataSourcesTab = ({
               <>
                 <div className={styles.infoItem}>
                   <div className={styles.infoLabel}>CONNECTION TYPE</div>
-                  <div className={styles.infoValue}><Badge appearance="tint" color="brand">{database_sources[0] || "NA"}</Badge></div>
+                  <div className={styles.infoValue}><Badge variant="default">{database_sources[0] || "NA"}</Badge></div>
                 </div>
                 {/* 
                 {database_sources.length > 1 && (
                   <div className={styles.infoItem}>
                     <div className={styles.infoLabel}>STORAGE FORMAT</div>
-                    <div className={styles.infoValue}><Badge appearance="tint" color="informative">{database_sources[1] || "NA"}</Badge></div>
+                    <div className={styles.infoValue}><Badge variant="secondary">{database_sources[1] || "NA"}</Badge></div>
                   </div>
                 )}
                 {database_sources.length > 2 && (
                   <div className={styles.infoItem}>
                     <div className={styles.infoLabel}>SERVER ADDRESS</div>
-                    <div className={styles.infoValue}><Badge appearance="tint" color="subtle">{database_sources[2] || "NA"}</Badge></div>
+                    <div className={styles.infoValue}><Badge variant="secondary">{database_sources[2] || "NA"}</Badge></div>
                   </div>
                 )}
                 */}
@@ -1898,16 +1898,16 @@ const DataSourcesTab = ({
                   <React.Fragment key={i}>
                     <div className={styles.infoItem}>
                       <div className={styles.infoLabel}>CONNECTION TYPE</div>
-                      <div className={styles.infoValue}><Badge appearance="tint" color="brand">{src.type || src.connection_type || src.Type || src.class || "NA"}</Badge></div>
+                      <div className={styles.infoValue}><Badge variant="default">{src.type || src.connection_type || src.Type || src.class || "NA"}</Badge></div>
                     </div>
                     {/* 
                     <div className={styles.infoItem}>
                       <div className={styles.infoLabel}>STORAGE FORMAT</div>
-                      <div className={styles.infoValue}><Badge appearance="tint" color="informative">{src.storage_format || src.mode || src.Storage_Format || "hyper"}</Badge></div>
+                      <div className={styles.infoValue}><Badge variant="secondary">{src.storage_format || src.mode || src.Storage_Format || "hyper"}</Badge></div>
                     </div>
                     <div className={styles.infoItem}>
                       <div className={styles.infoLabel}>SERVER ADDRESS</div>
-                      <div className={styles.infoValue}><Badge appearance="tint" color="subtle">{src.server || src.address || src.Server || src.host || src.server_address || "NA"}</Badge></div>
+                      <div className={styles.infoValue}><Badge variant="secondary">{src.server || src.address || src.Server || src.host || src.server_address || "NA"}</Badge></div>
                     </div>
                     */}
                   </React.Fragment>
@@ -1957,7 +1957,7 @@ const DataSourcesTab = ({
                         </div>
                       </td>
                       <td style={{ padding: "14px", verticalAlign: "middle" }}>
-                        <Badge appearance="tint" color="brand" style={{ fontSize: "12px", maxWidth: "100%", whiteSpace: "normal", wordBreak: "break-all", lineHeight: "1.3", height: "auto", padding: "3px 8px", textAlign: "left", display: "inline-block" }}>
+                        <Badge variant="default" style={{ fontSize: "12px", maxWidth: "100%", whiteSpace: "normal", wordBreak: "break-all", lineHeight: "1.3", height: "auto", padding: "3px 8px", textAlign: "left", display: "inline-block" }}>
                           {typeVal}
                         </Badge>
                       </td>
@@ -2135,7 +2135,7 @@ export function AssessmentTab({ selectedWorkbookId, projectId: propProjectId, ru
   const customSqlCount = semantics?.custom_sql_count || 0
 
   const getRiskColor = (score: number) => {
-    if (score >= 75) return "danger"
+    if (score >= 75) return "destructive"
     if (score >= 50) return "warning"
     return "success"
   }
@@ -2151,9 +2151,7 @@ export function AssessmentTab({ selectedWorkbookId, projectId: propProjectId, ru
           {complexity.complexity_score || "NA"}<span style={{ fontSize: "20px", color: "#64748b", marginLeft: "4px" }}> /100</span>
           {complexity.complexity_score !== undefined && (
             <Badge
-              appearance="tint"
-              color={getRiskColor(complexity.complexity_score)}
-              size="large"
+              variant={getRiskColor(complexity.complexity_score)}
               style={{ marginLeft: "12px" }}
             >
               {complexity.risk_level || "Unknown"}
@@ -2206,34 +2204,34 @@ export function AssessmentTab({ selectedWorkbookId, projectId: propProjectId, ru
           msOverflowStyle: "none",
           WebkitOverflowScrolling: "touch",
           marginBottom: "16px",
-          borderBottom: `1px solid ${tokens.colorNeutralStroke2}`
+          borderBottom: `1px solid var(--border)`
         }} className="vl-tablist-scroll-wrapper">
           <style>{`
             .vl-tablist-scroll-wrapper::-webkit-scrollbar {
               display: none;
             }
           `}</style>
-          <TabList
-            selectedValue={selectedTab}
-            onTabSelect={(_, data) => setSelectedTab(data.value as string)}
-            className={styles.tabList}
-            style={{ minWidth: "max-content", borderBottom: "none" }}
+          <Tabs
+            value={selectedTab}
+            onValueChange={(value) => setSelectedTab(value)}
           >
-            <Tab value="overview">Overview</Tab>
-            <Tab value="formatting">Formatting & Styling</Tab>
-            <Tab value="sources">Data Sources</Tab>
-            <Tab value="modeling">Modeling</Tab>
-            <Tab value="visuals">Visuals & Actions</Tab>
-            <Tab value="security">Security</Tab>
-            <Tab value="challenges">Challenges & Risks</Tab>
-          </TabList>
+            <TabsList className={styles.tabList} style={{ minWidth: "max-content", borderBottom: "none" }}>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="formatting">Formatting & Styling</TabsTrigger>
+              <TabsTrigger value="sources">Data Sources</TabsTrigger>
+              <TabsTrigger value="modeling">Modeling</TabsTrigger>
+              <TabsTrigger value="visuals">Visuals & Actions</TabsTrigger>
+              <TabsTrigger value="security">Security</TabsTrigger>
+              <TabsTrigger value="challenges">Challenges & Risks</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
         <div className={styles.tabContent}>
           {isPdfMode ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
               <div style={{ pageBreakInside: "avoid" }}>
-                <div style={{ fontSize: "20px", fontWeight: 600, color: tokens.colorBrandForeground1, marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid ${tokens.colorBrandBackground}` }}>
+                <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
                   Overview
                 </div>
                 <OverviewTab
@@ -2257,7 +2255,7 @@ export function AssessmentTab({ selectedWorkbookId, projectId: propProjectId, ru
               </div>
 
               <div style={{ pageBreakInside: "avoid" }}>
-                <div style={{ fontSize: "20px", fontWeight: 600, color: tokens.colorBrandForeground1, marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid ${tokens.colorBrandBackground}` }}>
+                <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
                   Formatting & Styling
                 </div>
                 <FormattingTab
@@ -2268,7 +2266,7 @@ export function AssessmentTab({ selectedWorkbookId, projectId: propProjectId, ru
               </div>
 
               <div style={{ pageBreakInside: "avoid" }}>
-                <div style={{ fontSize: "20px", fontWeight: 600, color: tokens.colorBrandForeground1, marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid ${tokens.colorBrandBackground}` }}>
+                <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
                   Data Sources
                 </div>
                 <DataSourcesTab
@@ -2289,7 +2287,7 @@ export function AssessmentTab({ selectedWorkbookId, projectId: propProjectId, ru
               </div>
 
               <div style={{ pageBreakInside: "avoid" }}>
-                <div style={{ fontSize: "20px", fontWeight: 600, color: tokens.colorBrandForeground1, marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid ${tokens.colorBrandBackground}` }}>
+                <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
                   Modeling
                 </div>
                 <ModelingTab
@@ -2310,7 +2308,7 @@ export function AssessmentTab({ selectedWorkbookId, projectId: propProjectId, ru
               </div>
 
               <div style={{ pageBreakInside: "avoid" }}>
-                <div style={{ fontSize: "20px", fontWeight: 600, color: tokens.colorBrandForeground1, marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid ${tokens.colorBrandBackground}` }}>
+                <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
                   Visuals & Actions
                 </div>
                 <VisualsTab
@@ -2333,7 +2331,7 @@ export function AssessmentTab({ selectedWorkbookId, projectId: propProjectId, ru
               </div>
 
               <div style={{ pageBreakInside: "avoid" }}>
-                <div style={{ fontSize: "20px", fontWeight: 600, color: tokens.colorBrandForeground1, marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid ${tokens.colorBrandBackground}` }}>
+                <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
                   Security & Risks
                 </div>
                 <SecurityTab
@@ -2348,7 +2346,7 @@ export function AssessmentTab({ selectedWorkbookId, projectId: propProjectId, ru
               </div>
 
               <div style={{ pageBreakInside: "avoid" }}>
-                <div style={{ fontSize: "20px", fontWeight: 600, color: tokens.colorBrandForeground1, marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid ${tokens.colorBrandBackground}` }}>
+                <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
                   Challenges
                 </div>
                 <ChallengesTab

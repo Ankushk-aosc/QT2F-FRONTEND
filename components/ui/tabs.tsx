@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { TabList, Tab } from "@fluentui/react-components";
 
 const TabsContext = createContext<{
   value?: string;
@@ -12,7 +11,12 @@ export function Tabs({
   onValueChange,
   children,
   ...props
-}: any) {
+}: {
+  value?: string;
+  defaultValue?: string;
+  onValueChange?: (value: string) => void;
+  children?: React.ReactNode;
+} & React.HTMLAttributes<HTMLDivElement>) {
   const [active, setActive] = useState(value || defaultValue);
 
   useEffect(() => {
@@ -23,9 +27,7 @@ export function Tabs({
 
   const handleValueChange = (val: string) => {
     setActive(val);
-    if (onValueChange) {
-      onValueChange(val);
-    }
+    onValueChange?.(val);
   };
 
   return (
@@ -35,29 +37,49 @@ export function Tabs({
   );
 }
 
-export function TabsList({ children, ...props }: any) {
-  const { value, onValueChange } = useContext(TabsContext);
+export function TabsList({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <TabList
-      selectedValue={value}
-      onTabSelect={(_, data) => onValueChange?.(data.value as string)}
+    <div role="tablist" className={["ui-tablist", className].filter(Boolean).join(" ")} {...props}>
+      {children}
+    </div>
+  );
+}
+
+export function TabsTrigger({
+  value,
+  children,
+  className,
+  ...props
+}: { value: string } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  const { value: activeValue, onValueChange } = useContext(TabsContext);
+  const selected = activeValue === value;
+
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      tabIndex={selected ? 0 : -1}
+      className={["ui-tab", className].filter(Boolean).join(" ")}
+      onClick={() => onValueChange?.(value)}
       {...props}
     >
       {children}
-    </TabList>
+    </button>
   );
 }
 
-export function TabsTrigger({ value, children, ...props }: any) {
-  return (
-    <Tab value={value} {...props}>
-      {children}
-    </Tab>
-  );
-}
-
-export function TabsContent({ value, children, ...props }: any) {
+export function TabsContent({
+  value,
+  children,
+  style,
+  ...props
+}: { value: string } & React.HTMLAttributes<HTMLDivElement>) {
   const { value: activeValue } = useContext(TabsContext);
   if (activeValue !== value) return null;
-  return <div style={{ marginTop: "12px" }} {...props}>{children}</div>;
+  return (
+    <div role="tabpanel" style={{ marginTop: "12px", ...style }} {...props}>
+      {children}
+    </div>
+  );
 }

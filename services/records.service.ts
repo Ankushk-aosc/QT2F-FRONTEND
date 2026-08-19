@@ -68,6 +68,14 @@ class RecordsService {
       }
       return data;
     } catch (error) {
+      // The backend answers 404 "Interactive status not found" when no record
+      // has been written yet. That is the not-configured state, not a failure,
+      // so report it as the documented default instead of throwing — otherwise
+      // it aborts the whole settings load alongside it.
+      if (error instanceof Error && /\[404\b/.test(error.message)) {
+        console.info("[RecordsService] No interactive status record yet; defaulting to disabled.");
+        return { status: false };
+      }
       console.error("[RecordsService] getInteractiveStatus error:", error);
       throw error;
     }
@@ -94,6 +102,13 @@ class RecordsService {
       }
       return data;
     } catch (error) {
+      // As with the interactive status, the backend answers 404 ("Running
+      // Status not found") until a record exists. That is the default-off
+      // state, not a failure.
+      if (error instanceof Error && /\[404\b/.test(error.message)) {
+        console.info("[RecordsService] No data layer record yet; defaulting to disabled.");
+        return { status: false };
+      }
       console.error("[RecordsService] getDataLayerStatus error:", error);
       throw error;
     }
@@ -214,24 +229,21 @@ class RecordsService {
     try {
       // ── Force-refresh ALL three tokens so resume-run never reuses cached invoke-batch tokens ──
       let fabricToken: string | undefined;
-      let onelakeToken: string | undefined;
 
       try {
-        const { getFabricToken, getStorageToken, getActiveToken } = await import(
+        const { getFabricToken, getActiveToken } = await import(
           "@/components/providers/MsalProviderWrapper"
         );
         // forceRefresh=true bypasses MSAL cache and always gets a brand-new token from Azure AD
-        [fabricToken, onelakeToken] = await Promise.all([
+        [fabricToken] = await Promise.all([
           getFabricToken(true),
-          getStorageToken(true),
         ]);
         // Also force-refresh the bearer token so the Authorization header is a new JWT too
         await getActiveToken(true);
-        console.log("[RecordsService] All tokens force-refreshed for resume-run (bearer, fabric, onelake)");
+        console.log("[RecordsService] All tokens force-refreshed for resume-run (bearer, fabric)");
       } catch (tokenErr) {
         console.warn("[RecordsService] Token force-refresh failed, falling back to sessionStorage", tokenErr);
         fabricToken = sessionStorage.getItem("fabric_access_token") ?? undefined;
-        onelakeToken = sessionStorage.getItem("onelake_token") ?? undefined;
       }
 
       const data = await fetchWithAuth<any>("/api/migration/resume", {
@@ -239,7 +251,6 @@ class RecordsService {
         body: JSON.stringify({
           run_id: runId,
           fabric_access_token: fabricToken,
-          onelake_token: onelakeToken,
         }),
       });
       return data;

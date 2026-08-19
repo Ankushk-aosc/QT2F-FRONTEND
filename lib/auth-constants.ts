@@ -1,6 +1,8 @@
 // lib/auth-constants.ts
-// Replaces usage of lib/msalConfig.ts for purely constant values that do NOT rely on env vars
-// For logic relying on env vars (like ClientID), use the async config fetch or contexts.
+// Constant scope values that do NOT depend on environment variables.
+// Anything env-derived (client id, authority, API scope) is fetched at runtime
+// from /api/auth/config by MsalProviderWrapper, which owns the single MSAL
+// instance. There is deliberately no second MSAL bootstrap in this codebase.
 
 // Fabric Scopes don't strictly need env vars if they are constant URLs
 export const fabricApiScopes = [
@@ -20,10 +22,6 @@ export const powerBiScopes = [
     "https://analysis.windows.net/powerbi/api/Workspace.ReadWrite.All",
 ];
 
-// Azure Storage scope
-export const storageScopes = [
-    "https://storage.azure.com/user_impersonation",
-];
 
 // Bump this version whenever you add new scopes that require user consent.
 // When the stored version for a user doesn't match, the consent flow is forced.

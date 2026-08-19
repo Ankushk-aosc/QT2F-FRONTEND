@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { httpClient } from "@/lib/api/httpClient";
 
 export const dynamic = "force-dynamic";
 
@@ -18,14 +17,24 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Missing folderName or agentName parameters" }, { status: 400 });
     }
 
-    const data = await httpClient.get<any>(
-      `/agent-actions/${folderName}?agent_name=${agentName}`,
-      {
-        apiType: "sql",
-        headers: { Authorization: authHeader },
-      }
+    // No backend serves a folder-scoped agent-action read. The Qlik migration
+    // store exposes only `POST /agent-actions` (verified: GET
+    // /agent-actions/{folder} is 404, and the collection itself is 405 on GET).
+    // The equivalent read is `/api/activities`, but it is keyed by
+    // project_id + run_id + workbook_id + agent_name rather than by folder, so
+    // it is not a drop-in substitute for this contract. Say so rather than
+    // returning a misleading 500 or an invented empty list.
+    console.warn(
+      `[API /api/qlik/agent-actions] No backend route for folder="${folderName}" agent="${agentName}" — returning 501.`
     );
-    return NextResponse.json(data);
+    return NextResponse.json(
+      {
+        error: "Agent action history by folder is not available.",
+        details:
+          "No backend exposes a folder-scoped agent-action read. Use /api/activities with project_id, run_id, workbook_id and agent_name instead.",
+      },
+      { status: 501 }
+    );
   } catch (err: any) {
     console.error("[API /api/qlik/agent-actions] Error:", err.message);
     const status = err.status || 500;

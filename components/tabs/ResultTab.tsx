@@ -1,46 +1,33 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from "react"
-import {
-  Badge,
-  Card,
-  Tab,
-  TabList,
-  makeStyles,
-  mergeClasses,
-  tokens,
-  Text,
-  Dropdown,
-  Option,
-  Spinner,
-  Button,
-  shorthands,
-  MessageBar,
-  MessageBarBody,
-  MessageBarTitle,
-  useToastController,
-  Toaster,
-  Toast,
-  ToastTitle,
-  ToastBody,
-  ProgressBar,
-} from "@fluentui/react-components"
-import { 
-  CheckmarkCircle24Filled, 
-  DocumentDatabase24Regular, 
-  DatabaseSearch24Regular, 
-  Layer24Regular, 
-  DataTrending24Regular, 
-  Settings24Regular,
-  ArrowRight24Regular,
-  BrainCircuit24Regular,
-  Pulse24Regular,
-  Clock24Regular,
-  Table24Regular,
-  ArrowClockwise24Regular,
-  Dismiss24Regular
-} from "@fluentui/react-icons"
+import { Card } from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectItem } from "@/components/ui/select"
+import { Spinner } from "@/components/ui/spinner"
+import { Button } from "@/components/ui/button"
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import { Toaster, toast } from "@/components/ui/toaster"
+import { RefreshCw, X } from "lucide-react"
 import { useAgentStore } from "@/stores/agent.store"
+
+function cx(...parts: Array<string | undefined | false>) {
+  return parts.filter(Boolean).join(" ")
+}
+
+const styles = {
+  container: "rt-container",
+  controlsRow: "rt-controlsRow",
+  selector: "rt-selector",
+  label: "rt-label",
+  projectValue: "rt-projectValue",
+  tabList: "rt-tabList",
+  tabContent: "rt-tabContent",
+  centerLoading: "rt-centerLoading",
+  tileIcon: "rt-tileIcon",
+  sparkline: "rt-sparkline",
+  sparklineBar: "rt-sparklineBar",
+}
 
 import { AssessmentTab } from "@/components/tabs/AssessmentTab"
 import { ParsingTab } from "@/components/tabs/ParsingTab"
@@ -62,273 +49,10 @@ import { useMonitoringStore } from "@/stores/monitoring.store"
 import { recordsService } from "@/services/records.service"
 import { isLiteMode } from "@/lib/config"
 
-const useStyles = makeStyles({
-  container: {
-    display: "flex",
-    flexDirection: "column",
-    height: "100%",
-    backgroundColor: "var(--background)",
-  },
-  header: {
-    ...shorthands.padding("16px", "24px"),
-    backgroundColor: "var(--background)",
-    ...shorthands.borderBottom("1px", "solid", tokens.colorNeutralStroke2),
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-  },
-  titleRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    width: "100%",
-  },
-  title: {
-    fontSize: tokens.fontSizeHero700,
-    fontWeight: tokens.fontWeightSemibold,
-    "@media (max-width: 600px)": {
-      fontSize: "24px",
-    },
-  },
-  backgroundStatus: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    opacity: 0.7,
-    color: tokens.colorNeutralForeground2,
-  },
-  controlsRow: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "32px",
-    rowGap: "16px",
-  },
-  projectDisplay: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    minWidth: "200px",
-  },
-  selector: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    minWidth: "300px",
-    "@media (max-width: 768px)": {
-      minWidth: "100%",
-      flexDirection: "column",
-      alignItems: "flex-start",
-      gap: "8px",
-    },
-  },
-  label: {
-    fontWeight: tokens.fontWeightSemibold,
-    fontSize: tokens.fontSizeBase300,
-    whiteSpace: "nowrap",
-  },
-  projectValue: {
-    fontWeight: tokens.fontWeightSemibold,
-    fontSize: tokens.fontSizeBase400,
-    color: tokens.colorNeutralForeground1,
-  },
-  tabList: {
-    ...shorthands.borderBottom("1px", "solid", tokens.colorNeutralStroke2),
-    paddingLeft: "24px",
-    marginTop: "16px",
-    backgroundColor: "var(--background)",
-  },
-  tabContent: {
-    flex: 1,
-    overflow: "auto",
-    backgroundColor: "var(--background)",
-    position: "relative",
-    minHeight: "500px", // Safely ensure content area has height for absolute spinners
-  },
-  centerLoading: {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "12px",
-    width: "100%",
-    boxSizing: "border-box",
-    ...shorthands.padding("0", "20px"),
-    textAlign: "center",
-    wordBreak: "break-word",
-  },
-  // --- New Premium Hero Styles ---
-  resultsContainer: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "24px",
-    padding: "32px",
-    backgroundColor: tokens.colorNeutralBackground2,
-    minHeight: "100%",
-  },
-  heroBanner: {
-    backgroundColor: tokens.colorNeutralBackground1,
-    borderRadius: "16px",
-    padding: "32px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-    position: "relative",
-    marginBottom: "32px",
-    overflow: "hidden",
-    boxShadow: tokens.shadow4,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-  },
-  statusBadge: {
-    height: "10px",
-    width: "10px",
-    borderRadius: "50%",
-    position: "relative",
-    "&::after": {
-      content: '""',
-      position: "absolute",
-      top: "-4px",
-      left: "-4px",
-      right: "-4px",
-      bottom: "-4px",
-      borderRadius: "50%",
-      border: "1px solid currentColor",
-      opacity: 0.4,
-    }
-  },
-  roadmapContainer: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    width: "100%",
-    boxSizing: "border-box",
-    padding: "0 20px",
-  },
-  intelligenceGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-    gap: "20px",
-    width: "100%",
-  },
-  tileIcon: {
-    fontSize: "24px",
-    color: tokens.colorBrandForeground1,
-  },
-  sparkline: {
-    height: "4px",
-    backgroundColor: tokens.colorNeutralBackground3,
-    borderRadius: "2px",
-    marginTop: "12px",
-    overflow: "hidden",
-  },
-  sparklineBar: {
-    height: "100%",
-    backgroundColor: tokens.colorBrandBackground,
-    borderRadius: "2px",
-    transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
-  },
-  stepIndicator: {
-    height: "24px",
-    width: "24px",
-    borderRadius: "50%",
-    backgroundColor: tokens.colorNeutralStroke2,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 3,
-    transition: "all 0.3s ease",
-    "&.active": {
-      backgroundColor: tokens.colorBrandBackground,
-      color: "#fff",
-    },
-    "&.done": {
-      backgroundColor: tokens.colorPaletteGreenBackground3,
-      color: "#fff",
-    }
-  },
-  stepLine: {
-    position: "absolute",
-    top: "8px",
-    left: "50%",
-    width: "100%",
-    height: "2px",
-    backgroundColor: tokens.colorNeutralStroke2,
-    zIndex: 2,
-    "@media (max-width: 900px)": {
-      display: "none",
-    },
-    "&.done": {
-      backgroundColor: tokens.colorPaletteGreenBackground3,
-    }
-  },
-  stepLabel: {
-    fontSize: tokens.fontSizeBase200,
-    fontWeight: tokens.fontWeightBold,
-    color: tokens.colorNeutralForeground3,
-    transition: "all 0.3s ease",
-    "&.active": {
-      color: tokens.colorBrandForeground1,
-    },
-    "&.done": {
-      color: tokens.colorNeutralForeground1,
-    }
-  },
-  heroStatusLabel: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "16px",
-    padding: "12px 32px",
-    borderRadius: tokens.borderRadiusCircular,
-    width: "fit-content",
-    margin: "0 auto",
-    backgroundColor: tokens.colorNeutralBackground2,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-  },
-  heroTitleRow: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-    marginBottom: "24px",
-  },
-  heroSubtitle: {
-    fontSize: tokens.fontSizeBase400,
-    color: tokens.colorNeutralForeground3,
-  },
-  heroActionArea: {
-    width: "100%",
-    display: "flex",
-    flexDirection: "column",
-    gap: "24px",
-    marginBottom: "32px",
-  },
-  roadmapTitle: {
-    fontSize: "12px",
-    fontWeight: 700,
-    color: tokens.colorNeutralForeground4,
-    textTransform: "uppercase",
-    letterSpacing: "0.1em",
-    textAlign: "center",
-  },
-  roadmapStep: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "8px",
-    position: "relative",
-    flex: 1,
-  },
-})
 
 type TabValue = "assessment" | "parsing" | "datalayer" | "mapping" | "validation" | "generation"
 
 export function ResultTab() {
-  const styles = useStyles()
   const [selectedTab, setSelectedTab] = useState<TabValue>("assessment")
 
   const { selectedProject, selectedProjectName, applications } = useDashboardStore()
@@ -418,8 +142,6 @@ export function ResultTab() {
     }
   }
 
-  const toasterId = "result-tab-toaster"
-  const { dispatchToast } = useToastController(toasterId)
   const toastShownRef = useRef(false)
 
   useEffect(() => {
@@ -541,8 +263,8 @@ export function ResultTab() {
     }
   }, [selectedTab, selectedWorkbookId, shouldSkipDataLayer])
 
-  const handleTabSelect = (_: any, data: any) => {
-    setSelectedTab(data.value as TabValue)
+  const handleTabSelect = (value: string) => {
+    setSelectedTab(value as TabValue)
   }
 
   // ★ Clear global validation error when switching workbooks or projects
@@ -552,13 +274,13 @@ export function ResultTab() {
     }
   }, [selectedWorkbookId, selectedProjectFilter]);
 
-  const handleProjectChange = (_: any, data: any) => {
-    setSelectedProjectFilter(data.optionValue as string)
+  const handleProjectChange = (value: string) => {
+    setSelectedProjectFilter(value)
     setSelectedWorkbookId("")
   }
 
-  const handleWorkbookChange = (_: any, data: any) => {
-    setSelectedWorkbookId(data.optionValue as string)
+  const handleWorkbookChange = (value: string) => {
+    setSelectedWorkbookId(value)
   }
 
   const hasAnyAssessment = viewableWorkbooks.length > 0
@@ -708,45 +430,6 @@ export function ResultTab() {
   // ★ Check if parsing data is actually available for the selected workbook
   const isParsingDataReady = !!parsingDataMap[selectedWorkbookId]
 
-  // --- INTERNAL INTELLIGENCE TILE COMPONENT ---
-  const IntelligenceTile = ({ 
-    label, 
-    value, 
-    icon, 
-    percentage = 100, 
-    color = tokens.colorBrandBackground 
-  }: { 
-    label: string; 
-    value: string | number; 
-    icon: React.ReactNode; 
-    percentage?: number; 
-    color?: string;
-  }) => {
-    return (
-      <Card className="vl-metric-card" style={{ position: "relative", overflow: "hidden" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
-          <div className="vl-metric-label">{label}</div>
-          <div className={styles.tileIcon}>{icon}</div>
-        </div>
-        
-        <div className="vl-metric-value" style={{ marginBottom: "8px" }}>
-          {value}
-        </div>
-  
-        <div className={styles.sparkline}>
-          <div 
-            className={styles.sparklineBar} 
-            style={{ width: `${percentage}%`, backgroundColor: color }}
-          />
-        </div>
-        
-        <div style={{ marginTop: "4px", fontSize: "11px", color: tokens.colorNeutralForeground4, fontWeight: 600 }}>
-          {percentage}% SYNCED
-        </div>
-      </Card>
-    );
-  };
-
   // ★ Detect if the SELECTED workbook has assessment data (fallback for missing activities)
   const isAssessmentDataReady = useMemo(() => {
     return viewableWorkbooks.some(wb => wb.id === selectedWorkbookId)
@@ -782,16 +465,10 @@ export function ResultTab() {
 
   useEffect(() => {
     if (mode === 'single' && !hasContinued && hasAnyAssessment && !toastShownRef.current) {
-       dispatchToast(
-         <Toast>
-           <ToastTitle>Success</ToastTitle>
-           <ToastBody>Assessment completed for selected workbook</ToastBody>
-         </Toast>,
-         { intent: "success" }
-       );
+       toast("success", "Assessment completed for selected workbook");
        toastShownRef.current = true;
     }
-  }, [mode, hasContinued, hasAnyAssessment, dispatchToast]);
+  }, [mode, hasContinued, hasAnyAssessment]);
 
   useEffect(() => {
     if (!hasAnyAssessment) {
@@ -828,13 +505,13 @@ export function ResultTab() {
     const renderStoppedMessage = (stageName: string, wbName: string) => {
       return (
         <div className={styles.centerLoading}>
-          <Dismiss24Regular style={{ fontSize: "48px", color: tokens.colorPaletteRedForeground1 }} />
-          <Text weight="semibold" style={{ fontSize: "16px", color: tokens.colorNeutralForeground1, marginTop: 12 }}>
+          <X style={{ fontSize: "48px", width: 48, height: 48, color: "var(--danger)" }} />
+          <span style={{ fontWeight: 600, fontSize: "16px", color: "var(--text)", marginTop: 12 }}>
             Migration Stopped
-          </Text>
-          <Text style={{ color: tokens.colorNeutralForeground3, fontSize: "13px", marginTop: 4 }}>
+          </span>
+          <span style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: 4 }}>
             This migration run was terminated. {stageName} results for <strong>{wbName}</strong> are not available.
-          </Text>
+          </span>
         </div>
       )
     }
@@ -843,12 +520,10 @@ export function ResultTab() {
     if (storeError && !hasAnyAssessment) {
       return (
         <div className={styles.centerLoading}>
-          <MessageBar intent="warning" style={{ maxWidth: 500 }}>
-            <MessageBarBody>
-              <MessageBarTitle>Waiting for backend</MessageBarTitle>
-              <Text>{storeError}</Text>
-            </MessageBarBody>
-          </MessageBar>
+          <Alert variant="default" style={{ maxWidth: 500 }}>
+            <AlertTitle>Waiting for backend</AlertTitle>
+            <AlertDescription>{storeError}</AlertDescription>
+          </Alert>
         </div>
       )
     }
@@ -857,24 +532,24 @@ export function ResultTab() {
       if (isRunStopped) {
         return (
           <div className={styles.centerLoading}>
-            <Dismiss24Regular style={{ fontSize: "48px", color: tokens.colorPaletteRedForeground1 }} />
-            <Text weight="semibold" style={{ fontSize: "16px", color: tokens.colorNeutralForeground1, marginTop: 12 }}>
+            <X style={{ fontSize: "48px", width: 48, height: 48, color: "var(--danger)" }} />
+            <span style={{ fontWeight: 600, fontSize: "16px", color: "var(--text)", marginTop: 12 }}>
               Migration Stopped
-            </Text>
-            <Text style={{ color: tokens.colorNeutralForeground3, fontSize: "13px", marginTop: 4 }}>
+            </span>
+            <span style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: 4 }}>
               This migration run was terminated.
-            </Text>
+            </span>
           </div>
         )
       }
 
       return (
         <div className={styles.centerLoading}>
-          <Spinner size="huge" label="Waiting for results..." />
+          <Spinner size="extra-large" label="Waiting for results..." />
           {hasAnyWorkbooks && (
-            <Text style={{ color: tokens.colorNeutralForeground3, fontSize: "13px", marginTop: 8 }}>
+            <span style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: 8 }}>
               {completedWorkbooks.length} workbook(s) processing...
-            </Text>
+            </span>
           )}
         </div>
       )
@@ -889,13 +564,13 @@ export function ResultTab() {
         }
         return (
           <div className={styles.centerLoading}>
-            <Spinner size="huge" />
-            <Text weight="semibold" style={{ fontSize: "16px", color: tokens.colorNeutralForeground1, marginTop: 12 }}>
+            <Spinner size="extra-large" />
+            <span style={{ fontWeight: 600, fontSize: "16px", color: "var(--text)", marginTop: 12 }}>
               Fetching parsing data for <strong>{wbName}</strong>...
-            </Text>
-            <Text style={{ color: tokens.colorNeutralForeground3, fontSize: "13px", marginTop: 4 }}>
+            </span>
+            <span style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: 4 }}>
               This may take a moment. Results will appear automatically.
-            </Text>
+            </span>
           </div>
         )
       }
@@ -918,13 +593,13 @@ export function ResultTab() {
         // Data layer will show the loading spinner until data is explicitly loaded or an error is explicitly triggered.
         return (
           <div className={styles.centerLoading}>
-            <Spinner size="huge" />
-            <Text weight="semibold" style={{ fontSize: "16px", color: tokens.colorNeutralForeground1, marginTop: 12 }}>
+            <Spinner size="extra-large" />
+            <span style={{ fontWeight: 600, fontSize: "16px", color: "var(--text)", marginTop: 12 }}>
               Fetching data layer results for <strong>{wbName}</strong>...
-            </Text>
-            <Text style={{ color: tokens.colorNeutralForeground3, fontSize: "13px", marginTop: 4 }}>
+            </span>
+            <span style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: 4 }}>
               This may take a moment. Results will appear automatically.
-            </Text>
+            </span>
           </div>
         )
       }
@@ -946,13 +621,13 @@ export function ResultTab() {
         }
         return (
           <div className={styles.centerLoading}>
-            <Spinner size="huge" />
-            <Text weight="semibold" style={{ fontSize: "16px", color: tokens.colorNeutralForeground1, marginTop: 12 }}>
+            <Spinner size="extra-large" />
+            <span style={{ fontWeight: 600, fontSize: "16px", color: "var(--text)", marginTop: 12 }}>
               Fetching mapping data for <strong>{wbName}</strong>...
-            </Text>
-            <Text style={{ color: tokens.colorNeutralForeground3, fontSize: "13px", marginTop: 4 }}>
+            </span>
+            <span style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: 4 }}>
               This may take a moment. Results will appear automatically.
-            </Text>
+            </span>
           </div>
         )
       }
@@ -974,13 +649,13 @@ export function ResultTab() {
         }
         return (
           <div className={styles.centerLoading}>
-            <Spinner size="huge" />
-            <Text weight="semibold" style={{ fontSize: "16px", color: tokens.colorNeutralForeground1, marginTop: 12 }}>
+            <Spinner size="extra-large" />
+            <span style={{ fontWeight: 600, fontSize: "16px", color: "var(--text)", marginTop: 12 }}>
               Fetching report generation data for <strong>{wbName}</strong>...
-            </Text>
-            <Text style={{ color: tokens.colorNeutralForeground3, fontSize: "13px", marginTop: 4 }}>
+            </span>
+            <span style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: 4 }}>
               This may take a moment. Results will appear automatically.
-            </Text>
+            </span>
           </div>
         )
       }
@@ -1005,7 +680,7 @@ export function ResultTab() {
 
   return (
     <div className={styles.container}>
-      <Toaster toasterId={toasterId} />
+      <Toaster />
 
       <div className="vl-header">
         <div className="vl-title">Processed Results</div>
@@ -1014,236 +689,50 @@ export function ResultTab() {
       <div className={styles.controlsRow}>
           {/* ── Project selector / display ── */}
           <div className={styles.selector}>
-            <Text className={styles.label}>Project:</Text>
+            <span className={styles.label}>Project:</span>
 
             {hasMultipleProjects ? (
-              <Dropdown
-                placeholder="Select project"
-                value={
-                  uniqueProjects.find(p => p.id === selectedProjectFilter)?.name ?? ""
-                }
-                selectedOptions={selectedProjectFilter ? [selectedProjectFilter] : []}
-                onOptionSelect={handleProjectChange}
-                style={{ minWidth: 280 }}
+              <Select
+                value={selectedProjectFilter}
+                onValueChange={handleProjectChange}
+                style={{ minWidth: 280, width: "auto" }}
               >
                 {uniqueProjects.map(proj => (
-                  <Option key={proj.id} value={proj.id} text={proj.name}>
+                  <SelectItem key={proj.id} value={proj.id}>
                     {proj.name}
-                  </Option>
+                  </SelectItem>
                 ))}
-              </Dropdown>
+              </Select>
             ) : (
-              <Text className={styles.projectValue}>
+              <span className={styles.projectValue}>
                 {uniqueProjects[0]?.name || selectedProjectName || "Processing..."}
-              </Text>
+              </span>
             )}
           </div>
 
           {/* ── Workbook selector ── */}
           <div className={styles.selector}>
-            <Text className={styles.label}>Workbook:</Text>
+            <span className={styles.label}>Workbook:</span>
 
             {!hasAnyAssessment ? (
-              <Text style={{ color: tokens.colorNeutralForeground3, fontStyle: "italic" }}>
+              <span style={{ color: "var(--text-secondary)", fontStyle: "italic" }}>
                 Waiting for data...
-              </Text>
+              </span>
             ) : (
-              <Dropdown
-                placeholder="Select workbook"
-                value={
-                  viewableWorkbooks.find((w) => w.id === selectedWorkbookId)?.name ?? ""
-                }
-                selectedOptions={selectedWorkbookId ? [selectedWorkbookId] : []}
-                onOptionSelect={handleWorkbookChange}
+              <Select
+                value={selectedWorkbookId}
+                onValueChange={handleWorkbookChange}
                 style={{ minWidth: 280, width: "100%" }}
               >
                 {viewableWorkbooks.map((wb) => (
-                  <Option key={wb.id} value={wb.id} text={wb.name}>
+                  <SelectItem key={wb.id} value={wb.id}>
                     {wb.name}
-                  </Option>
+                  </SelectItem>
                 ))}
-              </Dropdown>
+              </Select>
             )}
           </div>
 
-          {/* ── Run Validation / Re-run Validation for All (Disabled per client requirements) ── */}
-          {false && isAllGenerationDone && !hasAnyGenerationFailure && currentWorkbookIds.length > 1 && (
-            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
-              {showSyncWarningAll && (
-                <div style={{
-                  position: "fixed", inset: 0, zIndex: 1000,
-                  backgroundColor: "rgba(0,0,0,0.45)",
-                  display: "flex", alignItems: "center", justifyContent: "center"
-                }}>
-                  <div style={{
-                    background: "#fff", borderRadius: "14px", padding: "40px 48px",
-                    boxShadow: "0 20px 60px rgba(0,0,0,0.18)", maxWidth: "560px", width: "90%",
-                    display: "flex", flexDirection: "column", gap: "20px", alignItems: "center", textAlign: "center"
-                  }}>
-                    <div style={{ fontSize: "48px", lineHeight: 1 }}>⚠️</div>
-                    <Text weight="bold" size={500} style={{ color: "#92400e" }}>Workbooks Not Synced in Fabric</Text>
-
-                    {syncModalErrors.length === 0 ? (
-                      <Text size={300} style={{ color: "#64748b", lineHeight: "1.7" }}>
-                        Before running validation, please go to <strong>Microsoft Fabric</strong> and sync all your workbooks.
-                        Once the sync is complete, click <strong>&quot;I&apos;ve Synced All — Run Validation&quot;</strong> to proceed.
-                      </Text>
-                    ) : (
-                      <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "8px", textAlign: "left" }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "200px", overflowY: "auto" }}>
-                          {syncModalErrors.map((msg, i) => (
-                            <div key={i} style={{
-                              backgroundColor: "#fef2f2",
-                              border: "1px solid #fca5a5",
-                              borderRadius: "8px",
-                              padding: "10px 14px",
-                              display: "flex",
-                              alignItems: "flex-start",
-                              gap: "8px"
-                            }}>
-                              <span style={{ color: "#dc2626", fontSize: "14px", flexShrink: 0, marginTop: "1px" }}>✗</span>
-                              <Text size={200} style={{ color: "#991b1b", lineHeight: "1.5" }}>{msg}</Text>
-                            </div>
-                          ))}
-                        </div>
-                        <Text size={200} style={{ color: "#64748b", textAlign: "center", marginTop: "4px" }}>
-                          Please refresh those workbooks in Microsoft Fabric and click the button below to retry.
-                        </Text>
-                      </div>
-                    )}
-
-                    <div style={{ display: "flex", gap: "12px", marginTop: "8px", width: "100%", justifyContent: "center" }}>
-                      <Button appearance="secondary" onClick={() => { setShowSyncWarningAll(false); setSyncModalErrors([]); }}>Cancel</Button>
-                      <Button
-                        appearance="primary"
-                        size="large"
-                        disabled={isSyncModalLoading}
-                        onClick={async () => {
-                          setSyncModalErrors([]);
-                          setGlobalValidationError(null);
-                          setIsSyncModalLoading(true);
-                          const idsToStart = currentWorkbookIds.filter(id => !(manualValidationStarted?.[id] || validationActivitiesDone[id]));
-                          if (idsToStart.length > 0) {
-                            try {
-                              await startValidationForWorkbooks(idsToStart);
-                              // Success — all workbooks passed
-                              currentWorkbookIds.forEach(id => {
-                                try { localStorage.setItem(`fabric_synced_${currentRunId}_${id}`, "true"); } catch(e){}
-                              });
-                              setShowSyncWarningAll(false);
-                              setSyncModalErrors([]);
-                              setSelectedTab("validation");
-                            } catch (e: any) {
-                              const errorMsg = e.message || String(e);
-                              const cleanMsg = errorMsg.startsWith("SYNC_REQUIRED:") ? errorMsg.replace("SYNC_REQUIRED:", "") : errorMsg;
-                              // Collect per-workbook errors from the store error map
-                              const { useValidationStore } = await import("@/stores/validation.store");
-                              const errMap = useValidationStore.getState().error;
-                              const perWorkbookErrors = currentWorkbookIds
-                                .map(id => errMap[id])
-                                .filter((msg): msg is string => !!msg);
-                              setSyncModalErrors(perWorkbookErrors.length > 0 ? [...new Set(perWorkbookErrors)] : [cleanMsg]);
-                            } finally {
-                              setIsSyncModalLoading(false);
-                            }
-                          } else {
-                            setIsSyncModalLoading(false);
-                            setShowSyncWarningAll(false);
-                            setSyncModalErrors([]);
-                            setSelectedTab("validation");
-                          }
-                        }}
-                      >
-                        {isSyncModalLoading ? (
-                          <><Spinner size="tiny" style={{ marginRight: "8px" }} />Validating...</>
-                        ) : (
-                          syncModalErrors.length > 0 ? "I\u2019ve Synced \u2014 Retry Validation" : "I\u2019ve Synced All \u2014 Run Validation"
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isAllValidationDone ? (
-                <Button
-                  appearance="primary"
-                  size="large"
-                  icon={<ArrowClockwise24Regular />}
-                  disabled={isBulkValidationLoading || isSyncModalLoading}
-                  onClick={async () => {
-                    const confirmed = window.confirm("This will trigger a fresh validation run for ALL workbooks in this batch. This might take several minutes. Proceed?")
-                    if (!confirmed) return
-                    
-                    setGlobalValidationError(null);
-                    try {
-                      useAgentStore.getState().resetValidationForWorkbooks(currentWorkbookIds);
-                      await useAgentStore.getState().startRevalidationForWorkbooks(currentWorkbookIds);
-                      setSelectedTab("validation");
-                    } catch (e: any) {
-                      const errorMsg = e.message || String(e);
-                      if (errorMsg.startsWith("SYNC_REQUIRED:")) {
-                          setGlobalValidationError(errorMsg.replace("SYNC_REQUIRED:", ""));
-                      } else {
-                          setGlobalValidationError("Failed to re-run validation: " + errorMsg);
-                      }
-                      console.error(e);
-                    }
-                  }}
-                >
-                  {isBulkValidationLoading ? (
-                    <>
-                      <Spinner size="tiny" style={{ marginRight: "8px" }} />
-                      Processing...
-                    </>
-                  ) : (
-                    "Re-run Validation for All"
-                  )}
-                </Button>
-              ) : (
-                isBulkValidationLoading ? (
-                  <Button appearance="primary" size="large" disabled>
-                    <Spinner size="tiny" style={{ marginRight: "8px" }} />
-                    Processing...
-                  </Button>
-                ) : (
-                  <Button
-                    appearance="primary"
-                    size="large"
-                    onClick={async () => {
-                      setGlobalValidationError(null);
-                      // Check if all workbooks are synced
-                      const unsynced = currentWorkbookIds.filter(id => {
-                        try { return localStorage.getItem(`fabric_synced_${currentRunId}_${id}`) !== "true"; } catch(e){ return true; }
-                      });
-                      if (unsynced.length > 0) {
-                        setShowSyncWarningAll(true);
-                        return;
-                      }
-                      const idsToStart = currentWorkbookIds.filter(id => !(manualValidationStarted?.[id] || validationActivitiesDone[id]));
-                      if (idsToStart.length > 0) {
-                        try {
-                          await startValidationForWorkbooks(idsToStart);
-                          setSelectedTab("validation");
-                        } catch (e: any) {
-                          const errorMsg = e.message || String(e);
-                          if (errorMsg.startsWith("SYNC_REQUIRED:")) {
-                            setGlobalValidationError(errorMsg.replace("SYNC_REQUIRED:", ""));
-                          } else {
-                            setGlobalValidationError("Failed to start validation: " + errorMsg);
-                          }
-                        }
-                      } else {
-                        setSelectedTab("validation");
-                      }
-                    }}
-                  >
-                    Run Validation for All
-                  </Button>
-                )
-              )}
-            </div>
-          )}
           {globalValidationError && selectedTab === 'validation' && (
             <div style={{ marginTop: "12px", display: "flex", justifyContent: "flex-end" }}>
               <div style={{ 
@@ -1258,43 +747,39 @@ export function ResultTab() {
                 boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)"
               }}>
                 <span style={{ fontSize: "20px", lineHeight: 1 }}>⚠️</span>
-                <Text size={300} style={{ color: "#991b1b", lineHeight: "1.5" }}>
+                <span style={{ fontSize: "13px", color: "#991b1b", lineHeight: "1.5" }}>
                   {globalValidationError}
-                </Text>
+                </span>
               </div>
             </div>
           )}
         </div>
 
-      <div style={{ overflowX: "auto", whiteSpace: "nowrap", scrollbarWidth: "none", msOverflowStyle: "none", borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: "var(--background)" }}>
+      <div style={{ overflowX: "auto", whiteSpace: "nowrap", scrollbarWidth: "none", msOverflowStyle: "none", borderBottom: `1px solid var(--border)`, backgroundColor: "var(--background)" }}>
         <style>{`
           .hide-scrollbar::-webkit-scrollbar { display: none; }
         `}</style>
-        <TabList
-          className={mergeClasses(styles.tabList, "hide-scrollbar")}
-          style={{ borderBottom: "none", marginTop: 0 }}
-          selectedValue={selectedTab}
-          onTabSelect={handleTabSelect}
-          disabled={!hasAnyAssessment}
-        >
-          <Tab value="assessment">Assessment</Tab>
-          {isAssessmentCompleteForSelected && (
-            <Tab value="parsing">Parsing</Tab>
-          )}
-          {!isLiteMode() && !(mode === 'single' && !hasContinued) && isParsingDataReady && (
-            <Tab value="mapping">Mapping</Tab>
-          )}
-          {!isLiteMode() && !(mode === 'single' && !hasContinued) && !shouldSkipDataLayer(selectedWorkbookId) && isMappingDataReady && (
-            <Tab value="datalayer">Data Layer</Tab>
-          )}
-          {!isLiteMode() && !(mode === 'single' && !hasContinued) && 
-            (shouldSkipDataLayer(selectedWorkbookId) ? isMappingDataReady : isDatalayerDataReady) && (
-            <Tab value="generation">Report Generation</Tab>
-          )}
-          {!isLiteMode() && !(mode === 'single' && !hasContinued) && isGenerationDataReady && !hasGenerationFailed && (
-            <Tab value="validation">Validation</Tab>
-          )}
-        </TabList>
+        <Tabs value={selectedTab} onValueChange={handleTabSelect}>
+          <TabsList className={cx(styles.tabList, "hide-scrollbar")} style={{ borderBottom: "none", marginTop: 0 }}>
+            <TabsTrigger value="assessment" disabled={!hasAnyAssessment}>Assessment</TabsTrigger>
+            {isAssessmentCompleteForSelected && (
+              <TabsTrigger value="parsing" disabled={!hasAnyAssessment}>Parsing</TabsTrigger>
+            )}
+            {!isLiteMode() && !(mode === 'single' && !hasContinued) && isParsingDataReady && (
+              <TabsTrigger value="mapping" disabled={!hasAnyAssessment}>Mapping</TabsTrigger>
+            )}
+            {!isLiteMode() && !(mode === 'single' && !hasContinued) && !shouldSkipDataLayer(selectedWorkbookId) && isMappingDataReady && (
+              <TabsTrigger value="datalayer" disabled={!hasAnyAssessment}>Data Layer</TabsTrigger>
+            )}
+            {!isLiteMode() && !(mode === 'single' && !hasContinued) &&
+              (shouldSkipDataLayer(selectedWorkbookId) ? isMappingDataReady : isDatalayerDataReady) && (
+              <TabsTrigger value="generation" disabled={!hasAnyAssessment}>Report Generation</TabsTrigger>
+            )}
+            {!isLiteMode() && !(mode === 'single' && !hasContinued) && isGenerationDataReady && !hasGenerationFailed && (
+              <TabsTrigger value="validation" disabled={!hasAnyAssessment}>Validation</TabsTrigger>
+            )}
+          </TabsList>
+        </Tabs>
       </div>
 
       <div className={styles.tabContent}>

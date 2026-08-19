@@ -94,6 +94,93 @@ something that was never saved.
 5. **Register it** in `components/settings/sections/index.tsx` and flip
    `status` to `"available"`.
 
+## The connector framework
+
+Integrations is one section, not one section per vendor. Everything an
+administrator sees for a connector — the card, the form, the metadata viewer —
+is generated from a declarative definition, so **adding a connector is data, not
+code**.
+
+```
+lib/connectors/
+  registry.ts        The catalogue. Fields, auth methods, metadata kinds.
+  validation.ts      Pure validation derived from the registry (unit tested)
+  secrets.ts         Write-only credential store — the ONLY place a secret lands
+  repository.ts      Connections, metadata cache and activity log
+  service.ts         Orchestration: save → authenticate → discover → cache
+  discovery/
+    types.ts         DiscoveryAdapter — the swappable seam
+    qlik.backend.ts     ─┐
+    tableau.backend.ts   │ wired today, delegate to existing microservices
+    fabric.backend.ts   ─┘
+    index.ts         Adapter resolution. Change here to swap in a native adapter.
+
+components/settings/connectors/
+  ConnectorCard.tsx      ConnectorForm.tsx      MetadataViewer.tsx
+  ConnectionLogs.tsx     StatusBadges.tsx       ConnectorLogo.tsx
+  ConnectorFeedback.tsx  ConnectorDetail.tsx
+
+components/connectors/ConnectorRequired.tsx   Gate for migration screens
+hooks/useConnectorReadiness.ts                What the wizard asks
+```
+
+### Adding a connector
+
+Add a `ConnectorDefinition` to `lib/connectors/registry.ts` and a
+`DiscoveryAdapter` to `lib/connectors/discovery/`. That is the whole change —
+no new form, no new card, no new validation. The registry entry declares the
+fields (including which are secret), and validation, rendering and required-field
+checking all derive from it.
+
+A connector with no adapter cannot be configured at all: `getAdapter` returning
+undefined is the single check that keeps the ten "coming soon" connectors
+honest. They appear on the grid so the roadmap is visible, and say plainly that
+they are not available.
+
+### Save does everything
+
+Pressing Save runs one server-side sequence (`lib/connectors/service.ts`):
+
+```
+validate → store secrets → persist config → authenticate
+  → discover metadata → cache → report
+```
+
+The user never presses "load spaces" or "refresh projects". Two rules govern
+the tail of that sequence:
+
+- **A discovery failure does not fail a save.** Credentials that authenticate
+  are worth keeping when a tenant is merely slow. The connector goes `degraded`
+  and can be re-synced.
+- **A failed sync does not discard the previous snapshot.** Cached metadata
+  stays usable, so a transient outage degrades a connector to "stale" rather
+  than to "unusable".
+
+### Reuse in the migration wizard
+
+Migration screens contain no connection logic. They wrap a step in
+`<ConnectorRequired connectorId="qlik">` and read cached metadata from
+`useConnectorReadiness`. An unconfigured connector renders a gate that deep-links
+to that exact connector in Settings, rather than growing its own credential form
+— which is how the platform previously ended up asking for the same connector
+twice.
+
+"Ready" deliberately means connected **and** synced. A connector that
+authenticates but has never been discovered has nothing for a picker to show,
+and an empty picker is worse than a redirect.
+
+### Honest limitations of the wired adapters
+
+The backend adapters reuse the existing migration microservices, which expose
+spaces, apps, sites, projects, workbooks and lakehouses — and nothing deeper.
+Sheets, variables, data connections, reload tasks, flows, schedules and
+permissions are reported as **unsupported with a reason**, not as empty lists.
+The distinction matters: "0 reload tasks" and "this adapter cannot read reload
+tasks" lead an administrator to completely different actions.
+
+Filling those in means writing a native adapter and changing one line in
+`discovery/index.ts`. Nothing above the interface changes.
+
 ## Handling secrets
 
 API keys, PATs and connection strings **must not** go into the settings

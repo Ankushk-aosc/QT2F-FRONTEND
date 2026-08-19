@@ -28,8 +28,9 @@ export async function GET(req: NextRequest) {
         }
 
         const baseUrl = logsBase.replace(/\/$/, "");
-        // Fixed path: baseUrl already has /api/records
-        const targetUrl = new URL(`${baseUrl}/semantic-kernel`);
+        // LOGS_API_BASE is ".../api", not ".../api/records" — the "records/"
+        // segment has to be explicit or every run lookup 404s.
+        const targetUrl = new URL(`${baseUrl}/records/semantic-kernel`);
 
         if (email_id) {
             targetUrl.searchParams.append("email_id", email_id);

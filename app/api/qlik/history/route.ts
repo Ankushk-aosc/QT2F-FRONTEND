@@ -17,15 +17,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    const queryString = Array.from(searchParams.entries())
-      .filter(([key]) => key !== "email")
-      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
-      .join("&");
+    // The records API exposes run history at /api/records/run-history and
+    // requires `email_id` (it 422s without it). There is no
+    // /run-history/by-email/{email} route on any backend — that path 404'd.
+    // The frontend contract keeps its `email` param; translate it here.
+    const query = new URLSearchParams({ email_id: email });
+    for (const [key, value] of searchParams.entries()) {
+      if (key === "email") continue;
+      // `limit` is this route's public name for the backend's `page_size`.
+      query.set(key === "limit" ? "page_size" : key, value);
+    }
 
-    const endpoint = `/run-history/by-email/${encodeURIComponent(email)}${queryString ? `?${queryString}` : ""}`;
-
-    const data = await httpClient.get<any>(endpoint, {
-      apiType: "sql",
+    const data = await httpClient.get<any>(`/records/run-history?${query.toString()}`, {
+      apiType: "logs",
       headers: { Authorization: authHeader },
     });
     

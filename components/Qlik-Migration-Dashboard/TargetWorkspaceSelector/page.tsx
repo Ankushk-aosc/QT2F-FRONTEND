@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import React from "react";
+import { Database, ChevronDown, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 
 interface Workspace {
   id: string;
@@ -16,49 +15,25 @@ interface TargetWorkspaceSelectorProps {
   workspaces: Workspace[];
   isProcessing: boolean;
   hasProcessed: boolean;
+  isLoadingWorkspaces?: boolean;
+  loadError?: string | null;
+  onRetry?: () => void;
 }
-
-// Confirmation Popup Component
-const ConfirmationPopup: React.FC<{ onConfirm: () => void; onCancel: () => void }> = ({ onConfirm, onCancel }) => {
-  return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-80 text-center">
-        <h2 className="text-lg font-bold mb-4">Start New Processing?</h2>
-        <p className="mb-4">Do you want to start new processing?</p>
-        <div className="flex justify-center gap-4">
-          <Button
-            onClick={onConfirm}
-            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-          >
-            OK
-          </Button>
-          <Button
-            onClick={onCancel}
-            className="px-4 py-2 bg-gray-300 text-black rounded-md hover:bg-gray-400"
-          >
-            Cancel
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export function TargetWorkspaceSelectorContent({
   selectedWorkspace,
   onChange,
   workspaces,
   isProcessing,
-  hasProcessed,
+  isLoadingWorkspaces = false,
+  loadError = null,
+  onRetry,
 }: TargetWorkspaceSelectorProps) {
-  const [showConfirmPopup, setShowConfirmPopup] = useState(false);
-
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = e.target.value;
     const selectedWorkspaceData = workspaces.find((ws) => ws.id === selectedId);
 
     if (selectedWorkspaceData) {
-      // Store both ID and displayName in localStorage
       localStorage.setItem(
         "selected_workspace",
         JSON.stringify({
@@ -68,49 +43,67 @@ export function TargetWorkspaceSelectorContent({
       );
     }
 
-    if (hasProcessed && !isProcessing) {
-      setShowConfirmPopup(true);
-    } else {
-      onChange(e);
-    }
+    onChange(e);
   };
 
-  const handleConfirm = () => {
-    setShowConfirmPopup(false);
-    window.location.reload();
-  };
-
-  const handleCancel = () => {
-    setShowConfirmPopup(false);
-  };
+  const placeholderText = workspaces.length > 0
+    ? "Select a workspace"
+    : isLoadingWorkspaces
+    ? "Loading workspaces..."
+    : "No workspaces available — check the Fabric connection";
 
   return (
-    <>
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Target Fabric Workspace</label>
-        <div className="relative">
-          <select
-            value={selectedWorkspace}
-            onChange={handleChange}
-            className={cn(
-              "w-full p-2 border rounded-md appearance-none bg-white",
-              isProcessing && "opacity-60 cursor-not-allowed"
-            )}
-            disabled={isProcessing}
-          >
-            <option value="" disabled>
-              {workspaces.length === 0 ? "Loading workspaces..." : "Select a workspace"}
-            </option>
-            {workspaces.map((ws) => (
-              <option key={ws.id} value={ws.id}>
-                {ws.displayName}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3 top-3 h-4 w-4 pointer-events-none" />
+    <div className="space-y-1.5 w-full">
+      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        Target Fabric Workspace
+      </label>
+      <div className="relative">
+        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+          {isLoadingWorkspaces ? (
+            <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />
+          ) : (
+            <Database className="w-4 h-4 text-indigo-500" />
+          )}
         </div>
+        <select
+          value={selectedWorkspace}
+          onChange={handleChange}
+          disabled={isProcessing || isLoadingWorkspaces}
+          className={cn(
+            "w-full pl-9 pr-10 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-sm font-medium text-slate-900 dark:text-slate-100 shadow-xs appearance-none transition-all duration-200",
+            "hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-slate-50/50 dark:hover:bg-slate-800/40",
+            "focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500",
+            (isProcessing || isLoadingWorkspaces) && "opacity-60 cursor-not-allowed bg-slate-100 dark:bg-slate-800",
+            loadError && !isLoadingWorkspaces && "border-rose-300 dark:border-rose-800"
+          )}
+        >
+          <option value="" disabled>
+            {placeholderText}
+          </option>
+          {workspaces.map((ws) => (
+            <option key={ws.id} value={ws.id}>
+              {ws.displayName}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
       </div>
-      {showConfirmPopup && <ConfirmationPopup onConfirm={handleConfirm} onCancel={handleCancel} />}
-    </>
+
+      {loadError && !isLoadingWorkspaces && (
+        <div className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 mt-1">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          <span>{loadError}</span>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="text-xs font-semibold underline hover:no-underline ml-1 text-rose-700 dark:text-rose-300"
+            >
+              Retry
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

@@ -1,23 +1,11 @@
 import React from "react";
-import { tokens } from "@fluentui/react-components";
 
-export function Card({ className, style, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      style={{
-        backgroundColor: tokens.colorNeutralBackground1,
-        border: `1px solid ${tokens.colorNeutralStroke1}`,
-        borderRadius: tokens.borderRadiusMedium,
-        boxShadow: tokens.shadow2,
-        padding: "16px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "8px",
-        ...style,
-      }}
-      {...props}
-    />
-  );
+function cx(...parts: Array<string | undefined | false>) {
+  return parts.filter(Boolean).join(" ");
+}
+
+export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cx("ui-card", className)} {...props} />;
 }
 
 export function CardHeader({ style, ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -25,11 +13,11 @@ export function CardHeader({ style, ...props }: React.HTMLAttributes<HTMLDivElem
 }
 
 export function CardTitle({ style, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 style={{ fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1, margin: 0, ...style }} {...props} />;
+  return <h3 style={{ fontSize: "var(--text-lg)", fontWeight: 600, color: "var(--text)", margin: 0, ...style }} {...props} />;
 }
 
 export function CardDescription({ style, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
-  return <p style={{ fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, margin: 0, ...style }} {...props} />;
+  return <p style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", margin: 0, ...style }} {...props} />;
 }
 
 export function CardContent({ style, ...props }: React.HTMLAttributes<HTMLDivElement>) {
