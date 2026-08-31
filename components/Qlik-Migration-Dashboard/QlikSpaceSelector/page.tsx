@@ -1,9 +1,8 @@
 "use client";
 
-import React from "react";
-import { Folder, ChevronDown, Loader2, AlertCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import React, { useState } from "react";
+import { Dropdown, Option } from "@/components/ui/dropdown";
+import { Label } from "@/components/ui/label";
 
 interface QlikSpace {
   id: string;
@@ -14,111 +13,138 @@ interface QlikSpaceSelectorProps {
   selectedQlikSpace: string;
   onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   qlikSpaces: QlikSpace[];
+  /** True while the space list itself is in flight -- mirrors QlikAppsSelector's isFetchingApps. */
+  isFetchingSpaces?: boolean;
+  isLoadingSpaces?: boolean;
+  loadError?: string | null;
+  onRetry?: () => void;
   isProcessing: boolean;
   hasProcessed: boolean;
   showNoAppsPopup: boolean;
   setShowNoAppsPopup: (show: boolean) => void;
-  /** True while the space fetch is in flight. */
-  isLoadingSpaces?: boolean;
-  /** Message from a failed fetch, shown beneath the picker. */
-  loadError?: string | null;
-  /** Re-runs the fetch. Omit to hide the retry control. */
-  onRetry?: () => void;
+}
+
+function ConfirmationPopup({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-80 rounded-lg bg-white p-6 text-center shadow-lg">
+        <h2 className="mb-4 text-lg font-bold">Start New Processing?</h2>
+        <p className="mb-4">Do you want to start new processing?</p>
+        <div className="flex justify-center gap-4">
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary-hover"
+          >
+            OK
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-md bg-surface-subtle px-4 py-2 text-foreground hover:bg-border"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function QlikSpaceSelectorContent({
   selectedQlikSpace,
   onChange,
   qlikSpaces,
+  isFetchingSpaces = false,
+  isLoadingSpaces,
+  loadError,
+  onRetry,
   isProcessing,
+  hasProcessed,
   showNoAppsPopup,
   setShowNoAppsPopup,
-  isLoadingSpaces = false,
-  loadError = null,
-  onRetry,
 }: QlikSpaceSelectorProps) {
-  const placeholderText = qlikSpaces.length > 0
-    ? "Select a space"
-    : isLoadingSpaces
-    ? "Loading spaces..."
-    : "No spaces available";
+  const [showConfirmPopup, setShowConfirmPopup] = useState(false);
+  const loading = isFetchingSpaces || !!isLoadingSpaces;
+
+  // The upstream handler only ever reads e.target.value, so hand it a
+  // matching shape rather than re-typing the whole prop chain.
+  const handleSelect = (spaceId: string) => {
+    if (hasProcessed && !isProcessing) {
+      setShowConfirmPopup(true);
+    } else {
+      onChange({ target: { value: spaceId } } as React.ChangeEvent<HTMLSelectElement>);
+    }
+  };
+
+  const handleConfirm = () => {
+    setShowConfirmPopup(false);
+    window.location.reload();
+  };
+
+  const handleCancel = () => {
+    setShowConfirmPopup(false);
+  };
 
   return (
     <>
-      <div className="space-y-1.5 w-full">
-        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          Select Qlik Space
-        </label>
-        <div className="relative">
-          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-            {isLoadingSpaces ? (
-              <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-            ) : (
-              <Folder className="w-4 h-4 text-blue-500" />
-            )}
-          </div>
-          <select
-            value={selectedQlikSpace}
-            onChange={onChange}
-            disabled={isProcessing || isLoadingSpaces}
-            className={cn(
-              "w-full pl-9 pr-10 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-sm font-medium text-slate-900 dark:text-slate-100 shadow-xs appearance-none transition-all duration-200",
-              "hover:border-blue-400 dark:hover:border-blue-500 hover:bg-slate-50/50 dark:hover:bg-slate-800/40",
-              "focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500",
-              (isProcessing || isLoadingSpaces) && "opacity-60 cursor-not-allowed bg-slate-100 dark:bg-slate-800",
-              loadError && !isLoadingSpaces && "border-rose-300 dark:border-rose-800"
-            )}
-          >
-            <option value="" disabled>
-              {placeholderText}
-            </option>
-            {qlikSpaces.map((space) => (
-              <option key={space.id} value={space.id}>
-                {space.name}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-        </div>
-
-        {loadError && !isLoadingSpaces && (
-          <div className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 mt-1">
-            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+      <div>
+        <Label className="text-primary">Select Qlik Space</Label>
+        {!loading && loadError && (
+          <div className="mb-2 rounded bg-destructive/10 p-2 text-xs text-destructive flex items-center justify-between">
             <span>{loadError}</span>
             {onRetry && (
               <button
                 type="button"
                 onClick={onRetry}
-                className="text-xs font-semibold underline hover:no-underline ml-1 text-rose-700 dark:text-rose-300"
+                className="font-medium underline ml-2 hover:opacity-80"
               >
                 Retry
               </button>
             )}
           </div>
         )}
+        <Dropdown
+          placeholder="Select a space"
+          selectedOptions={selectedQlikSpace ? [selectedQlikSpace] : []}
+          onOptionSelect={(_, d) => handleSelect(d.optionValue as string)}
+          disabled={isProcessing || loading}
+          className="w-full"
+        >
+          {/* The in-flight case has to come first. Without it an empty
+              `qlikSpaces` during the fetch renders "No spaces available", so a
+              slow tenant looks like an empty one. */}
+          {loading ? (
+            <Option disabled key="loading">Loading spaces...</Option>
+          ) : qlikSpaces.length === 0 ? (
+            <Option disabled key="no-data">No spaces available</Option>
+          ) : (
+            [...qlikSpaces]
+              .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+              .map((space) => (
+                <Option key={space.id} value={space.id} text={space.name}>
+                  {space.name}
+                </Option>
+              ))
+          )}
+        </Dropdown>
       </div>
-
       {showNoAppsPopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs z-50 animate-in fade-in-0 duration-200">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-88 text-center space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-600 flex items-center justify-center mx-auto">
-              <Folder className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">No Applications Found</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                We couldn&apos;t find any applications in the selected Qlik space.
-              </p>
-            </div>
-            <Button
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-80 rounded-lg bg-white p-6 text-center shadow-lg">
+            <h2 className="mb-4 text-lg font-bold">No Qlik Apps Found</h2>
+            <p className="mb-4">We couldn&apos;t find any apps for the selected space.</p>
+            <button
+              type="button"
               onClick={() => setShowNoAppsPopup(false)}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs"
+              className="rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary-hover"
             >
-              Understand
-            </Button>
+              OK
+            </button>
           </div>
         </div>
       )}
+      {showConfirmPopup && <ConfirmationPopup onConfirm={handleConfirm} onCancel={handleCancel} />}
     </>
   );
 }

@@ -1752,11 +1752,24 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         console.warn(`[Polling] Error (${_consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}): ${err.message?.slice(0, 80) || "unknown"}`)
       } finally {
         // Schedule the next poll only if we are still polling
-        if (get().isPolling) {
+        if (get().isPolling && (typeof document === "undefined" || !document.hidden)) {
           const timeout = setTimeout(poll, 8000)
             ; (get() as any)._timeout = timeout
         }
       }
+    }
+
+    const visibilityHandler = () => {
+      if (document.hidden || !get().isPolling) return
+      const timeout = (get() as any)._timeout
+      if (timeout) clearTimeout(timeout)
+      ; (get() as any)._timeout = undefined
+      poll()
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", visibilityHandler)
+      ; (get() as any)._visibilityHandler = visibilityHandler
     }
 
     poll()
@@ -1765,6 +1778,12 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
   stopPolling: () => {
     const timeout = (get() as any)._timeout
     if (timeout) clearTimeout(timeout)
+    const visibilityHandler = (get() as any)._visibilityHandler
+    if (visibilityHandler && typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", visibilityHandler)
+    }
+    ; (get() as any)._timeout = undefined
+    ; (get() as any)._visibilityHandler = undefined
     set({ isPolling: false })
   },
 

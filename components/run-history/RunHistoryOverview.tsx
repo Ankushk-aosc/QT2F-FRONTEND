@@ -133,6 +133,15 @@ export function RunHistoryOverview() {
           </button>
         ),
       },
+      {
+        key: "application",
+        header: "Application",
+        render: (run) => (
+          <span className="dt-primary-text font-medium">
+            {orDash(run.workbook_name || run.project_name || (run.processed_items?.[0]?.app_name) || (run.processed_items?.[0]?.workbook_name))}
+          </span>
+        ),
+      },
       { key: "source", header: "Source", render: () => <Absent /> },
       { key: "destination", header: "Destination", render: () => <Absent /> },
       {

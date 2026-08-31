@@ -55,7 +55,7 @@ function Text({
 ═══════════════════════════════════════════════════════════════════════ */
 
 export interface RiskFlag { label: string; danger: boolean }
-export interface DataSource { name: string; type: string; mode: "Live" | "Extract"; server?: string; schema?: string | null; custom_sql: boolean; tables?: string[]; id?: string; connections?: any[] }
+export interface DataSource { name: string; type: string; mode: "Live" | "Extract" | "File"; server?: string; schema?: string | null; custom_sql: boolean; tables?: string[]; id?: string; connections?: any[] }
 export interface LogicalRelationship { left: string; right: string; on: string; type: string; cardinality?: string }
 export interface PhysicalJoin { left: string; right: string; join_type: string; condition: string }
 export interface DataModel { logical: LogicalRelationship[]; physical: PhysicalJoin[]; blends: any[] }
@@ -532,12 +532,11 @@ function ItemCard({
 
 const P_TABS = [
   { key: "sources", label: "Data Sources" },
-  { key: "model", label: "Data Model" },
+  { key: "tables_entities", label: "Tables / Entities" },
   { key: "analytical_model", label: "Analytical Model" },
-  { key: "params", label: "Parameters & Sets" },
+  { key: "dashboard_objects", label: "Dashboard Objects" },
   { key: "insights", label: "Insights" },
-  { key: "permissions", label: "Permissions" },
-  { key: "embedded_assets", label: "Embedded Assets" }
+  { key: "renamed_fields", label: "Renamed Fields" }
 ] as const
 
 type TabKey = typeof P_TABS[number]["key"]
@@ -558,8 +557,8 @@ export function ParsingTab({ workbookId, projectId: propProjectId, runId: propRu
   const d = parsingDataMap[workbookId]
   const storeError = errorMap[workbookId]
 
-  const { currentRunId, currentProjectId, activities } = useAgentStore()
-  const { selectedProject } = useDashboardStore()
+  const { currentRunId, currentProjectId, activities, assessmentData } = useAgentStore()
+  const { selectedProject, applications } = useDashboardStore()
 
   const projectId = propProjectId || currentProjectId || selectedProject || ""
   const runId = propRunId || currentRunId || ""
@@ -607,20 +606,69 @@ export function ParsingTab({ workbookId, projectId: propProjectId, runId: propRu
 
   useEffect(() => { setTab("sources") }, [workbookId])
 
-  const displayWorkbookName = d?.workbook_name || workbookId
+  const resolvedWorkbookName = useMemo(() => {
+    // 1. Check if parsing data d has a valid workbook_name that isn't "Unknown Workbook" / "Unknown" / UUID
+    const dName = d?.workbook_name || (d as any)?.app_name || (d as any)?.name;
+    if (dName && dName !== "Unknown Workbook" && dName !== "Unknown" && !/^[0-9a-fA-F-]{32,36}$/.test(dName)) {
+      return dName;
+    }
 
-  const connectionModeText = useMemo(() => {
-    if (!d) return "None";
-    if (d.live > 0 && d.extract > 0) return `${d.live} Live / ${d.extract} Extract`;
-    if (d.live > 0) return `${d.live} Live Connection${d.live > 1 ? 's' : ''}`;
-    if (d.extract > 0) return `${d.extract} Extract Connection${d.extract > 1 ? 's' : ''}`;
-    return "None";
-  }, [d]);
+    // 2. Check assessmentData from useAgentStore
+    const assessObj = runId ? assessmentData[runId]?.[workbookId] : undefined;
+    const payload = assessObj?.payload || assessObj || {};
+    const assessName = payload.app_name 
+      || payload.app?.app_name 
+      || payload.workbook_name 
+      || assessObj?.workbook_name 
+      || (assessObj as any)?.app_name;
+
+    if (assessName && assessName !== "Unknown Workbook" && assessName !== "Unknown" && !/^[0-9a-fA-F-]{32,36}$/.test(assessName)) {
+      return assessName;
+    }
+
+    // 3. Check applications from useDashboardStore
+    const appObj = (applications || []).find(a => a.workbookId === workbookId || a.id === workbookId);
+    if (appObj?.workbookName && appObj.workbookName !== "Unknown Workbook" && appObj.workbookName !== "Unknown") {
+      return appObj.workbookName;
+    }
+
+    // 4. Fallback to dName if present, or workbookId
+    return (dName && dName !== "Unknown Workbook") ? dName : (workbookId || "Application");
+  }, [d, workbookId, runId, assessmentData, applications]);
+
+  const displayWorkbookName = resolvedWorkbookName;
 
   const uniqueDsTypes = useMemo(() => {
     if (!d) return "N/A";
-    return Array.from(new Set(d.sources.map(s => s.type))).filter(Boolean).join(", ") || "N/A";
+    const types = Array.from(new Set(d.sources.map(s => s.type))).filter(Boolean);
+    return types.length > 0 ? types.join(", ") : d.file_type || "snowflake";
   }, [d]);
+
+  const tableCount = useMemo(() => {
+    if (!d) return 0;
+    return d.tables?.length || d.sources.reduce((acc, s) => acc + (s.tables?.length || 0), 0) || 0;
+  }, [d]);
+
+  const dimCount = useMemo(() => d?.fields?.dimensions?.length || 0, [d]);
+  const measCount = useMemo(() => d?.fields?.measures?.length || 0, [d]);
+  const filterCount = useMemo(() => {
+    if (!d) return 0;
+    const paramCount = d.parameters?.length || 0;
+    const setCount = d.sets?.length || 0;
+    const wsFilterCount = (d.worksheets || []).reduce((acc, w) => acc + (w.filters?.length || 0), 0);
+    return paramCount + setCount + wsFilterCount;
+  }, [d]);
+
+  const handleExportJson = () => {
+    if (!d) return;
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(d, null, 2));
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `${resolvedWorkbookName}_parsing_results.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
 
   return (
     <div className={styles.container} style={isPdfMode ? { backgroundColor: "#ffffff" } : {}}>
@@ -632,51 +680,99 @@ export function ParsingTab({ workbookId, projectId: propProjectId, runId: propRu
         <Card className={styles.tabsCard} style={{ padding: "40px" }}>
           <Text weight="semibold" style={{ color: "#dc2626", fontSize: "16px" }}>Error: {storeError}</Text>
         </Card>
-      ) : (!d || d.workbook_name !== displayWorkbookName) ? (
+      ) : !d ? (
         <Card className={styles.tabsCard} style={{ padding: "60px", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Spinner size="large" label={isHistoricalRun ? "Fetching historical parsing results..." : "Finalizing parsing results..."} />
         </Card>
       ) : (
         <>
-          <div className={styles.header}>
-            <div className={styles.title} style={{ fontSize: "32px", fontWeight: 600 }}>Parsing Results</div>
-            <div className={styles.subtitle}>
-              Detailed structural extraction of data sources, calculations, and visuals for <span style={{ color: "#0f172a", fontWeight: 600 }}>{displayWorkbookName}</span>
+          <div className={styles.header} style={{ marginBottom: "24px" }}>
+            <div>
+              <div className={styles.title} style={{ fontSize: "28px", fontWeight: 700, color: "#0f172a", lineHeight: 1.2 }}>Parsing Results</div>
+              <div className={styles.subtitle} style={{ fontSize: "14px", color: "#64748b", marginTop: "6px" }}>
+                Detailed structural metadata of data sources, tables, and metrics for <span style={{ color: "#0f172a", fontWeight: 600 }}>{resolvedWorkbookName}</span>
+              </div>
             </div>
           </div>
 
-          <div className={styles.metricsGrid3}>
-            {[
-              { label: "WORKBOOK", value: d.workbook_name },
-              { label: "CONNECTION MODE", value: connectionModeText },
-              { label: "DATASOURCE TYPE", value: uniqueDsTypes },
-              { label: "DIMENSIONS", value: d.fields?.dimensions?.length || 0 },
-              { label: "LODs", value: (d.calculations || []).filter(c => c.is_lod).length },
-              { label: "MEASURES", value: d.fields?.measures?.length || 0 }
-            ].map((metric, index) => (
-              <Card key={index} className={styles.metricCard} style={isPdfMode ? { backgroundColor: "#ffffff" } : {}}>
-                <div className={styles.metricValue}>{metric.value}</div>
-                <div className={styles.metricLabel}>{metric.label}</div>
-              </Card>
-            ))}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "14px", marginBottom: "24px", width: "100%", boxSizing: "border-box" }}>
+            <Card style={{ padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "#ffffff", display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
+              <div style={{ padding: "10px", borderRadius: "10px", backgroundColor: "#eff6ff", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Shapes size={22} />
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>APPLICATION</div>
+                <div title={resolvedWorkbookName} style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{resolvedWorkbookName}</div>
+              </div>
+            </Card>
+
+            <Card style={{ padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "#ffffff", display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
+              <div style={{ padding: "10px", borderRadius: "10px", backgroundColor: "#eff6ff", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Database size={22} />
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>DATA SOURCE TYPE</div>
+                <div title={uniqueDsTypes} style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{uniqueDsTypes}</div>
+              </div>
+            </Card>
+
+            <Card style={{ padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "#ffffff", display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
+              <div style={{ padding: "10px", borderRadius: "10px", backgroundColor: "#eff6ff", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Database size={22} />
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>TABLES</div>
+                <div style={{ fontSize: "20px", fontWeight: 700, color: "#0f172a" }}>{tableCount}</div>
+              </div>
+            </Card>
+
+            <Card style={{ padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "#ffffff", display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
+              <div style={{ padding: "10px", borderRadius: "10px", backgroundColor: "#eff6ff", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Key size={22} />
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>DIMENSIONS</div>
+                <div style={{ fontSize: "20px", fontWeight: 700, color: "#0f172a" }}>{dimCount}</div>
+              </div>
+            </Card>
+
+            <Card style={{ padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "#ffffff", display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
+              <div style={{ padding: "10px", borderRadius: "10px", backgroundColor: "#eff6ff", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <FileText size={22} />
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>MEASURES</div>
+                <div style={{ fontSize: "20px", fontWeight: 700, color: "#0f172a" }}>{measCount}</div>
+              </div>
+            </Card>
+
+            <Card style={{ padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "#ffffff", display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
+              <div style={{ padding: "10px", borderRadius: "10px", backgroundColor: "#eff6ff", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Filter size={22} />
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>FILTERS</div>
+                <div style={{ fontSize: "20px", fontWeight: 700, color: "#0f172a" }}>{filterCount}</div>
+              </div>
+            </Card>
           </div>
 
-          <Card className={styles.tabsCard} style={isPdfMode ? { backgroundColor: "#ffffff", border: "none" } : { padding: 0 }}>
-            <div className={styles.tabListWrapper} style={{ 
+          <Card className={styles.tabsCard} style={isPdfMode ? { backgroundColor: "#ffffff", border: "none" } : { padding: 0, overflow: "hidden" }}>
+            <div style={{ 
+              width: "100%",
               overflowX: "auto", 
               scrollbarWidth: "none", 
               msOverflowStyle: "none",
               WebkitOverflowScrolling: "touch",
               borderBottom: `1px solid var(--border)`
             }}>
-              <style>{`
-                .${styles.tabListWrapper}::-webkit-scrollbar {
-                  display: none;
-                }
-              `}</style>
               <Tabs value={tab} onValueChange={(value) => setTab(value as TabKey)}>
-                <TabsList className={styles.tabList} style={{ minWidth: "max-content", borderBottom: "none" }}>
-                  {P_TABS.map(t => (<TabsTrigger key={t.key} value={t.key} className={styles.noHoverTab}>{t.label}</TabsTrigger>))}
+                <TabsList style={{ display: "inline-flex", minWidth: "max-content", borderBottom: "none" }}>
+                  {P_TABS.map(t => (
+                    <TabsTrigger key={t.key} value={t.key} className={styles.noHoverTab} style={{ whiteSpace: "nowrap", flexShrink: 0 }}>
+                      {t.label}
+                    </TabsTrigger>
+                  ))}
                 </TabsList>
               </Tabs>
             </div>
@@ -693,7 +789,7 @@ export function ParsingTab({ workbookId, projectId: propProjectId, runId: propRu
 
                   <div style={{ pageBreakInside: "avoid" }}>
                     <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
-                      Data Model
+                      Tables / Entities
                     </div>
                     <P_Model d={d} isPdfMode={isPdfMode} />
                   </div>
@@ -707,51 +803,33 @@ export function ParsingTab({ workbookId, projectId: propProjectId, runId: propRu
 
                   <div style={{ pageBreakInside: "avoid" }}>
                     <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
-                      Parameters & Sets
+                      Dashboard Objects
                     </div>
-                    <P_Params d={d} isPdfMode={isPdfMode} />
+                    <P_DashboardObjects d={d} isPdfMode={isPdfMode} />
                   </div>
 
                   <div style={{ pageBreakInside: "avoid" }}>
                     <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
                       Insights
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-                      <P_DashboardsAndStories d={d} isPdfMode={isPdfMode} />
-                      <div style={{ height: "1px", backgroundColor: "#e2e8f0", margin: "8px 0" }} />
-                      <P_Visuals d={d} isPdfMode={isPdfMode} />
-                    </div>
+                    <P_Visuals d={d} isPdfMode={isPdfMode} />
                   </div>
 
                   <div style={{ pageBreakInside: "avoid" }}>
                     <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
-                      Permissions
+                      Renamed Fields
                     </div>
-                    <P_Permissions d={d} isPdfMode={isPdfMode} />
-                  </div>
-
-                  <div style={{ pageBreakInside: "avoid" }}>
-                    <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--primary)", marginBottom: "16px", paddingBottom: "8px", borderBottom: `2px solid var(--primary)` }}>
-                      Embedded Assets
-                    </div>
-                    <P_EmbeddedAssets d={d} isPdfMode={isPdfMode} />
+                    <P_RenamedFields d={d} isPdfMode={isPdfMode} />
                   </div>
                 </div>
               ) : (
                 <>
                   {tab === "sources" && <P_Sources d={d} isPdfMode={isPdfMode} />}
-                  {tab === "model" && <P_Model d={d} isPdfMode={isPdfMode} />}
+                  {tab === "tables_entities" && <P_Model d={d} isPdfMode={isPdfMode} />}
                   {tab === "analytical_model" && <P_FieldsAndLODs d={d} isPdfMode={isPdfMode} />}
-                  {tab === "params" && <P_Params d={d} isPdfMode={isPdfMode} />}
-                  {tab === "insights" && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-                      <P_DashboardsAndStories d={d} isPdfMode={isPdfMode} />
-                      <div style={{ height: "1px", backgroundColor: "#e2e8f0", margin: "8px 0" }} />
-                      <P_Visuals d={d} isPdfMode={isPdfMode} />
-                    </div>
-                  )}
-                  {tab === "permissions" && <P_Permissions d={d} isPdfMode={isPdfMode} />}
-                  {tab === "embedded_assets" && <P_EmbeddedAssets d={d} isPdfMode={isPdfMode} />}
+                  {tab === "dashboard_objects" && <P_DashboardObjects d={d} isPdfMode={isPdfMode} />}
+                  {tab === "insights" && <P_Visuals d={d} isPdfMode={isPdfMode} />}
+                  {tab === "renamed_fields" && <P_RenamedFields d={d} isPdfMode={isPdfMode} />}
                 </>
               )}
             </div>
@@ -2722,4 +2800,201 @@ function P_EmbeddedAssets({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMo
 
     </div>
   )
+}
+
+function P_DashboardObjects({ d, isPdfMode = false }: { d: ParsingPayload; isPdfMode?: boolean }) {
+  const styles = useStyles();
+  const ws = d.worksheets || [];
+  const kpis = ws.filter(w => w.mark_type === 'kpi' || w.type === 'kpi');
+  const charts = ws.filter(w => w.mark_type !== 'kpi' && w.type !== 'kpi');
+  const actionsCount = d.actions || 0;
+  const navMenusCount = d.stories_list?.length || 0;
+  const imageCount = (d.embedded_assets || []).filter(a => a.type === 'image').length;
+  const filterPaneCount = ws.reduce((acc, w) => acc + (w.filters?.length || 0), 0);
+
+  const [openSection, setOpenSection] = useState<string>("charts");
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      {/* KPIs Accordion */}
+      <Card className={styles.sectionCard}>
+        <div 
+          className={styles.sectionHeaderRow} 
+          onClick={() => setOpenSection(openSection === "kpi" ? "" : "kpi")}
+          style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {openSection === "kpi" ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+            <span style={{ fontWeight: 600, fontSize: "16px", color: "#0f172a" }}>KPIs</span>
+            <Badge variant="secondary">({kpis.length})</Badge>
+          </div>
+        </div>
+        {openSection === "kpi" && (
+          <div style={{ marginTop: "16px" }}>
+            {kpis.length > 0 ? (
+              <DataTable<Worksheet>
+                cols={[
+                  { key: "name", label: "Title", render: r => <strong>{r.name}</strong> },
+                  { key: "sheet_id", label: "Sheet", render: r => r.sheet_id || r.name },
+                  { key: "mark_type", label: "Chart Type", render: r => <Badge variant="secondary">KPI</Badge> },
+                  { key: "columns", label: "Dimensions", mono: true, render: r => r.columns?.join(", ") || "—" },
+                  { key: "rows", label: "Measures", mono: true, render: r => r.rows?.join(", ") || "—" }
+                ]}
+                rows={kpis}
+                isPdfMode={isPdfMode}
+              />
+            ) : (
+              <Empty label="No KPI objects found." />
+            )}
+          </div>
+        )}
+      </Card>
+
+      {/* Standard Charts Accordion */}
+      <Card className={styles.sectionCard}>
+        <div 
+          className={styles.sectionHeaderRow} 
+          onClick={() => setOpenSection(openSection === "charts" ? "" : "charts")}
+          style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {openSection === "charts" ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+            <span style={{ fontWeight: 600, fontSize: "16px", color: "#0f172a" }}>Standard Charts</span>
+            <Badge variant="default">({charts.length})</Badge>
+          </div>
+        </div>
+        {(openSection === "charts" || isPdfMode) && (
+          <div style={{ marginTop: "16px" }}>
+            {charts.length > 0 ? (
+              <DataTable<Worksheet>
+                cols={[
+                  { key: "name", label: "Title", render: r => <strong style={{ color: "#0f172a" }}>{r.name}</strong> },
+                  { key: "sheet_id", label: "Sheet", render: r => r.sheet_id || r.name },
+                  { key: "mark_type", label: "Chart Type", render: r => <Badge variant="secondary" style={{ textTransform: "capitalize" }}>{r.mark_type || r.type}</Badge> },
+                  { key: "columns", label: "Dimensions", mono: true, render: r => r.columns?.join(", ") || "—" },
+                  { key: "rows", label: "Measures", mono: true, render: r => r.rows?.join(", ") || "—" }
+                ]}
+                rows={charts}
+                pageSize={5}
+                isPdfMode={isPdfMode}
+              />
+            ) : (
+              <Empty label="No standard charts found." />
+            )}
+          </div>
+        )}
+      </Card>
+
+      {/* Action Buttons Accordion */}
+      <Card className={styles.sectionCard}>
+        <div className={styles.sectionHeaderRow} style={{ cursor: "default", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontWeight: 600, fontSize: "16px", color: "#0f172a" }}>Action Buttons</span>
+            <Badge variant="secondary">({actionsCount})</Badge>
+          </div>
+        </div>
+      </Card>
+
+      {/* Navigation Menus Accordion */}
+      <Card className={styles.sectionCard}>
+        <div className={styles.sectionHeaderRow} style={{ cursor: "default", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontWeight: 600, fontSize: "16px", color: "#0f172a" }}>Navigation Menus</span>
+            <Badge variant="secondary">({navMenusCount})</Badge>
+          </div>
+        </div>
+      </Card>
+
+      {/* Custom Objects / Extensions Accordion */}
+      <Card className={styles.sectionCard}>
+        <div className={styles.sectionHeaderRow} style={{ cursor: "default", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontWeight: 600, fontSize: "16px", color: "#0f172a" }}>Custom Objects / Extensions</span>
+            <Badge variant="secondary">(0)</Badge>
+          </div>
+        </div>
+      </Card>
+
+      {/* Images Accordion */}
+      <Card className={styles.sectionCard}>
+        <div className={styles.sectionHeaderRow} style={{ cursor: "default", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontWeight: 600, fontSize: "16px", color: "#0f172a" }}>Images</span>
+            <Badge variant="secondary">({imageCount})</Badge>
+          </div>
+        </div>
+      </Card>
+
+      {/* Filter Panes Accordion */}
+      <Card className={styles.sectionCard}>
+        <div className={styles.sectionHeaderRow} style={{ cursor: "default", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontWeight: 600, fontSize: "16px", color: "#0f172a" }}>Filter Panes</span>
+            <Badge variant="secondary">({filterPaneCount})</Badge>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function P_RenamedFields({ d, isPdfMode = false }: { d: ParsingPayload; isPdfMode?: boolean }) {
+  const styles = useStyles();
+
+  const renamedFieldsList = useMemo(() => {
+    if (!d) return [];
+    const result: { original: string; renamed: string; type: string; table: string; sheet: string }[] = [];
+
+    (d.tables || []).forEach(t => {
+      (t.columns || []).forEach(c => {
+        if (c.renamed_column_name && c.renamed_column_name !== c.name) {
+          result.push({
+            original: c.name,
+            renamed: c.renamed_column_name,
+            type: c.datatype || "String",
+            table: t.table_name || "Table",
+            sheet: d.workbook_name || "App"
+          });
+        }
+      });
+    });
+
+    return result;
+  }, [d]);
+
+  return (
+    <Card className={styles.sectionCard}>
+      <div className={styles.sectionHeader} style={{ marginBottom: "4px" }}>Renamed Fields</div>
+      <div style={{ fontSize: "14px", color: "#64748b", marginBottom: "24px" }}>
+        Fields carrying custom display names or aliases in the workbook layout
+      </div>
+
+      {renamedFieldsList.length === 0 ? (
+        <Empty label="No renamed fields or aliases detected in this application." />
+      ) : (
+        <DataTable<{ original: string; renamed: string; type: string; table: string; sheet: string }>
+          cols={[
+            {
+              key: "original",
+              label: "Original Name",
+              render: r => (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontFamily: T.mono, color: "#64748b" }}>{r.original}</span>
+                  <span style={{ color: "#2563eb", fontWeight: 700 }}>→</span>
+                  <strong style={{ color: "#0f172a" }}>{r.renamed}</strong>
+                </div>
+              )
+            },
+            { key: "renamed", label: "Renamed To", render: r => <Badge variant="default">{r.renamed}</Badge> },
+            { key: "type", label: "Type", render: r => <Badge variant="secondary">{r.type}</Badge> },
+            { key: "table", label: "Table", render: r => r.table },
+            { key: "sheet", label: "Sheet", render: r => r.sheet }
+          ]}
+          rows={renamedFieldsList}
+          pageSize={5}
+          isPdfMode={isPdfMode}
+        />
+      )}
+    </Card>
+  );
 }

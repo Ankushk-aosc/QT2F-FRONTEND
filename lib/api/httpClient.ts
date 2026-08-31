@@ -1,35 +1,35 @@
 import { headers } from "next/headers";
 import "server-only";
 
-import { interceptTableauPayload } from "./tableauPayload";
+export type ApiType =
+    | "QLIK"
+    | "qlik"
+    | "TABLEAU"
+    | "tableau"
+    | "semantic"
+    | "logs"
+    | "records"
+    | "qlik-mongo"
+    | "fabric";
 
-/**
- * `qlik-mongo` is the Qlik migration store (QLIK_MONGO_DB_URL) holding mapping,
- * parsing, assessment, report-generation and agent-action records. It is a
- * different service from `logs`/`sql` (the async records API) — the two were
- * previously conflated, which sent every mapping lookup to a host that has no
- * such route.
- */
-type ApiType = "tableau" | "semantic" | "logs" | "fabric" | "qlik" | "qlik-mongo" | "sql" | "qlik-assessment" | "qlik-parsing";
-
-type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
 export interface RequestOptions extends RequestInit {
     apiType?: ApiType;
     forwardHeaders?: boolean; // If true, forwards Authorization header from incoming request
-    tableauEnv?: "cloud" | "server";
-    /**
-     * Sends the body exactly as given, skipping `interceptPayload`.
-     *
-     * Required by connection-management calls. `interceptPayload` rewrites any
-     * body carrying a Tableau server URL into "use the default connection
-     * instead" — correct for discovery calls that must run against a stored
-     * connection, catastrophic for `/connections` itself, where the server URL
-     * *is* the payload and injecting a `connection_id` turns a create into an
-     * update of somebody else's connection.
-     */
+    QLIKEnv?: "cloud" | "server";
     skipPayloadIntercept?: boolean;
+    /** Milliseconds before the request is aborted. Default 15000. */
+    timeoutMs?: number;
 }
+
+// Every call through this client used to be a bare fetch() with no signal --
+// a backend that's down in a way that hangs instead of refusing (agent
+// process alive but stuck, a black-holed port, cold start) blocked the
+// Next.js route handler indefinitely, which is what made components stall
+// on screen with no error and no way to recover short of a page reload.
+// Set to 60s to accommodate Render's ~50s free tier cold starts.
+const DEFAULT_TIMEOUT_MS = 60000;
 
 // Internal helper to perform the request
 async function request<T>(endpoint: string, method: HttpMethod, options: RequestOptions = {}): Promise<T> {
@@ -38,68 +38,66 @@ async function request<T>(endpoint: string, method: HttpMethod, options: Request
     const { getEnv } = require("@/lib/env");
     const env = getEnv();
 
-    const { apiType = "tableau", forwardHeaders = true, headers: customHeaders, ...rest } = options;
-    let tableauEnv = options.tableauEnv;
+    const { apiType = "QLIK", forwardHeaders = true, headers: customHeaders, timeoutMs = DEFAULT_TIMEOUT_MS, ...rest } = options;
+    let QLIKEnv = options.QLIKEnv;
 
     // Try to get environment from headers if not provided
-    if (!tableauEnv) {
+    if (!QLIKEnv) {
         try {
             const headerStore = await headers();
-            const envHeader = headerStore.get("x-tableau-environment");
+            const envHeader = headerStore.get("x-QLIK-environment");
             if (envHeader === "server" || envHeader === "cloud") {
-                tableauEnv = envHeader as "cloud" | "server";
+                QLIKEnv = envHeader as "cloud" | "server";
             }
         } catch (e) {
             // Not in request context
         }
     }
 
-    // Determine Base URL
+    // Determine Base URL. Every branch below reads a real, typed field off
+    // Env (lib/env.ts) -- each of those fields is resolved through its own
+    // dedicated helper (getQlikApiBaseUrl/getTableauApiBaseUrl/
+    // getRecordsApiBaseUrl) that checks every known spelling of that
+    // service's env var before falling back to a hardcoded default. This
+    // used to read several fields (QLIK_BASE_API_URL, TABLEAU_BASE_API_URL,
+    // MONGO_API_URL, ASSESSMENT_API_URL, etc.) that were never declared on
+    // Env -- since getEnv() is reached through an untyped require() a few
+    // lines up, TypeScript never caught it, and those branches always fell
+    // straight to their literal fallback regardless of any env var actually
+    // set. The "assessment"/"parsing"/"mapping"/"report-generation"/
+    // "validation" branches that existed here are gone entirely: they were
+    // never reachable (not part of the ApiType union, zero real callers --
+    // confirmed via search) and duplicated URLs that now live in one place,
+    // vl-q2f-semantic-kernel's routers, which is what the frontend calls
+    // for those stages today.
     let baseUrl = "";
-    switch (apiType) {
+    const normalizedType = String(apiType || "records").toLowerCase();
+    switch (normalizedType) {
+        case "qlik":
+            baseUrl = env.QLIK_API_URL;
+            break;
         case "tableau":
             baseUrl = env.TABLEAU_API_URL;
             break;
         case "semantic":
-            baseUrl = env.SEMANTIC_KERNEL_URL;
+            baseUrl = env.SEMANTIC_KERNEL_URL || "http://127.0.0.1:8080";
             break;
         case "logs":
-            baseUrl = env.LOGS_API_BASE;
+        case "records":
+        case "qlik-mongo":
+            baseUrl = env.API_BASE_URL;
             break;
         case "fabric":
-            baseUrl = env.FABRIC_API_BASE_URL;
-            break;
-        case "qlik":
-            baseUrl = env.QLIK_URL || "";
-            break;
-        case "qlik-mongo":
-            baseUrl = env.QLIK_MONGO_DB_URL || "";
-            break;
-        case "sql":
-            baseUrl = env.SQL_BASE_URL || "";
-            break;
-        case "qlik-assessment":
-            baseUrl = env.ASSESSMENT_API || "";
-            break;
-        case "qlik-parsing":
-            baseUrl = env.PARSING_API || "";
+            baseUrl = env.FABRIC_API_BASE_URL || "https://api.fabric.microsoft.com/v1";
             break;
         default:
-            throw new Error(`[HttpClient] Unknown API type: ${apiType}`);
+            baseUrl = env.API_BASE_URL;
+            break;
     }
 
-    // A missing base URL used to produce a relative fetch that failed with an
-    // opaque parse error. Name the misconfigured variable instead.
-    if (!baseUrl) {
-        const error = new Error(
-            `[HttpClient] No base URL configured for apiType "${apiType}". Check the corresponding environment variable.`
-        );
-        (error as any).status = 500;
-        throw error;
-    }
 
     // Construct URL
-    const url = `${baseUrl.replace(/\/$/, "")}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+    const url = `${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
     // Handle Headers & Authorization
     const requestHeaders: HeadersInit = {
@@ -130,23 +128,15 @@ async function request<T>(endpoint: string, method: HttpMethod, options: Request
         authHeaderFound = true;
     }
 
-    // The Qlik engine authenticates against Qlik Cloud, not Entra — forwarding the
-    // caller's Entra token is meaningless to it. When a Qlik key is configured,
-    // swap it in. It is read server-side only and never reaches the browser.
-    if (apiType === "qlik" && env.QLIK_API_KEY) {
-        (requestHeaders as any)["Authorization"] = `Bearer ${env.QLIK_API_KEY}`;
-        authHeaderFound = true;
-    }
-
-    // Start Logging
-    console.log(`[HttpClient] ${method} ${url}`);
-    console.log(`[HttpClient] Auth Header Present: ${authHeaderFound}`);
-
-    // Execute Fetch
+    // Execute Fetch, bounded so a hung upstream fails fast instead of
+    // blocking this route handler (and therefore the UI) indefinitely.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
         const response = await fetch(url, {
             method,
             headers: requestHeaders,
+            signal: controller.signal,
             ...rest,
         });
 
@@ -163,57 +153,45 @@ async function request<T>(endpoint: string, method: HttpMethod, options: Request
         return await response.json() as T;
 
     } catch (error: any) {
-        // Distinguish network failures from HTTP errors for meaningful diagnostics
-        if (error?.message?.startsWith("API Error")) {
-            // Already formatted by the !response.ok block above — rethrow as-is
-            throw error;
+        if (error?.name === "AbortError") {
+            console.error(`[HttpClient] Request timed out after ${timeoutMs}ms: ${url}`);
+            const timeoutError = new Error(`Request to ${apiType} timed out after ${timeoutMs}ms`);
+            (timeoutError as any).status = 504;
+            throw timeoutError;
         }
-
-        // Network-level failure: ECONNREFUSED, ENOTFOUND, ETIMEDOUT, etc.
-        const cause = error?.cause;
-        const causeCode = cause?.code ?? (cause?.errors?.[0]?.code) ?? "";
-        let diagnostic = `[HttpClient] Network error on ${method} ${url}`;
-
-        if (causeCode === "ECONNREFUSED") {
-            diagnostic += ` — Connection refused. The backend at ${url} is not reachable.`;
-        } else if (causeCode === "ENOTFOUND") {
-            diagnostic += ` — DNS lookup failed. The hostname could not be resolved.`;
-        } else if (causeCode === "ETIMEDOUT") {
-            diagnostic += ` — Connection timed out.`;
-        } else if (causeCode === "ECONNRESET") {
-            diagnostic += ` — Connection was reset by the remote server.`;
-        } else {
-            diagnostic += ` — ${error.message || "Unknown network error"}`;
-        }
-
-        console.error(diagnostic);
-
-        const enriched = new Error(diagnostic);
-        (enriched as any).status = error.status || 503;
-        (enriched as any).cause = cause;
-        throw enriched;
+        console.error("[HttpClient] Request failed", error);
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
     }
 }
 
-/** Applies the Tableau payload rewrite unless the caller opted out. */
-function maybeIntercept(body: any, options?: RequestOptions) {
-    if (options?.skipPayloadIntercept) return body;
-
-    // eslint-disable-next-line
-    const { getEnv } = require("@/lib/env");
-    return interceptTableauPayload(body, {
-        defaultConnectionId: getEnv().DEFAULT_CONNECTION_ID,
-    });
+function interceptPayload(body: any) {
+    if (!body || typeof body !== "object") return body;
+    // Clone body to avoid mutating the original object passed by reference.
+    // These legacy raw-URL fields are stripped because the backend now
+    // resolves the Qlik server URL itself from connection_id (see
+    // vl-q2f-semantic-kernel/plugins/queue_handler.py) -- a raw URL sent
+    // here would be stale/unverified. We do NOT substitute a fake
+    // connection_id when one is missing: a request with no real connection
+    // selected should fail loudly (the caller is expected to supply
+    // connection_id explicitly), not get silently mislabeled with someone
+    // else's connection.
+    const newBody = { ...body };
+    delete newBody.QLIK_SERVER_URL;
+    delete newBody.QLIK_server_url;
+    return newBody;
 }
 
 // Exported methods
 export const httpClient = {
     get: <T>(endpoint: string, options?: RequestOptions) => request<T>(endpoint, "GET", options),
-    post: <T>(endpoint: string, body: any, options?: RequestOptions) => request<T>(endpoint, "POST", { ...options, body: JSON.stringify(maybeIntercept(body, options)) }),
-    put: <T>(endpoint: string, body: any, options?: RequestOptions) => request<T>(endpoint, "PUT", { ...options, body: JSON.stringify(maybeIntercept(body, options)) }),
-    // PATCH is what the backend's /connections endpoint expects for an update;
-    // POST there creates a second connection instead of amending the first.
-    patch: <T>(endpoint: string, body: any, options?: RequestOptions) => request<T>(endpoint, "PATCH", { ...options, body: JSON.stringify(maybeIntercept(body, options)) }),
+    post: <T>(endpoint: string, body: any, options?: RequestOptions) =>
+        request<T>(endpoint, "POST", { ...options, body: JSON.stringify(options?.skipPayloadIntercept ? body : interceptPayload(body)) }),
+    put: <T>(endpoint: string, body: any, options?: RequestOptions) =>
+        request<T>(endpoint, "PUT", { ...options, body: JSON.stringify(options?.skipPayloadIntercept ? body : interceptPayload(body)) }),
+    patch: <T>(endpoint: string, body: any, options?: RequestOptions) =>
+        request<T>(endpoint, "PATCH", { ...options, body: JSON.stringify(options?.skipPayloadIntercept ? body : interceptPayload(body)) }),
     delete: <T>(endpoint: string, options?: RequestOptions) => request<T>(endpoint, "DELETE", options),
 };
 
@@ -238,15 +216,11 @@ export async function httpGet<T>(apiType: string, endpoint: string, options: Req
 }
 
 export async function httpPost<T>(apiType: string, endpoint: string, body: any, options: RequestOptions = {}): Promise<{ data: T; status: number }> {
-    try {
-        const data = await httpClient.post<T>(endpoint, body, {
-            apiType: apiType as ApiType,
-            ...options
-        });
-        return { data, status: 200 };
-    } catch (e: any) {
-        throw e;
-    }
+    const data = await httpClient.post<T>(endpoint, body, {
+        apiType: apiType as ApiType,
+        ...options
+    });
+    return { data, status: 200 };
 }
 
 export function errorResponse(error: any, defaultMessage: string) {
@@ -254,3 +228,4 @@ export function errorResponse(error: any, defaultMessage: string) {
     const status = error?.status || 500;
     return { body: { error: message }, status };
 }
+

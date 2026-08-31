@@ -3,7 +3,7 @@ import ClientProviders from "@/components/providers/ClientProviders";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Switchblade Autonomous Migration",
+  title: "MigrateIQ",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

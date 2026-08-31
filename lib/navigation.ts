@@ -33,12 +33,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: "/migrations",
     description: "Start a Qlik or Tableau migration to Microsoft Fabric",
   },
-  {
-    id: "monitoring",
-    label: "Monitoring",
-    href: "/monitoring",
-    description: "Live agent activity for in-flight runs",
-  },
+  // {
+  //   id: "monitoring",
+  //   label: "Monitoring",
+  //   href: "/monitoring",
+  //   description: "Live agent activity for in-flight runs",
+  // },
   {
     id: "run-history",
     label: "Run History",

@@ -7,6 +7,8 @@ export const dynamic = 'force-dynamic';
  * GET  /api/tableau/connections — List all connections (no secrets)
  */
 
+import { httpClient } from "@/lib/api/httpClient";
+
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get("Authorization");
@@ -19,50 +21,50 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
-    const backendBaseUrl = process.env.TABLEAU_API_URL;
-    if (!backendBaseUrl) {
-      return NextResponse.json(
-        { error: "Server configuration error: TABLEAU_API_URL missing" },
-        { status: 500 }
-      );
+    // 1. Primary: Save directly in MongoDB via Semantic Kernel
+    try {
+      const data = await httpClient.post<any>("/tableau/connections", body, {
+        apiType: "semantic",
+        headers: { Authorization: authHeader },
+      });
+      if (data) {
+        return NextResponse.json(data, { status: 200 });
+      }
+    } catch (skErr: any) {
+      console.warn("[POST /api/tableau/connections] SK route warning, trying microservice fallback:", skErr?.message);
     }
 
-    const fullUrl = `${backendBaseUrl.replace(/\/$/, "")}/connections`;
-    console.log("[POST /api/tableau/connections] Forwarding to:", fullUrl);
+    // 2. Fallback: Microservice endpoint
+    const backendBaseUrl = process.env.TABLEAU_API_URL;
+    if (backendBaseUrl) {
+      const fullUrl = `${backendBaseUrl.replace(/\/$/, "")}/connections`;
+      const backendResponse = await fetch(fullUrl, {
+        method: "POST",
+        headers: {
+          "Authorization": authHeader,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
 
-    const backendResponse = await fetch(fullUrl, {
-      method: "POST",
-      headers: {
-        "Authorization": authHeader,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!backendResponse.ok) {
+      if (backendResponse.ok) {
+        const result = await backendResponse.json();
+        return NextResponse.json(result, { status: 200 });
+      }
       let errorText = "";
       try {
         const textData = await backendResponse.text();
         errorText = textData;
-        try {
-          const errorJson = JSON.parse(textData);
-          errorText = JSON.stringify(errorJson);
-        } catch {
-          // Keep raw text if it's not JSON (like 504 Gateway Timeout HTML)
-        }
       } catch (readError) {
         errorText = `Could not read error response: ${readError}`;
       }
-      console.error(`[POST connections] Backend failed: ${backendResponse.status} - ${errorText}`);
       return NextResponse.json(
         { error: "Backend request failed", details: errorText },
         { status: backendResponse.status }
       );
     }
 
-    const result = await backendResponse.json();
-    return NextResponse.json(result, { status: 200 });
-
+    return NextResponse.json({ error: "No backend available" }, { status: 500 });
   } catch (err: any) {
     console.error("[POST /api/tableau/connections] Error:", err);
     return NextResponse.json(
@@ -71,7 +73,6 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
 
 export async function GET(req: NextRequest) {
   try {
@@ -83,51 +84,41 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const backendBaseUrl = process.env.TABLEAU_API_URL;
-    if (!backendBaseUrl) {
-      return NextResponse.json(
-        { error: "Server configuration error: TABLEAU_API_URL missing" },
-        { status: 500 }
-      );
-    }
-
-    // Forward query params (e.g., ?env_type=cloud)
     const envType = req.nextUrl.searchParams.get("env_type") || "";
-    const queryString = envType ? `?env_type=${envType}` : "";
-    const fullUrl = `${backendBaseUrl.replace(/\/$/, "")}/connections${queryString}`;
+    const queryString = envType ? `?env_type=${encodeURIComponent(envType)}` : "";
 
-    const backendResponse = await fetch(fullUrl, {
-      method: "GET",
-      headers: {
-        "Authorization": authHeader,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!backendResponse.ok) {
-      let errorText = "";
-      try {
-        const textData = await backendResponse.text();
-        errorText = textData;
-        try {
-          const errorJson = JSON.parse(textData);
-          errorText = JSON.stringify(errorJson);
-        } catch {
-          // Keep raw text if it's not JSON
-        }
-      } catch (readError) {
-        errorText = `Could not read error response: ${readError}`;
+    // 1. Primary: Use Semantic Kernel with direct MongoDB Atlas persistence
+    try {
+      const data = await httpClient.get<any>(`/tableau/connections${queryString}`, {
+        apiType: "semantic",
+        headers: { Authorization: authHeader },
+      });
+      if (Array.isArray(data)) {
+        return NextResponse.json(data, { status: 200 });
       }
-      console.error(`[GET /api/tableau/connections] Backend failed: ${backendResponse.status} - ${errorText}`);
-      return NextResponse.json(
-        { error: "Backend request failed", details: errorText },
-        { status: backendResponse.status }
-      );
+    } catch (skErr: any) {
+      console.warn("[GET /api/tableau/connections] SK route warning, trying microservice fallback:", skErr?.message);
     }
 
-    const result = await backendResponse.json();
-    return NextResponse.json(result, { status: 200 });
+    // 2. Fallback: Microservice endpoint
+    const backendBaseUrl = process.env.TABLEAU_API_URL;
+    if (backendBaseUrl) {
+      const fullUrl = `${backendBaseUrl.replace(/\/$/, "")}/connections${queryString}`;
+      const backendResponse = await fetch(fullUrl, {
+        method: "GET",
+        headers: {
+          "Authorization": authHeader,
+          "Content-Type": "application/json",
+        },
+      });
 
+      if (backendResponse.ok) {
+        const result = await backendResponse.json();
+        return NextResponse.json(result, { status: 200 });
+      }
+    }
+
+    return NextResponse.json([], { status: 200 });
   } catch (err: any) {
     console.error("[GET /api/tableau/connections] Error:", err);
     return NextResponse.json(

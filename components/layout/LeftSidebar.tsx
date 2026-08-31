@@ -1,9 +1,5 @@
 "use client"
 import React, { useState, useEffect, useMemo, useRef } from "react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
-import { Tooltip } from "@/components/ui/tooltip"
 import {
   X,
   List,
@@ -18,6 +14,9 @@ import {
   PanelLeftOpen,
 } from "lucide-react"
 
+import { Badge } from "@/components/ui/badge"
+import { Tooltip } from "@/components/ui/tooltip"
+import { Spinner } from "@/components/ui/spinner"
 import { useUIStore } from "@/stores/ui.store"
 import { useQlikStore } from "@/stores/qlikStore"
 import { useDashboardStore } from "@/stores/dashboard.store"
@@ -30,38 +29,6 @@ import { useDatalayerStore } from "@/stores/datalayer.store"
 import { useMonitoringStore } from "@/stores/monitoring.store"
 import { matchesAgent } from "@/lib/agentNames"
 import { isLiteMode } from "@/lib/config"
-
-function cx(...parts: Array<string | undefined | false>) {
-  return parts.filter(Boolean).join(" ")
-}
-
-const styles = {
-  sidebar: "ls-sidebar",
-  sidebarCollapsed: "ls-sidebar-collapsed",
-  sidebarToggleButton: "ls-sidebar-toggle-button",
-  header: "ls-header",
-  summaryContent: "ls-summary-content",
-  statusRow: "ls-status-row",
-  statusLabel: "ls-status-label",
-  statusValue: "ls-status-value",
-  introContainer: "ls-intro-container",
-  introText: "ls-intro-text",
-  appSectionTitle: "ls-app-section-title",
-  appCard: "ls-app-card",
-  appHeader: "ls-app-header",
-  appName: "ls-app-name",
-  levelHeader: "ls-level-header",
-  levelHeaderSite: "ls-level-header-site",
-  levelHeaderProject: "ls-level-header-project",
-  levelHeaderProjectPromoted: "ls-level-header-project-promoted",
-  levelHeaderHover: "ls-level-header-hover",
-  countText: "ls-count-text",
-  workbookActions: "ls-workbook-actions",
-  actionsHeader: "ls-actions-header",
-  waitingContainer: "ls-waiting-container",
-  workbookHeader: "ls-workbook-header",
-  activityItem: "ls-activity-item",
-}
 
 interface Application {
   id: string
@@ -92,7 +59,14 @@ interface LeftSidebarProps {
   onClose?: () => void
 }
 
-const getStatusColor = (status: string | undefined): "warning" | "success" | "destructive" | "secondary" => {
+const STATUS_BADGE_VARIANT: Record<string, "warning" | "success" | "destructive" | "secondary"> = {
+  warning: "warning",
+  success: "success",
+  danger: "destructive",
+  subtle: "secondary",
+}
+
+const getStatusColor = (status: string | undefined): "warning" | "success" | "danger" | "subtle" => {
   const s = status?.toLowerCase() || ""
   if (s === "running" || s.includes("processing")) {
     return "warning"
@@ -110,9 +84,9 @@ const getStatusColor = (status: string | undefined): "warning" | "success" | "de
     return "success"
   }
   if (s === "failed" || s.includes("validation failed")) {
-    return "destructive"
+    return "danger"
   }
-  return "secondary"
+  return "subtle"
 }
 
 const checkAssessmentExists = (app: Application, runId: string | null | undefined, activities: any) => {
@@ -166,8 +140,8 @@ const getDisplayedStatus = (
   hasAllResults: boolean = false,
   hasAnyFailure: boolean = false
 ) => {
-  const stoppedRunIds = useMonitoringStore.getState().stoppedRunIds || [];
-  const isRunStopped = runId ? stoppedRunIds.includes(runId) : false;
+  const stoppedRunIds = useMonitoringStore.getState().stoppedRunIds || []
+  const isRunStopped = runId ? stoppedRunIds.includes(runId) : false
 
   if (isRunStopped) {
     return "Stopped"
@@ -176,7 +150,6 @@ const getDisplayedStatus = (
   if (hasAnyFailure || app.final_status?.toLowerCase() === "failed" || app.status?.toLowerCase() === "failed") {
     return "Failed"
   }
-  // ★ Show "Completed" only when result data has actually loaded in all tabs
   if (hasAllResults) {
     return "Completed"
   } else if (
@@ -214,7 +187,7 @@ function TypingText({ text, onComplete }: { text: string; onComplete?: () => voi
     const timeout = setTimeout(() => {
       setDisplayedText((prev) => (prev ? prev + " " + words[wordIndex] : words[wordIndex]))
       setWordIndex(wordIndex + 1)
-    }, 40) // Word-by-word feels more premium
+    }, 40)
 
     return () => clearTimeout(timeout)
   }, [wordIndex, words, onComplete])
@@ -222,12 +195,11 @@ function TypingText({ text, onComplete }: { text: string; onComplete?: () => voi
   return (
     <span>
       {displayedText}
-      {wordIndex < words.length && <span style={{ animation: "blink 1s step-end infinite" }}>|</span>}
+      {wordIndex < words.length && <span className="animate-pulse">|</span>}
     </span>
   )
 }
 
-// ★ Module-level: persists across sidebar open/close — activities typed once are NEVER re-typed
 const _typedActivities = new Set<string>()
 
 function AgentActionsBlock({
@@ -235,7 +207,7 @@ function AgentActionsBlock({
   runId,
   agentName,
   title,
-  iconColor,
+  iconColor = "#2554c7",
   isCompleted,
   isFailed,
 }: {
@@ -247,18 +219,40 @@ function AgentActionsBlock({
   isCompleted?: boolean
   isFailed?: boolean
 }) {
+  const workspace = useUIStore(s => s.workspace)
   const { getActivitiesForWorkbook, datalayerActivitiesDone, assessmentActivitiesDone, parsingActivitiesDone, mappingActivitiesDone, generationActivitiesDone, validationActivitiesDone } = useAgentStore()
+  const qlikActivities = useQlikStore(s => s.activities[app.workbookId])
+  const isQlikProcessing = useQlikStore(s => s.isProcessing)
 
-  const stoppedRunIds = useMonitoringStore(s => s.stoppedRunIds) || []
-  const isRunStopped = runId ? stoppedRunIds.includes(runId) : false
+  const stoppedRunIds = useMonitoringStore(s => s.stoppedRunIds)
+  const isRunStopped = runId && stoppedRunIds ? stoppedRunIds.includes(runId) : false
 
   const [isOpen, setIsOpen] = useState(true)
 
-  const allActivities = getActivitiesForWorkbook(app.workbookId)
   const activities = useMemo(() => {
+    if (workspace === "qlik") {
+      let logs: any[] = [];
+      if (qlikActivities) {
+        if (agentName.toLowerCase() === "generation" || agentName.toLowerCase() === "reportgeneration") {
+          logs = qlikActivities["generation"] || qlikActivities["reportGeneration"] || qlikActivities["reportgeneration"] || [];
+        } else {
+          logs = qlikActivities[agentName] || qlikActivities[agentName.toLowerCase()] || [];
+        }
+      }
+
+      if (Array.isArray(logs)) {
+        return logs.map((log: any, idx: number) => ({
+          id: log.id || `${app.workbookId}-${agentName}-${idx}`,
+          activity_summary: typeof log === "string" ? log : log.activity_summary || log.action || log.message || log.text || JSON.stringify(log),
+          created_at: log.timestamp || log.created_at || new Date().toISOString(),
+          agent_name: agentName,
+        }))
+      }
+      return []
+    }
+
+    const allActivities = getActivitiesForWorkbook(app.workbookId)
     const raw = allActivities.filter(a => matchesAgent(a.agent_name, agentName))
-    // ★ Deduplicate based on: ${agent}-${timestamp}-${message}
-    // This prevents first/last logs of an agent stage from showing twice
     const seen = new Set<string>()
     return raw.filter(act => {
       const key = `${act.agent_name}-${act.created_at}-${act.activity_summary}`
@@ -266,9 +260,8 @@ function AgentActionsBlock({
       seen.add(key)
       return true
     })
-  }, [allActivities, agentName])
+  }, [workspace, qlikActivities, app.workbookId, agentName, getActivitiesForWorkbook])
 
-  // Check if the stage is marked done in the store (even without actual activity records)
   const stageCompletionMap: Record<string, Record<string, boolean>> = {
     assessment: assessmentActivitiesDone,
     parsing: parsingActivitiesDone,
@@ -277,97 +270,83 @@ function AgentActionsBlock({
     generation: generationActivitiesDone,
     validation: validationActivitiesDone,
   }
-  const isStageDone = !!stageCompletionMap[agentName]?.[app.workbookId]
+  const isAgentCompleted = isCompleted !== undefined ? isCompleted : stageCompletionMap[agentName]?.[app.workbookId]
 
-  // ★ FIX: typingIndex must start at 0 on mount when no activities have loaded yet.
-  // On mount: if activities already exist, start at first untyped one.
+  const isCurrentAgentRunning = activities.length > 0 && !isAgentCompleted && !isRunStopped && (workspace === "qlik" ? isQlikProcessing : true)
+
   const [typingIndex, setTypingIndex] = useState(() => {
     const firstUntyped = activities.findIndex(a => !_typedActivities.has(a.id))
     return firstUntyped === -1 ? activities.length : firstUntyped
   })
 
-  // ★ BATCH REVEAL FIX: When multiple activities arrive at once (e.g. 10 from a single
-  // API call), we must NOT type them one-by-one — that would take minutes.
-  // Instead: instantly reveal all activities EXCEPT the most recent one, which gets
-  // the typing animation. This gives a "live update" feel for the latest entry
-  // while showing all historical context immediately.
   useEffect(() => {
     setTypingIndex(prev => {
       if (activities.length <= prev) return prev
 
       const newActivities = activities.slice(prev)
       if (newActivities.length > 1) {
-        // Batch arrival: instantly mark all-but-last as already-typed
         newActivities.slice(0, -1).forEach(a => {
           if (a.id) _typedActivities.add(a.id)
         })
-        // Set frontier to the last new activity so it gets the typing animation
         return activities.length - 1
       }
-      // Single new activity via live polling: animate normally
       return prev
     })
-  }, [activities.length]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (!runId) return null
+  }, [activities.length])
 
   return (
-    <div className={styles.workbookActions}>
-      <div className={styles.actionsHeader} onClick={() => setIsOpen(!isOpen)}>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <Sparkles size={14} color={iconColor || "var(--primary)"} />
-          <span style={{ color: "var(--text)" }}>{title}</span>
+    <div className="mt-2 ml-3 rounded-lg border border-border bg-surface-subtle p-2.5 text-xs">
+      <div
+        className="flex cursor-pointer select-none items-center justify-between font-semibold text-foreground"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className="flex items-center gap-1.5">
+          <Sparkles size={14} style={{ color: iconColor }} />
+          <span>{title}</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          {isCompleted && <CheckCircle2 size={16} color="var(--success)" />}
-          {isFailed && <XCircle size={16} color="var(--danger)" />}
+        <div className="flex items-center gap-1.5">
+          {isCompleted && <CheckCircle2 size={16} className="text-success" />}
+          {isFailed && <XCircle size={16} className="text-destructive" />}
           {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </div>
       </div>
 
       {isOpen && (
-        <div style={{ marginTop: "10px" }}>
+        <div className="mt-2.5">
           {activities.length === 0 ? (
-            isStageDone ? (
-              <div className={styles.waitingContainer} style={{ fontStyle: "normal", color: "var(--text-secondary)" }}>
-                <CheckCircle2 size={16} color="var(--success)" />
+            isAgentCompleted ? (
+              <div className="flex items-center gap-2 py-1 text-muted-foreground">
+                <CheckCircle2 size={16} className="text-success" />
                 <span>{title.replace(" Agent", "")} completed.</span>
               </div>
             ) : isRunStopped ? (
-              <div className={styles.waitingContainer} style={{ fontStyle: "normal", color: "var(--danger)" }}>
+              <div className="flex items-center gap-2 py-1 text-destructive">
                 <X size={16} />
                 <span>processing terminated</span>
               </div>
             ) : (
-              <div className={styles.waitingContainer}>
+              <div className="flex items-center gap-2 py-1 italic text-muted-foreground">
                 <Clock size={16} />
                 <span>Waiting for {title.toLowerCase()}...</span>
                 <Spinner size="tiny" />
               </div>
             )
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <div className="flex flex-col gap-1.5">
               {activities.map((act, index) => {
-                // ★ FIX: Show ALL activities that have arrived — don't gate on typingIndex
-                // for already-typed ones. Only the "current typing" one is gated.
                 const alreadyTyped = _typedActivities.has(act.id)
-
-                // Activities beyond the typing frontier are hidden (not yet revealed)
                 if (!alreadyTyped && index > typingIndex) return null
-
                 const isCurrentlyTyping = !alreadyTyped && index === typingIndex
 
                 return (
                   <div
                     key={act.id}
-                    className={styles.activityItem}
-                    style={iconColor ? { borderLeftColor: iconColor } : undefined}
+                    className="break-words rounded-md bg-surface py-1.5 px-2.5 border-l-4"
+                    style={{ borderLeftColor: iconColor }}
                   >
                     {alreadyTyped ? (
-                      // ★ Already typed before — show instantly as plain text
                       <span>{act.activity_summary}</span>
                     ) : isCurrentlyTyping ? (
-                      // ★ New activity — type it out, then mark as done permanently
                       <TypingText
                         text={act.activity_summary}
                         onComplete={() => {
@@ -387,7 +366,6 @@ function AgentActionsBlock({
   )
 }
 
-
 function WorkbookLevel({
   app,
   runId,
@@ -395,61 +373,120 @@ function WorkbookLevel({
   app: Application
   runId: string | null
 }) {
-  const { activities, parsingTriggered, datalayerTriggered, mappingTriggered, generationTriggered, validationTriggered, shouldSkipDataLayer, assessmentData, currentRunId, manualValidationStarted } = useAgentStore()
+  const workspace = useUIStore(s => s.workspace)
+  const { activities, parsingTriggered, datalayerTriggered, mappingTriggered, generationTriggered, validationTriggered, shouldSkipDataLayer, assessmentData, manualValidationStarted } = useAgentStore()
+
+  // Safe Zustand selectors returning stable references
+  const qlikProcessStates = useQlikStore(s => s.processStates[app.workbookId])
+  const isQlikProcessing = useQlikStore(s => s.isProcessing)
   const { migrationPhase } = useDashboardStore()
-  const { mode, hasContinued, dataLayerEnabled } = useUIStore()
+  const { mode, hasContinued } = useUIStore()
   const [open, setOpen] = useState(true)
 
-  // ★ Subscribe to result stores to know when actual data has loaded
-  const hasAssessment = !!(runId && assessmentData[runId]?.[app.workbookId])
-  const hasParsing = !!useParsingStore(s => s.parsingData[app.workbookId])
-  const hasDataLayer = !!useDatalayerStore(s => s.datalayerData[app.workbookId])
-  const hasMapping = !!useMappingStore(s => s.mappingData[app.workbookId])
+  // Unconditional hook subscriptions for Tableau
+  const hasTableauParsing = useParsingStore(s => !!s.parsingData[app.workbookId])
+  const hasTableauDataLayer = useDatalayerStore(s => !!s.datalayerData[app.workbookId])
+  const hasTableauMapping = useMappingStore(s => !!s.mappingData[app.workbookId])
   const generationEntry = useGenerationStore(s => s.generationData[app.workbookId])
   const generationRawEntry = useGenerationStore(s => s.generationRaw[app.workbookId])
-  const hasGeneration = !!generationEntry
-  const hasValidation = !!useValidationStore(s => s.validationData[app.workbookId])
-  const hasAllResults = hasParsing && hasMapping && hasGeneration && hasValidation
+  const hasTableauValidation = useValidationStore(s => !!s.validationData[app.workbookId])
 
-  // ★ Robust failure detection: check mapped status, raw outer status, AND nested final_response
-  const hasGenerationFailed = hasGeneration && (() => {
-    const mappedStatus = (generationEntry?.status || "").toLowerCase()
-    const rawOuterStatus = (generationRawEntry?.status || "").toLowerCase()
-    const rawFinalStatus = (generationRawEntry?.payload?.final_response?.status ||
-      generationRawEntry?.final_response?.status || "").toLowerCase()
-    return (
-      mappedStatus === 'failed' || mappedStatus === 'error' ||
-      rawOuterStatus === 'failed' || rawOuterStatus === 'error' ||
-      rawFinalStatus === 'failed' || rawFinalStatus === 'error'
-    )
-  })()
+  // Unconditional useMemo hooks
+  const isTableauAssessmentComplete = useMemo(() => {
+    if (!runId || !activities || !activities[runId]) return false
+    const acts = activities[runId][app.workbookId] || []
+    const assessmentActs = acts.filter((a: any) => matchesAgent(a.agent_name, 'assessment'))
+    return assessmentActs.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()))
+  }, [activities, runId, app.workbookId])
 
-  const isSinglePreContinue = mode === 'single' && !hasContinued;
+  const isTableauParsingComplete = useMemo(() => {
+    if (!runId || !activities || !activities[runId]) return false
+    const acts = activities[runId][app.workbookId] || []
+    const parsingActs = acts.filter((a: any) => matchesAgent(a.agent_name, 'parsing'))
+    return parsingActs.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()))
+  }, [activities, runId, app.workbookId])
 
-  const isAssessmentComplete = useMemo(() => {
-    if (!runId || !activities || !activities[runId]) return false;
-    const acts = activities[runId][app.workbookId] || [];
-    const assessmentActs = acts.filter((a: any) => matchesAgent(a.agent_name, 'assessment'));
-    return assessmentActs.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()));
-  }, [activities, runId, app.workbookId]);
+  const isTableauMappingComplete = useMemo(() => {
+    if (!runId || !activities || !activities[runId]) return false
+    const acts = activities[runId][app.workbookId] || []
+    const mappingActs = acts.filter((a: any) => matchesAgent(a.agent_name, 'mapping'))
+    return mappingActs.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()))
+  }, [activities, runId, app.workbookId])
 
-  let displayedStatus = getDisplayedStatus(app, runId, activities, migrationPhase, !shouldSkipDataLayer(app.workbookId), hasAllResults, hasGenerationFailed)
+  const isTableauGenerationComplete = useMemo(() => {
+    if (!runId || !activities || !activities[runId]) return false
+    const acts = activities[runId][app.workbookId] || []
+    const generationActs = acts.filter((a: any) => matchesAgent(a.agent_name, 'generation'))
+    return generationActs.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()))
+  }, [activities, runId, app.workbookId])
 
-  // ★ For partial processing: show "Extraction Completed" only when parsing result data is loaded
+  const isTableauValidationComplete = useMemo(() => {
+    if (!runId || !activities || !activities[runId]) return false
+    const acts = activities[runId][app.workbookId] || []
+    const validationActs = acts.filter((a: any) => matchesAgent(a.agent_name, 'validation'))
+    return validationActs.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()))
+  }, [activities, runId, app.workbookId])
+
+  // Determine stage completion for Qlik vs Tableau
+  const hasAssessment = workspace === "qlik"
+    ? ["completed", "success"].includes(qlikProcessStates?.assessment?.status?.toLowerCase() || "")
+    : !!(runId && assessmentData[runId]?.[app.workbookId])
+
+  const hasParsing = workspace === "qlik"
+    ? ["completed", "success"].includes(qlikProcessStates?.parsing?.status?.toLowerCase() || "")
+    : hasTableauParsing
+
+  const hasDataLayer = workspace === "qlik"
+    ? false
+    : hasTableauDataLayer
+
+  const hasMapping = workspace === "qlik"
+    ? ["completed", "success"].includes(qlikProcessStates?.mapping?.status?.toLowerCase() || "")
+    : hasTableauMapping
+
+  const hasGeneration = workspace === "qlik"
+    ? ["completed", "success"].includes(qlikProcessStates?.reportGeneration?.status?.toLowerCase() || "")
+    : !!generationEntry
+
+  const hasValidation = workspace === "qlik"
+    ? false
+    : hasTableauValidation
+
+  const hasAllResults = workspace === "qlik"
+    ? (hasAssessment && hasParsing && hasMapping && hasGeneration)
+    : (hasParsing && hasMapping && hasGeneration && hasValidation)
+
+  const hasGenerationFailed = workspace === "qlik"
+    ? qlikProcessStates?.reportGeneration?.status?.toLowerCase() === "failed" || qlikProcessStates?.reportGeneration?.status?.toLowerCase() === "error"
+    : hasGeneration && (() => {
+        const mappedStatus = (generationEntry?.status || "").toLowerCase()
+        const rawOuterStatus = (generationRawEntry?.status || "").toLowerCase()
+        const rawFinalStatus = (generationRawEntry?.payload?.final_response?.status ||
+          generationRawEntry?.final_response?.status || "").toLowerCase()
+        return (
+          mappedStatus === 'failed' || mappedStatus === 'error' ||
+          rawOuterStatus === 'failed' || rawOuterStatus === 'error' ||
+          rawFinalStatus === 'failed' || rawFinalStatus === 'error'
+        )
+      })()
+
+  const isSinglePreContinue = mode === 'single' && !hasContinued
+
+  const isAssessmentComplete = workspace === "qlik"
+    ? hasAssessment
+    : isTableauAssessmentComplete
+
+  let displayedStatus = workspace === "qlik"
+    ? (app.status === "completed" ? "Migration Completed" : app.status === "running" ? "Processing..." : app.status === "failed" ? "Failed" : "Pending")
+    : getDisplayedStatus(app, runId, activities, migrationPhase, !shouldSkipDataLayer(app.workbookId), hasAllResults, hasGenerationFailed)
+
   if (isSinglePreContinue && hasParsing && displayedStatus === "Processing...") {
-    displayedStatus = isLiteMode() ? "Extraction Completed" : "Extraction Completed"
+    displayedStatus = "Extraction Completed"
   }
 
-  // ★ Replace paused or parsing status with Extraction Completed
-  if (displayedStatus.toLowerCase().includes("paused") || displayedStatus.toLowerCase().includes("parsing") || displayedStatus === "Parsing Done") {
-    displayedStatus = isLiteMode() ? "Extraction Completed" : "Extraction Completed"
-  }
-
-  // ★ Generation failed — always show "Failed" badge regardless of other state
   if (hasGenerationFailed) {
     displayedStatus = "Failed"
   } else {
-    // ★ For manual validation pause: show "Completed"
     const isPausedWaitingForValidation = hasGeneration && !manualValidationStarted[app.workbookId]
     if (isPausedWaitingForValidation && displayedStatus === "Processing...") {
       displayedStatus = "Completed"
@@ -458,86 +495,45 @@ function WorkbookLevel({
 
   const toggleOpen = () => setOpen((prev) => !prev)
 
-  const isParsingComplete = useMemo(() => {
-    if (!runId || !activities || !activities[runId]) return false;
-    const acts = activities[runId][app.workbookId] || [];
-    const parsingActs = acts.filter((a: any) => matchesAgent(a.agent_name, 'parsing'));
-    return parsingActs.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()));
-  }, [activities, runId, app.workbookId]);
+  const isParsingComplete = workspace === "qlik"
+    ? hasParsing
+    : isTableauParsingComplete
 
-  const isMappingComplete = useMemo(() => {
-    if (!runId || !activities || !activities[runId]) return false;
-    const acts = activities[runId][app.workbookId] || [];
-    const mappingActs = acts.filter((a: any) => matchesAgent(a.agent_name, 'mapping'));
-    return mappingActs.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()));
-  }, [activities, runId, app.workbookId]);
+  const isMappingComplete = workspace === "qlik"
+    ? hasMapping
+    : isTableauMappingComplete
 
-  const isDataLayerComplete = useMemo(() => {
-    if (!runId || !activities || !activities[runId]) return false;
-    const acts = activities[runId][app.workbookId] || [];
-    const dlActs = acts.filter((a: any) => matchesAgent(a.agent_name, 'datalayer'));
-    return dlActs.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()));
-  }, [activities, runId, app.workbookId]);
+  const isGenerationComplete = workspace === "qlik"
+    ? hasGeneration
+    : isTableauGenerationComplete
 
-  const isGenerationComplete = useMemo(() => {
-    if (!runId || !activities || !activities[runId]) return false;
-    const acts = activities[runId][app.workbookId] || [];
-    const generationActs = acts.filter((a: any) => matchesAgent(a.agent_name, 'generation'));
-    return generationActs.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()));
-  }, [activities, runId, app.workbookId]);
-
-  const isValidationComplete = useMemo(() => {
-    if (!runId || !activities || !activities[runId]) return false;
-    const acts = activities[runId][app.workbookId] || [];
-    const validationActs = acts.filter((a: any) => matchesAgent(a.agent_name, 'validation'));
-    return validationActs.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()));
-  }, [activities, runId, app.workbookId]);
-
-  const hasDownstream = hasValidation || hasGeneration || hasMapping || isMappingComplete || isDataLayerComplete || isGenerationComplete || isValidationComplete;
-
-  if (displayedStatus === "Completed" || displayedStatus === "Success") {
-    if (isLiteMode() && !hasDownstream) {
-      displayedStatus = "Extraction Completed"
-    } else if (hasValidation) {
-      displayedStatus = "Migration Completed"
-    } else if (hasGeneration) {
-      displayedStatus = "Validation Pending"
-    } else {
-      displayedStatus = "Migration Completed"
-    }
-  } else if (isLiteMode() && !hasDownstream && displayedStatus === "Migration Completed") {
-    displayedStatus = "Extraction Completed"
-  }
+  const isValidationComplete = workspace === "qlik"
+    ? false
+    : isTableauValidationComplete
 
   const statusColor = getStatusColor(displayedStatus)
+  const isMultilineBadge = displayedStatus === "Migration Completed" || displayedStatus === "Extraction Completed"
 
   return (
-    <div className={styles.appCard}>
-      <div
-        className={styles.appHeader}
-        onClick={toggleOpen}
-        style={{ cursor: "pointer" }}
-      >
-        <div className={styles.workbookHeader}>
-          <Badge
-            variant={statusColor}
-            style={(displayedStatus === "Migration Completed" || displayedStatus === "Extraction Completed") ? { height: "auto", padding: "4px 8px", lineHeight: "1.2" } : undefined}
-          >
-            {(displayedStatus === "Migration Completed" || displayedStatus === "Extraction Completed") ? (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <span>{displayedStatus === "Migration Completed" ? "Migration" : "Interactive"}</span>
+    <div className="rounded-lg border border-border bg-surface p-3">
+      <div className="flex cursor-pointer items-start justify-between gap-2" onClick={toggleOpen}>
+        <div className="flex flex-1 items-center gap-2">
+          <Badge variant={STATUS_BADGE_VARIANT[statusColor]} className={isMultilineBadge ? "flex-col !items-center px-2 py-1 leading-tight" : undefined}>
+            {isMultilineBadge ? (
+              <span className="flex flex-col items-center">
+                <span>{displayedStatus === "Migration Completed" ? "Migration" : "Extraction"}</span>
                 <span>Completed</span>
-              </div>
+              </span>
             ) : (
               displayedStatus
             )}
           </Badge>
-          <span className={styles.appName}>{app.workbookName}</span>
+          <span className="flex-1 break-words text-sm font-semibold leading-snug text-foreground">{app.workbookName}</span>
         </div>
         {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
       </div>
 
-      <div style={{ display: open ? "block" : "none" }}>
+      <div className={open ? "block" : "hidden"}>
         <AgentActionsBlock
           app={app}
           runId={runId}
@@ -546,29 +542,29 @@ function WorkbookLevel({
           isCompleted={hasAssessment}
         />
 
-        {isAssessmentComplete && parsingTriggered[app.workbookId] && (
+        {(isAssessmentComplete || (workspace === "qlik" && (hasParsing || qlikProcessStates?.parsing?.status === "running"))) && (
           <AgentActionsBlock
             app={app}
             runId={runId}
             agentName="parsing"
             title="Parsing Agent"
-            iconColor="#121513"
+            iconColor="#0f172a"
             isCompleted={hasParsing}
           />
         )}
 
-        {isParsingComplete && !isSinglePreContinue && mappingTriggered[app.workbookId] && (
+        {(isParsingComplete || (workspace === "qlik" && (hasMapping || qlikProcessStates?.mapping?.status === "running"))) && (
           <AgentActionsBlock
             app={app}
             runId={runId}
             agentName="mapping"
             title="Mapping Agent"
-            iconColor="#3b82f6"
+            iconColor="#2554c7"
             isCompleted={hasMapping}
           />
         )}
 
-        {!shouldSkipDataLayer(app.workbookId) && isMappingComplete && !isSinglePreContinue && datalayerTriggered[app.workbookId] && (
+        {workspace !== "qlik" && !shouldSkipDataLayer(app.workbookId) && isMappingComplete && !isSinglePreContinue && datalayerTriggered[app.workbookId] && (
           <AgentActionsBlock
             app={app}
             runId={runId}
@@ -579,7 +575,7 @@ function WorkbookLevel({
           />
         )}
 
-        {(shouldSkipDataLayer(app.workbookId) ? isMappingComplete : isDataLayerComplete) && !isSinglePreContinue && generationTriggered[app.workbookId] && (
+        {(isMappingComplete || (workspace === "qlik" && (hasGeneration || qlikProcessStates?.reportGeneration?.status === "running"))) && (
           <AgentActionsBlock
             app={app}
             runId={runId}
@@ -591,7 +587,7 @@ function WorkbookLevel({
           />
         )}
 
-        {isGenerationComplete && !isSinglePreContinue && validationTriggered[app.workbookId] && !hasGenerationFailed && (
+        {workspace !== "qlik" && isGenerationComplete && !isSinglePreContinue && validationTriggered[app.workbookId] && !hasGenerationFailed && (
           <AgentActionsBlock
             app={app}
             runId={runId}
@@ -623,28 +619,20 @@ function ProjectLevel({
   return (
     <div>
       <div
-        className={cx(
-          styles.levelHeader,
-          isPromoted ? styles.levelHeaderProjectPromoted : styles.levelHeaderProject,
-          styles.levelHeaderHover
-        )}
+        className={[
+          "flex cursor-pointer select-none items-center justify-between rounded-lg border border-border px-3 py-2.5 font-semibold transition-colors hover:shadow-xs",
+          isPromoted ? "bg-primary-subtle text-[15px]" : "bg-surface-subtle text-sm",
+        ].join(" ")}
         onClick={() => setOpen(!open)}
       >
         <span>{project.name || "Default Project"}</span>
-        <span className={styles.countText}>
+        <span className="text-sm font-normal text-muted-foreground">
           {totalRunning} / {totalWorkbooks}
         </span>
         {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
       </div>
 
-      <div
-        style={{
-          display: open ? "flex" : "none",
-          padding: "10px 0 10px 16px",
-          flexDirection: "column",
-          gap: "12px",
-        }}
-      >
+      <div className={["flex-col gap-3 py-2.5 pl-4", open ? "flex" : "hidden"].join(" ")}>
         {project.workbooks.map((wb) => (
           <WorkbookLevel key={wb.id} app={wb} runId={runId} />
         ))}
@@ -671,24 +659,17 @@ function SiteLevel({
   return (
     <div>
       <div
-        className={cx(styles.levelHeader, styles.levelHeaderSite, styles.levelHeaderHover)}
+        className="flex cursor-pointer select-none items-center justify-between rounded-lg border border-border bg-primary-subtle px-3 py-2.5 text-[15px] font-semibold transition-colors hover:shadow-xs"
         onClick={() => setOpen(!open)}
       >
         <span>{site.name || "Default Site"}</span>
-        <span className={styles.countText}>
+        <span className="text-sm font-normal text-muted-foreground">
           {totalRunning} / {totalWorkbooks}
         </span>
         {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
       </div>
 
-      <div
-        style={{
-          display: open ? "flex" : "none",
-          padding: "10px 0 10px 16px",
-          flexDirection: "column",
-          gap: "12px",
-        }}
-      >
+      <div className={["flex-col gap-3 py-2.5 pl-4", open ? "flex" : "hidden"].join(" ")}>
         {site.projects.map((proj) => (
           <ProjectLevel key={proj.name} project={proj} runId={runId} />
         ))}
@@ -697,10 +678,12 @@ function SiteLevel({
   )
 }
 
-function TableauSidebarContent({ onClose }: LeftSidebarProps) {
-  const { setSidebarOpen, mode, hasContinued } = useUIStore()
+export function LeftSidebar({ onClose }: LeftSidebarProps) {
+  const { isSidebarOpen, setSidebarOpen, mode, hasContinued, workspace } = useUIStore()
+
+  // Tableau Store Data
   const {
-    applications,
+    applications: tableauApps,
     runId: dashboardRunId,
     migrationPhase,
     tableauSiteName,
@@ -709,16 +692,84 @@ function TableauSidebarContent({ onClose }: LeftSidebarProps) {
   const { currentRunId: agentRunId, activities, assessmentData, generationActivitiesDone } = useAgentStore()
   const isSinglePreContinue = mode === 'single' && !hasContinued
 
+  // Qlik Store Data
+  const qlikApps = useQlikStore((s) => s.apps)
+  const selectedQlikApps = useQlikStore((s) => s.selectedApps)
+  const qlikProcessStates = useQlikStore((s) => s.processStates)
+  const isQlikProcessing = useQlikStore((s) => s.isProcessing)
+  const isQlikProcessCompleted = useQlikStore((s) => s.isProcessCompleted)
 
   const runId = agentRunId || dashboardRunId
-  const introMessage =
-    "This agent automatically fetches Tableau Projects & Workbooks and loads them into the system for further processing."
+  const [displayedIntro, setDisplayedIntro] = useState("")
+
+  const introMessage = workspace === "qlik"
+    ? "This agent automatically discovers Qlik Sense Spaces & Applications and loads them into the pipeline for Microsoft Fabric migration."
+    : "This agent automatically fetches Tableau Projects & Workbooks and loads them into the system for further processing."
+
+  useEffect(() => {
+    setDisplayedIntro("")
+    let i = 0
+    const interval = setInterval(() => {
+      setDisplayedIntro((prev) => {
+        if (i < introMessage.length) {
+          i++
+          return introMessage.slice(0, i)
+        }
+        clearInterval(interval)
+        return prev
+      })
+    }, 35)
+
+    return () => clearInterval(interval)
+  }, [introMessage])
 
   const parsingData = useParsingStore(s => s.parsingData)
   const mappingData = useMappingStore(s => s.mappingData)
   const generationData = useGenerationStore(s => s.generationData)
   const generationRaw = useGenerationStore(s => s.generationRaw)
   const validationData = useValidationStore(s => s.validationData)
+
+  // Map Qlik apps to Application interface if workspace is qlik
+  const applications: Application[] = useMemo(() => {
+    if (workspace === "qlik") {
+      let targetQlikApps = qlikApps || []
+      if (selectedQlikApps.length > 0) {
+        targetQlikApps = targetQlikApps.filter((qa) => selectedQlikApps.includes(qa.id))
+      } else if (isQlikProcessing || isQlikProcessCompleted) {
+        targetQlikApps = targetQlikApps.filter((qa) => {
+          const states = qlikProcessStates[qa.id]
+          return states && Object.values(states).some((s: any) => s?.status && s.status !== "pending")
+        })
+      } else {
+        // No apps selected yet and not running: don't flood queue with unselected apps
+        targetQlikApps = []
+      }
+
+      return targetQlikApps.map((qa) => {
+        const states = qlikProcessStates[qa.id] || {}
+        const statuses = Object.values(states).map((s: any) => s?.status?.toLowerCase())
+        let status = "pending"
+        if (statuses.includes("failed") || statuses.includes("error")) {
+          status = "failed"
+        } else if (statuses.includes("running") || statuses.includes("in_progress")) {
+          status = "running"
+        } else if (statuses.length >= 4 && statuses.every((s) => s === "completed" || s === "success" || s === "done")) {
+          status = "completed"
+        }
+        return {
+          id: qa.id,
+          workbookId: qa.id,
+          siteName: (qa as any).spaceName || "Qlik Space",
+          projectName: (qa as any).spaceName || "Applications",
+          projectId: (qa as any).spaceId || "qlik-space",
+          workbookName: qa.name,
+          status,
+          startTime: new Date(),
+        }
+      })
+    }
+    return tableauApps
+  }, [workspace, qlikApps, selectedQlikApps, qlikProcessStates, isQlikProcessing, isQlikProcessCompleted, tableauApps])
 
   const dynamicCounters = useMemo(() => {
     let running = 0
@@ -766,22 +817,22 @@ function TableauSidebarContent({ onClose }: LeftSidebarProps) {
   }, [applications, activities, runId, isSinglePreContinue, parsingData, mappingData, generationData, generationRaw, validationData, assessmentData])
 
   const stats = useMemo(() => {
-    const total = activeRunStats ? activeRunStats.total_workbooks : dynamicCounters.total;
-    const success = activeRunStats ? Math.max((activeRunStats.total_generation_completed ?? activeRunStats.total_migrated) || 0, dynamicCounters.success) : dynamicCounters.success;
-    const failed = activeRunStats ? Math.max(activeRunStats.total_failed || 0, dynamicCounters.failed) : dynamicCounters.failed;
-    const cancelled = activeRunStats ? activeRunStats.total_cancelled || 0 : 0;
+    const total = activeRunStats ? activeRunStats.total_workbooks : dynamicCounters.total
+    const success = activeRunStats ? Math.max((activeRunStats.total_generation_completed ?? activeRunStats.total_migrated) || 0, dynamicCounters.success) : dynamicCounters.success
+    const failed = activeRunStats ? Math.max(activeRunStats.total_failed || 0, dynamicCounters.failed) : dynamicCounters.failed
+    const cancelled = activeRunStats ? activeRunStats.total_cancelled || 0 : 0
 
-    let running = total - success - failed - cancelled;
-    if (running < 0) running = 0;
+    let running = total - success - failed - cancelled
+    if (running < 0) running = 0
 
     return {
       total, running, success, failed, cancelled
-    };
-  }, [activeRunStats, dynamicCounters]);
+    }
+  }, [activeRunStats, dynamicCounters])
 
   const sitesMap = new Map<string, Map<string, { id: string; workbooks: Application[] }>>()
   applications.forEach((app) => {
-    const siteKey = tableauSiteName || app.siteName || "Default Site"
+    const siteKey = (workspace === "tableau" ? tableauSiteName : null) || app.siteName || "Default Site"
     const projectKey = app.projectName || "Default Project"
     if (!sitesMap.has(siteKey)) sitesMap.set(siteKey, new Map())
     const projects = sitesMap.get(siteKey)!
@@ -814,362 +865,107 @@ function TableauSidebarContent({ onClose }: LeftSidebarProps) {
     }
   }
 
-  const stoppedRunIds = useMonitoringStore(s => s.stoppedRunIds) || [];
-  const isRunStopped = runId ? stoppedRunIds.includes(runId) : false;
+  const stoppedRunIds = useMonitoringStore(s => s.stoppedRunIds) || []
+  const isRunStopped = runId ? stoppedRunIds.includes(runId) : false
 
   let statusMessage: string | null = null
-  let messageBg = ""
-  let messageBorder = ""
-  let messageColor = ""
+  let messageClasses = ""
 
   if (isRunStopped) {
     statusMessage = "processing terminated"
-    messageBg = "#fef2f2"
-    messageBorder = "#fca5a5"
-    messageColor = "#991b1b"
-  } else if (migrationPhase === 'starting') {
+    messageClasses = "bg-destructive-subtle border-destructive/30 text-destructive"
+  } else if (migrationPhase === 'starting' || (workspace === "qlik" && isQlikProcessing)) {
     statusMessage = "Processing has been Started."
-    messageBg = "#fefce8"
-    messageBorder = "#fef08a"
-    messageColor = "#854d0e"
-
+    messageClasses = "bg-warning-subtle border-warning/30 text-warning"
   } else if (migrationPhase === 'completed') {
     statusMessage = "Processing has been completed."
-    messageBg = "#f0fdf4"
-    messageBorder = "#bbf7d0"
-    messageColor = "#166534"
+    messageClasses = "bg-success-subtle border-success/30 text-success"
   }
 
   return (
-    <>
-      <div className={styles.header}>
-        <Sparkles size={20} />
-        <span>Migration Summary</span>
-        <Tooltip content="Collapse" relationship="label">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Collapse Sidebar"
-            className={styles.sidebarToggleButton}
-          >
-            <PanelLeftClose size={20} />
-          </Button>
-        </Tooltip>
-      </div>
-
-      <div className={styles.summaryContent}>
-        <div className={styles.statusRow}>
-          <List size={20} color="var(--primary)" />
-          <span className={styles.statusLabel}>Total Queue Size:</span>
-          <span className={styles.statusValue}>{stats.total}</span>
-        </div>
-        <div className={styles.statusRow}>
-          <Play size={20} color="var(--warning)" />
-          <span className={styles.statusLabel}>Pending Migrations:</span>
-          <span className={styles.statusValue}>{stats.running}</span>
-        </div>
-        <div className={styles.statusRow}>
-          <CheckCircle2 size={20} color="var(--success)" />
-          <span className={styles.statusLabel}>Processed Workbooks:</span>
-          <span className={styles.statusValue}>{stats.success}</span>
-        </div>
-        <div className={styles.statusRow}>
-          <XCircle size={20} color="var(--danger)" />
-          <span className={styles.statusLabel}>Failed Migrations:</span>
-          <span className={styles.statusValue}>{stats.failed}</span>
-        </div>
-        <div className={styles.statusRow}>
-          <X size={20} color="var(--text-secondary)" />
-          <span className={styles.statusLabel}>Cancelled Migrations:</span>
-          <span className={styles.statusValue}>{stats.cancelled}</span>
-        </div>
-      </div>
-      <div className={styles.introContainer}>
-        <div className={styles.introText}>
-          {introMessage}
-        </div>
-      </div>
-
-      {statusMessage && (
-        <div
-          style={{
-            margin: "16px 0 20px",
-            padding: "14px 18px",
-            backgroundColor: messageBg,
-            border: `1px solid ${messageBorder}`,
-            borderRadius: "8px",
-            color: messageColor,
-            fontWeight: 500,
-            fontSize: "14.5px",
-            textAlign: "center",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-          }}
-        >
-          {statusMessage}
-        </div>
-      )}
-
-      {applications.length > 0 ? (
+    <div className={["flex h-full w-full flex-col gap-4 overflow-y-auto border-r border-border bg-surface py-4 shadow-card transition-[padding]", isSidebarOpen ? "px-3 pb-6" : "items-center px-2 py-4"].join(" ")}>
+      {isSidebarOpen ? (
         <>
-          <span className={styles.appSectionTitle}>Selected Workbooks</span>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>{content}</div>
-        </>
-      ) : runId ? (
-        <span style={{ color: "var(--text-muted)", textAlign: "center", padding: "20px 0" }}>
-          Loading applications...
-        </span>
-      ) : null}
-    </>
-  )
-}
-
-function QlikAppLevel({
-  app,
-  processStatus,
-}: {
-  app: any
-  processStatus: any
-}) {
-  const [open, setOpen] = useState(false)
-  const activities = useQlikStore((s) => s.activities[app.id]) || {}
-
-  const steps = ["assessment", "parsing", "mapping", "reportGeneration"] as const
-  const completedCount = steps.filter((step) => {
-    const s = processStatus?.[step]?.status?.toLowerCase()
-    return s === "completed" || s === "success" || s === "done"
-  }).length
-
-  const hasFailed = steps.some((step) => {
-    const s = processStatus?.[step]?.status?.toLowerCase()
-    return s === "failed" || s === "error"
-  })
-
-  const progress = (completedCount / steps.length) * 100
-
-  let statusColor: "success" | "warning" | "destructive" | "secondary" = "secondary"
-  let statusText = "Pending"
-  if (hasFailed) {
-    statusColor = "destructive"
-    statusText = "Failed"
-  } else if (completedCount === steps.length) {
-    statusColor = "success"
-    statusText = "Completed"
-  } else if (completedCount > 0 || steps.some((step) => processStatus?.[step]?.status?.toLowerCase() === "running")) {
-    statusColor = "warning"
-    statusText = "Processing"
-  }
-
-  return (
-    <div style={{ marginBottom: "12px", borderBottom: "1px solid #f0f1f3", paddingBottom: "12px" }}>
-      <div
-        style={{ display: "flex", alignItems: "center", cursor: "pointer", gap: "8px" }}
-        onClick={() => setOpen(!open)}
-      >
-        {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-        <span style={{ fontWeight: 600, fontSize: "14px", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {app.name}
-        </span>
-        <Badge variant={statusColor}>
-          {statusText}
-        </Badge>
-      </div>
-
-      <div style={{ width: "95%", backgroundColor: "#e2e8f0", borderRadius: "9999px", height: "6px", marginTop: "8px", overflow: "hidden" }}>
-        <div
-          style={{
-            backgroundColor: hasFailed ? "#ef4444" : completedCount === steps.length ? "#22c55e" : "#3b82f6",
-            width: `${progress}%`,
-            height: "100%",
-            transition: "width 0.3s ease"
-          }}
-        />
-      </div>
-
-      {open && (
-        <div style={{ marginLeft: "20px", marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px" }}>
-          {steps.map((step) => {
-            const stepData = processStatus?.[step] || { status: "pending" }
-            const stepStatus = stepData.status?.toLowerCase()
-            const stepLogs = activities[step] || []
-
-            let stepColor: "success" | "warning" | "destructive" | "secondary" = "secondary"
-            let stepLabel = "Pending"
-            if (stepStatus === "completed" || stepStatus === "success" || stepStatus === "done") {
-              stepColor = "success"
-              stepLabel = "Completed"
-            } else if (stepStatus === "running" || stepStatus === "in_progress") {
-              stepColor = "warning"
-              stepLabel = "Processing"
-            } else if (stepStatus === "failed" || stepStatus === "error") {
-              stepColor = "destructive"
-              stepLabel = "Failed"
-            }
-
-            const stepDisplayName = step === "reportGeneration" ? "Report Generation" : step.charAt(0).toUpperCase() + step.slice(1)
-
-            return (
-              <div key={step} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: "13px", color: "#475569", fontWeight: 500 }}>
-                    {stepDisplayName} Agent
-                  </span>
-                  <Badge variant={stepColor}>
-                    {stepLabel}
-                  </Badge>
-                </div>
-                {stepLogs.length > 0 && (
-                  <div style={{ paddingLeft: "8px", borderLeft: "2px solid #cbd5e1", fontSize: "11px", color: "#64748b", marginTop: "4px", display: "flex", flexDirection: "column", gap: "2px" }}>
-                    {stepLogs.map((log: any, idx: number) => (
-                      <div key={idx}>{log.action}</div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function QlikSidebarContent({ onClose }: LeftSidebarProps) {
-  const { apps, selectedApps, processStates } = useQlikStore()
-  const setSidebarOpen = useUIStore((s) => s.setSidebarOpen)
-
-  const introMessage = "This agent automatically fetches Qlik Sense spaces and unbuilds applications for migration."
-
-  const targetApps = useMemo(() => {
-    if (selectedApps.length > 0) {
-      return apps.filter((app) => selectedApps.includes(app.id))
-    }
-    return []
-  }, [apps, selectedApps])
-
-  const stats = useMemo(() => {
-    const activeList = targetApps.length > 0 ? targetApps : apps
-    const total = activeList.length
-    let running = 0
-    let success = 0
-    let failed = 0
-    let pending = 0
-
-    activeList.forEach((app) => {
-      const states = processStates[app.id] || {}
-      const statuses = Object.values(states).map((s: any) => s.status?.toLowerCase())
-      if (statuses.includes("failed") || statuses.includes("error")) {
-        failed++
-      } else if (statuses.includes("running") || statuses.includes("in_progress")) {
-        running++
-      } else if (statuses.length === 4 && statuses.every((s) => s === "completed" || s === "success" || s === "done")) {
-        success++
-      } else {
-        pending++
-      }
-    })
-
-    return { total, running, success, failed, pending }
-  }, [targetApps, apps, processStates])
-
-  return (
-    <>
-      <div className={styles.header}>
-        <Sparkles size={20} className="text-blue-600" />
-        <span className="font-bold text-sm tracking-tight">Qlik Migration Summary</span>
-        <Tooltip content="Collapse" relationship="label">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Collapse Sidebar"
-            className={styles.sidebarToggleButton}
-          >
-            <PanelLeftClose size={18} />
-          </Button>
-        </Tooltip>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 p-1">
-        <div className="p-2.5 bg-blue-50/70 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60 rounded-xl space-y-1">
-          <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
-            <List size={14} />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Total Apps</span>
+          <div className="flex items-center gap-2 text-base font-semibold text-foreground">
+            <Sparkles size={20} className="text-primary" />
+            <span>Migration Summary</span>
+            <Tooltip content="Collapse Sidebar" relationship="label">
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Collapse Sidebar"
+                className="ml-auto flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-subtle hover:text-foreground"
+              >
+                <PanelLeftClose size={18} />
+              </button>
+            </Tooltip>
           </div>
-          <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{stats.total}</div>
-        </div>
 
-        <div className="p-2.5 bg-amber-50/70 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/60 rounded-xl space-y-1">
-          <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
-            <Clock size={14} />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Pending</span>
+          <div className="flex flex-col gap-2.5 border-b border-border pb-3 pl-1">
+            <div className="flex items-center gap-2.5 text-sm text-secondary-foreground">
+              <List size={20} className="text-primary" />
+              <span className="flex-1">Total Queue Size:</span>
+              <span className="min-w-8 text-right font-semibold text-foreground">{stats.total}</span>
+            </div>
+            <div className="flex items-center gap-2.5 text-sm text-secondary-foreground">
+              <Play size={20} className="text-warning" />
+              <span className="flex-1">Pending Migrations:</span>
+              <span className="min-w-8 text-right font-semibold text-foreground">{stats.running}</span>
+            </div>
+            <div className="flex items-center gap-2.5 text-sm text-secondary-foreground">
+              <CheckCircle2 size={20} className="text-success" />
+              <span className="flex-1">
+                {workspace === "qlik" ? "Processed Apps:" : "Processed Workbooks:"}
+              </span>
+              <span className="min-w-8 text-right font-semibold text-foreground">{stats.success}</span>
+            </div>
+            <div className="flex items-center gap-2.5 text-sm text-secondary-foreground">
+              <XCircle size={20} className="text-destructive" />
+              <span className="flex-1">Failed Migrations:</span>
+              <span className="min-w-8 text-right font-semibold text-foreground">{stats.failed}</span>
+            </div>
+            <div className="flex items-center gap-2.5 text-sm text-secondary-foreground">
+              <X size={20} className="text-muted-foreground" />
+              <span className="flex-1">Cancelled Migrations:</span>
+              <span className="min-w-8 text-right font-semibold text-foreground">{stats.cancelled}</span>
+            </div>
           </div>
-          <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{stats.running + stats.pending}</div>
-        </div>
 
-        <div className="p-2.5 bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/60 rounded-xl space-y-1">
-          <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-            <CheckCircle2 size={14} />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Processed</span>
+          <div className="min-h-20 py-2 text-[13.5px] leading-relaxed text-secondary-foreground">
+            <span className="whitespace-pre-wrap">
+              {displayedIntro}
+              {displayedIntro.length < introMessage.length && <span className="ml-0.5 animate-pulse">|</span>}
+            </span>
           </div>
-          <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{stats.success}</div>
-        </div>
 
-        <div className="p-2.5 bg-rose-50/70 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/60 rounded-xl space-y-1">
-          <div className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
-            <XCircle size={14} />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Failed</span>
-          </div>
-          <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{stats.failed}</div>
-        </div>
-      </div>
+          {statusMessage && (
+            <div className={["rounded-lg border px-4.5 py-3.5 text-center text-sm font-medium shadow-xs", messageClasses].join(" ")}>
+              {statusMessage}
+            </div>
+          )}
 
-      <div className="px-1 py-1.5 text-xs text-slate-500 dark:text-slate-400 leading-relaxed border-b border-slate-100 dark:border-slate-800">
-        {introMessage}
-      </div>
-
-      {targetApps.length > 0 ? (
-        <>
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1 pt-2">
-            Selected Apps ({targetApps.length})
-          </span>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "0 4px" }}>
-            {targetApps.map((app) => (
-              <QlikAppLevel key={app.id} app={app} processStatus={processStates[app.id]} />
-            ))}
-          </div>
+          {applications.length > 0 ? (
+            <>
+              <span className="mt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {workspace === "qlik" ? "Selected Applications" : "Selected Workbooks"}
+              </span>
+              <div className="flex flex-col gap-3">{content}</div>
+            </>
+          ) : runId ? (
+            <p className="py-5 text-center text-muted-foreground">Loading applications...</p>
+          ) : null}
         </>
       ) : (
-        <div className="text-center py-6 px-4 text-xs text-slate-400 bg-slate-50/60 dark:bg-slate-800/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
-          No applications selected. Choose one or more applications from the dropdown to monitor migration steps.
-        </div>
-      )}
-    </>
-  )
-}
-
-export function LeftSidebar({ onClose }: LeftSidebarProps) {
-  const workspace = useUIStore((s) => s.workspace)
-  const isSidebarOpen = useUIStore((s) => s.isSidebarOpen)
-  const setSidebarOpen = useUIStore((s) => s.setSidebarOpen)
-
-  return (
-    <div className={cx(styles.sidebar, !isSidebarOpen && styles.sidebarCollapsed)}>
-      {!isSidebarOpen ? (
-        <Tooltip content="Expand" relationship="label">
-          <Button
-            variant="ghost"
-            size="icon"
+        <Tooltip content="Expand Sidebar" relationship="label">
+          <button
+            type="button"
             onClick={() => setSidebarOpen(true)}
             aria-label="Expand Sidebar"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-subtle hover:text-foreground"
           >
-            <PanelLeftOpen size={20} />
-          </Button>
+            <PanelLeftOpen size={18} />
+          </button>
         </Tooltip>
-      ) : workspace === "qlik" ? (
-        <QlikSidebarContent onClose={onClose} />
-      ) : (
-        <TableauSidebarContent onClose={onClose} />
       )}
     </div>
   )

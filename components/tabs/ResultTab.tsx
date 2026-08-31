@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from "react"
+import dynamic from "next/dynamic"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectItem } from "@/components/ui/select"
@@ -29,12 +30,14 @@ const styles = {
   sparklineBar: "rt-sparklineBar",
 }
 
-import { AssessmentTab } from "@/components/tabs/AssessmentTab"
-import { ParsingTab } from "@/components/tabs/ParsingTab"
-import MappingTab from "@/components/tabs/MappingTab"
-import { DataLayerTab } from "@/components/tabs/DataLayerTab"
-import { ValidationTab } from "@/components/tabs/ValidationTab"
-import { ReportGenerationTab } from "@/components/tabs/ReportGenerationTab"
+import { MigrationTabSkeleton } from "@/components/ui/Skeletons"
+
+const AssessmentTab = dynamic(() => import("@/components/tabs/AssessmentTab").then(m => ({ default: m.AssessmentTab })), { ssr: false, loading: () => <MigrationTabSkeleton /> })
+const ParsingTab = dynamic(() => import("@/components/tabs/ParsingTab").then(m => ({ default: m.ParsingTab })), { ssr: false, loading: () => <MigrationTabSkeleton /> })
+const MappingTab = dynamic(() => import("@/components/tabs/MappingTab"), { ssr: false, loading: () => <MigrationTabSkeleton /> })
+const DataLayerTab = dynamic(() => import("@/components/tabs/DataLayerTab").then(m => ({ default: m.DataLayerTab })), { ssr: false, loading: () => <MigrationTabSkeleton /> })
+const ValidationTab = dynamic(() => import("@/components/tabs/ValidationTab").then(m => ({ default: m.ValidationTab })), { ssr: false, loading: () => <MigrationTabSkeleton /> })
+const ReportGenerationTab = dynamic(() => import("@/components/tabs/ReportGenerationTab").then(m => ({ default: m.ReportGenerationTab })), { ssr: false, loading: () => <MigrationTabSkeleton /> })
 
 
 import { useDashboardStore } from "@/stores/dashboard.store"
@@ -56,8 +59,8 @@ export function ResultTab() {
   const [selectedTab, setSelectedTab] = useState<TabValue>("assessment")
 
   const { selectedProject, selectedProjectName, applications } = useDashboardStore()
-  const { user } = useAuthStore()
-  const { mode, hasContinued, setHasContinued, dataLayerEnabled, selectedWorkbookId, setSelectedWorkbookId } = useUIStore()
+  const { mode, hasContinued, setHasContinued, dataLayerEnabled, selectedWorkbookId, setSelectedWorkbookId, workspace } = useUIStore()
+  const isQlik = workspace === "qlik"
 
   const [isResuming, setIsResuming] = useState(false)
   const [showSyncWarningAll, setShowSyncWarningAll] = useState(false)
@@ -263,8 +266,11 @@ export function ResultTab() {
     }
   }, [selectedTab, selectedWorkbookId, shouldSkipDataLayer])
 
+  const userHasManuallySwitchedTabRef = useRef(false);
+
   const handleTabSelect = (value: string) => {
-    setSelectedTab(value as TabValue)
+    userHasManuallySwitchedTabRef.current = true;
+    setSelectedTab(value as TabValue);
   }
 
   // ★ Clear global validation error when switching workbooks or projects
@@ -325,6 +331,22 @@ export function ResultTab() {
     if (!currentRunId || currentWorkbookIds.length === 0) return false;
     return currentWorkbookIds.every(id => !!validationDataMap?.[id] || !!validationErrorMap?.[id]);
   }, [currentWorkbookIds, validationDataMap, validationErrorMap, currentRunId]);
+
+  // ★ Auto-advance selectedTab as each stage's activities & results finish for the selected workbook
+  const activeStageName = useMemo(() => {
+    if (!isAllAssessmentDone) return "assessment";
+    if (!isAllParsingDone) return "parsing";
+    if (hasContinued && !isAllMappingDone) return "mapping";
+    if (isAllMappingDone && !isAllGenerationDone) return "generation";
+    if (isAllGenerationDone && !isAllValidationDone) return "validation";
+    return null;
+  }, [isAllAssessmentDone, isAllParsingDone, hasContinued, isAllMappingDone, isAllGenerationDone, isAllValidationDone]);
+
+  useEffect(() => {
+    if (activeStageName && !userHasManuallySwitchedTabRef.current) {
+      setSelectedTab(activeStageName as TabValue);
+    }
+  }, [activeStageName]);
 
   const stages = isLiteMode()
     ? [
@@ -406,18 +428,18 @@ export function ResultTab() {
       const assessmentLods = payload.lods_analysis?.total_count || 0;
       metrics.lods += Math.max(parsingLods, assessmentLods);
 
-      // Measures and Dimensions (Intelligent selection: use parsing if it's more comprehensive, fallback to assessment)
-      const parsingMeasures = pData?.fields?.measures?.length || 0;
-      const parsingDimensions = pData?.fields?.dimensions?.length || 0;
+      // Measures and Dimensions (Intelligent selection: use parsing if available, fallback to assessment)
+      const parsingMeasures = (typeof pData?.measures === "number" ? pData.measures : pData?.fields?.measures?.length) || 0;
+      const parsingDimensions = (typeof pData?.dimensions === "number" ? pData.dimensions : pData?.fields?.dimensions?.length) || 0;
       
       if (parsingMeasures > 0 || parsingDimensions > 0) {
          metrics.measures += parsingMeasures;
          metrics.dimensions += parsingDimensions;
-      } else if (payload.calculation_stats) {
-         const stats = payload.calculation_stats;
-         const total = stats.total_calculations || 0;
-         const measures = stats.num_measures ?? Math.round((stats.pct_basic / 100) * total);
-         const dimensions = stats.num_dimensions ?? (total - measures);
+      } else if (payload.calculation_stats || payload.calculations_analysis || payload.metrics) {
+         const stats = payload.calculation_stats || payload.calculations_analysis || {};
+         const total = stats.total_calculations || stats.total_count || 0;
+         const measures = stats.num_measures ?? (payload.metrics?.measures || 0);
+         const dimensions = stats.num_dimensions ?? (payload.metrics?.dimensions || (total - measures));
          
          metrics.measures += Math.max(0, measures);
          metrics.dimensions += Math.max(0, dimensions);
@@ -687,9 +709,9 @@ export function ResultTab() {
       </div>
 
       <div className={styles.controlsRow}>
-          {/* ── Project selector / display ── */}
+          {/* ── Project / Space selector / display ── */}
           <div className={styles.selector}>
-            <span className={styles.label}>Project:</span>
+            <span className={styles.label}>{isQlik ? "Space:" : "Project:"}</span>
 
             {hasMultipleProjects ? (
               <Select
@@ -699,20 +721,20 @@ export function ResultTab() {
               >
                 {uniqueProjects.map(proj => (
                   <SelectItem key={proj.id} value={proj.id}>
-                    {proj.name}
+                    {proj.name || (isQlik ? "Personal Space" : "Default Project")}
                   </SelectItem>
                 ))}
               </Select>
             ) : (
               <span className={styles.projectValue}>
-                {uniqueProjects[0]?.name || selectedProjectName || "Processing..."}
+                {uniqueProjects[0]?.name || selectedProjectName || (isQlik ? "Personal Space" : "Default Project")}
               </span>
             )}
           </div>
 
-          {/* ── Workbook selector ── */}
+          {/* ── Workbook / Application selector ── */}
           <div className={styles.selector}>
-            <span className={styles.label}>Workbook:</span>
+            <span className={styles.label}>{isQlik ? "Application:" : "Workbook:"}</span>
 
             {!hasAnyAssessment ? (
               <span style={{ color: "var(--text-secondary)", fontStyle: "italic" }}>
@@ -726,7 +748,7 @@ export function ResultTab() {
               >
                 {viewableWorkbooks.map((wb) => (
                   <SelectItem key={wb.id} value={wb.id}>
-                    {wb.name}
+                    {wb.name || wb.id || (isQlik ? "Unnamed Application" : "Unnamed Workbook")}
                   </SelectItem>
                 ))}
               </Select>

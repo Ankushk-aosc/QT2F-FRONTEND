@@ -61,6 +61,40 @@ function isMsalInteracting(): boolean {
   return status !== InteractionStatus.None;
 }
 
+/**
+ * Returns true if an error indicates that the MSAL session or token has expired.
+ */
+export function isExpiredSessionError(err: any): boolean {
+  if (!err) return false;
+  const msg = (err.message || err.errorCode || err.toString() || "").toLowerCase();
+  return (
+    msg.includes("session_expired") ||
+    msg.includes("user_cancelled") ||
+    msg.includes("no active account") ||
+    msg.includes("token_expired") ||
+    msg.includes("aadsts50173") ||
+    msg.includes("aadsts500133") ||
+    msg.includes("invalid_grant")
+  );
+}
+
+/**
+ * Returns true if an error indicates that interactive MFA, login, or consent is required.
+ */
+export function isMfaOrInteractionRequired(err: any): boolean {
+  if (!err) return false;
+  if (err instanceof InteractionRequiredAuthError) return true;
+  const msg = (err.message || err.errorCode || err.toString() || "").toLowerCase();
+  return (
+    msg.includes("interaction_required") ||
+    msg.includes("consent_required") ||
+    msg.includes("login_required") ||
+    msg.includes("aadsts50076") ||
+    msg.includes("aadsts50079") ||
+    msg.includes("aadsts65001")
+  );
+}
+
 // ─── Refresh-token seed (server-side confidential flow) ───────────────────────
 /**
  * One-time, silent seeding of the server-side refresh_token used by Semantic

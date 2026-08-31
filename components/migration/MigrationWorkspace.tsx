@@ -1,24 +1,33 @@
 "use client"
 
 import React, { Suspense, useEffect, useRef, useState } from "react"
+import dynamic from "next/dynamic"
 import { PanelLeftOpen } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip } from "@/components/ui/tooltip"
 
-import { MigrationTab } from "@/components/tabs/MigrationTab"
-import { MonitoringTab } from "@/components/tabs/MonitoringTab"
-import { RunHistoryTab } from "@/components/tabs/RunHistoryTab"
-import { QlikMigrationTab } from "@/components/qlik/QlikMigrationTab"
-import { QlikMonitoringTab } from "@/components/qlik/QlikMonitoringTab"
-import { QlikRunHistoryTab } from "@/components/qlik/QlikRunHistoryTab"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs"
 import { MigrationTabSkeleton, RowSkeleton } from "@/components/ui/Skeletons"
 import { useUIStore } from "@/stores/ui.store"
 import { useAgentStore } from "@/stores/agent.store"
 import type { WorkspaceKind } from "@/types/settings"
+
+const MigrationTab = dynamic(
+  () => import("@/components/tabs/MigrationTab").then(m => ({ default: m.MigrationTab })),
+  { ssr: false, loading: () => <MigrationTabSkeleton /> }
+)
+const QlikMigrationTab = dynamic(
+  () => import("@/components/qlik/QlikMigrationTab").then(m => ({ default: m.QlikMigrationTab })),
+  { ssr: false, loading: () => <MigrationTabSkeleton /> }
+)
+
+const MonitoringTab = dynamic(() => import("@/components/tabs/MonitoringTab").then(m => ({ default: m.MonitoringTab })), { ssr: false, loading: () => <MigrationTabSkeleton /> });
+const RunHistoryTab = dynamic(() => import("@/components/tabs/RunHistoryTab").then(m => ({ default: m.RunHistoryTab })), { ssr: false, loading: () => <MigrationTabSkeleton /> });
+const QlikMonitoringTab = dynamic(() => import("@/components/qlik/QlikMonitoringTab").then(m => ({ default: m.QlikMonitoringTab })), { ssr: false, loading: () => <MigrationTabSkeleton /> });
+const QlikRunHistoryTab = dynamic(() => import("@/components/qlik/QlikRunHistoryTab").then(m => ({ default: m.QlikRunHistoryTab })), { ssr: false, loading: () => <MigrationTabSkeleton /> });
 
 export type WorkspaceTab = "Migration" | "Monitoring" | "History"
 
@@ -32,16 +41,6 @@ interface MigrationWorkspaceProps {
   forcedWorkspace?: WorkspaceKind
 }
 
-/**
- * The detailed Migration / Monitoring / Run History workspace for one source.
- *
- * This is the pre-existing tabbed dashboard, mounted at
- * `/migrations/{qlik,tableau}`. Its tabs switch in place: `/monitoring` and
- * `/run-history` are now their own overview pages, so navigating there on a tab
- * click would strand this workspace's detailed views — run selection, workbook
- * drill-down, log dialogs and stop-run. The selected tab is mirrored into
- * `ui.store`, which the tab content already reads.
- */
 export function MigrationWorkspace({ activeTab, forcedWorkspace }: MigrationWorkspaceProps) {
   const {
     setActiveTab,
@@ -53,13 +52,7 @@ export function MigrationWorkspace({ activeTab, forcedWorkspace }: MigrationWork
     setWorkspace,
   } = useUIStore()
 
-  // The workspace tabs switch in place rather than navigating. `/monitoring`
-  // and `/run-history` are now their own overview pages, so routing there would
-  // make this workspace's detailed monitoring and history views — with their
-  // run selection, workbook drill-down and log dialogs — unreachable.
   const [currentTab, setCurrentTab] = useState<WorkspaceTab>(activeTab)
-  const [visitedTabs, setVisitedTabs] = useState<Set<WorkspaceTab>>(() => new Set([activeTab]))
-
   const hasInitRef = useRef(false)
 
   useEffect(() => {
@@ -77,10 +70,8 @@ export function MigrationWorkspace({ activeTab, forcedWorkspace }: MigrationWork
 
   useEffect(() => {
     setCurrentTab(activeTab)
-    setVisitedTabs((prev) => new Set(prev).add(activeTab))
   }, [activeTab])
 
-  // The tab content reads the active tab from `ui.store`, so keep it in step.
   useEffect(() => {
     setActiveTab(currentTab)
   }, [currentTab, setActiveTab])
@@ -93,7 +84,6 @@ export function MigrationWorkspace({ activeTab, forcedWorkspace }: MigrationWork
 
   const goToTab = (tab: WorkspaceTab) => {
     if (tab === currentTab) return
-    setVisitedTabs((prev) => new Set(prev).add(tab))
     setCurrentTab(tab)
   }
 
@@ -119,8 +109,8 @@ export function MigrationWorkspace({ activeTab, forcedWorkspace }: MigrationWork
         <Tabs value={currentTab} onValueChange={(value: string) => goToTab(value as WorkspaceTab)}>
           <TabsList className="workspace-tablist">
             <TabsTrigger value="Migration">Migration</TabsTrigger>
-            <TabsTrigger value="Monitoring">Monitoring</TabsTrigger>
-            <TabsTrigger value="History">Run History</TabsTrigger>
+            {/* <TabsTrigger value="Monitoring">Monitoring</TabsTrigger> */}
+            {/* <TabsTrigger value="History">Run History</TabsTrigger> */}
           </TabsList>
         </Tabs>
       </div>
@@ -128,8 +118,8 @@ export function MigrationWorkspace({ activeTab, forcedWorkspace }: MigrationWork
       <div className="workspace-content">
         {workspace === "qlik" ? (
           <>
-            {visitedTabs.has("Migration") && (
-              <div style={{ display: currentTab === "Migration" ? "block" : "none", height: "100%" }}>
+            {currentTab === "Migration" && (
+              <div className="workspace-tab-panel">
                 <ErrorBoundary>
                   <Suspense fallback={<MigrationTabSkeleton />}>
                     <QlikMigrationTab />
@@ -137,8 +127,8 @@ export function MigrationWorkspace({ activeTab, forcedWorkspace }: MigrationWork
                 </ErrorBoundary>
               </div>
             )}
-            {visitedTabs.has("Monitoring") && (
-              <div style={{ display: currentTab === "Monitoring" ? "block" : "none", height: "100%" }}>
+            {currentTab === "Monitoring" && (
+              <div className="workspace-tab-panel">
                 <ErrorBoundary>
                   <Suspense fallback={<MigrationTabSkeleton />}>
                     <QlikMonitoringTab />
@@ -146,8 +136,8 @@ export function MigrationWorkspace({ activeTab, forcedWorkspace }: MigrationWork
                 </ErrorBoundary>
               </div>
             )}
-            {visitedTabs.has("History") && (
-              <div style={{ display: currentTab === "History" ? "block" : "none", height: "100%" }}>
+            {currentTab === "History" && (
+              <div className="workspace-tab-panel">
                 <ErrorBoundary>
                   <Suspense fallback={<RowSkeleton count={6} />}>
                     <QlikRunHistoryTab />
@@ -158,8 +148,8 @@ export function MigrationWorkspace({ activeTab, forcedWorkspace }: MigrationWork
           </>
         ) : (
           <>
-            {visitedTabs.has("Migration") && (
-              <div style={{ display: currentTab === "Migration" ? "block" : "none", height: "100%" }}>
+            {currentTab === "Migration" && (
+              <div className="workspace-tab-panel">
                 <ErrorBoundary>
                   <Suspense fallback={<MigrationTabSkeleton />}>
                     <MigrationTab />
@@ -167,8 +157,8 @@ export function MigrationWorkspace({ activeTab, forcedWorkspace }: MigrationWork
                 </ErrorBoundary>
               </div>
             )}
-            {visitedTabs.has("Monitoring") && (
-              <div style={{ display: currentTab === "Monitoring" ? "block" : "none", height: "100%" }}>
+            {currentTab === "Monitoring" && (
+              <div className="workspace-tab-panel">
                 <ErrorBoundary>
                   <Suspense fallback={<MigrationTabSkeleton />}>
                     <MonitoringTab />
@@ -176,8 +166,8 @@ export function MigrationWorkspace({ activeTab, forcedWorkspace }: MigrationWork
                 </ErrorBoundary>
               </div>
             )}
-            {visitedTabs.has("History") && (
-              <div style={{ display: currentTab === "History" ? "block" : "none", height: "100%" }}>
+            {currentTab === "History" && (
+              <div className="workspace-tab-panel">
                 <ErrorBoundary>
                   <Suspense fallback={<RowSkeleton count={6} />}>
                     <RunHistoryTab />
@@ -191,4 +181,3 @@ export function MigrationWorkspace({ activeTab, forcedWorkspace }: MigrationWork
     </div>
   )
 }
-

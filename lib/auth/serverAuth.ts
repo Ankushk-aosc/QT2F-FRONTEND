@@ -17,22 +17,34 @@ export const OAUTH_RETURN_COOKIE = "t2f_oauth_return";
 export const CALLBACK_PATH = "/api/auth/callback";
 
 /**
- * Resolve the externally reachable base URL (protocol + host), mirroring
- * /api/auth/config so the redirect_uri exactly matches a registered Web URI.
+ * Resolve the externally reachable base URL (protocol + host) of THIS app — not
+ * of any backend service. Used to build the OAuth redirect_uri, so it must match
+ * a Web redirect URI registered in Entra.
+ *
+ * APP_URL wins when set (pin it when the public URL differs from what the app
+ * sees, e.g. behind a CDN). Otherwise it is derived from the request, which is
+ * correct in every environment — localhost in dev, the container host in Docker,
+ * the forwarded host behind Azure's proxy — with no URL hardcoded in source.
+ *
+ * The single source of truth for this: /api/auth/config calls it too, so the
+ * browser-side redirectUri and the server-side redirect_uri cannot drift apart.
  */
 export async function resolveBaseUrl(): Promise<string> {
-  const env = getEnv();
-  let baseUrl = env.APP_URL;
+  const configured = getEnv().APP_URL;
+  if (configured) return configured.replace(/\/$/, "");
 
   const h = await headers();
-  const forwardedHost = h.get("x-forwarded-host");
-  const host = h.get("host");
+  const proto = h.get("x-forwarded-proto") || "http";
+  const host = h.get("x-forwarded-host") || h.get("host");
 
-  if (env.APP_URL === "http://localhost:3000" && (forwardedHost || host)) {
-    const proto = h.get("x-forwarded-proto") || "http";
-    baseUrl = `${proto}://${forwardedHost || host}`;
+  if (!host) {
+    throw new Error(
+      "[Env] Cannot resolve this app's base URL: APP_URL is unset and the request " +
+        "carries no X-Forwarded-Host or Host header. Set APP_URL to the app's public URL."
+    );
   }
-  return baseUrl.replace(/\/$/, "");
+
+  return `${proto}://${host}`.replace(/\/$/, "");
 }
 
 function normalizedAuthority(): string {

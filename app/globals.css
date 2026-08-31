@@ -11,23 +11,48 @@
    also injects Preflight — a global reset of headings/buttons/inputs) turns
    those classes on without touching the many still-Fluent screens that sit
    alongside them and were never built expecting a CSS reset.
+
+   `tailwindcss/utilities` alone is just the utility *engine* — it has no
+   default theme, so anything relying on Tailwind's built-in scales (the
+   `sm:`/`md:`/`lg:` breakpoints, the 0–96 spacing scale used by classes like
+   `pl-10`/`py-2.5`, fraction utilities like `top-1/2`/`-translate-y-1/2`,
+   the default color palette, the default radius scale) silently produced no
+   CSS at all. `tailwindcss/theme` supplies exactly that default scale
+   (`@theme default { ... }`) with still no Preflight, so it's safe to add
+   alongside the existing utilities-only setup.
 ═══════════════════════════════════════════════════════════════════════ */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss/theme" layer(theme);
 @import "tailwindcss/utilities";
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--text);
   --color-surface: var(--surface);
+  --color-surface-subtle: var(--surface-subtle);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--text-muted);
+  --color-secondary-foreground: var(--text-secondary);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-subtle: var(--primary-subtle);
   --color-primary-foreground: var(--text-on-primary);
   --color-destructive: var(--danger);
+  --color-destructive-subtle: var(--danger-subtle);
   --color-destructive-foreground: var(--text-on-primary);
   --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
   --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-info: var(--info);
+  --color-info-subtle: var(--info-subtle);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --shadow-xs: var(--shadow-sm);
+  --shadow-card: var(--shadow-md);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -146,6 +171,30 @@ html, body {
 
 .scroll-container::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
+}
+
+.workspace-tab-panel {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+@media (max-width: 768px) {
+  html, body {
+    overflow: auto;
+  }
+
+  .workspace-tabs-wrapper {
+    overflow-x: auto;
+  }
+
+  .workspace-tablist {
+    min-width: max-content;
+  }
+
+  .workspace-content {
+    min-width: 0;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -524,30 +573,6 @@ html, body {
   .vl-grid-5, .vl-grid-4, .vl-grid-3, .vl-grid-2 {
     grid-template-columns: 1fr;
     gap: 16px;
-  }
-}
-
-.vl-grid-5 {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 16px;
-}
-
-@media (max-width: 1440px) {
-  .vl-grid-5 {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 1024px) {
-  .vl-grid-5 {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 768px) {
-  .vl-grid-5 {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -3017,15 +3042,36 @@ details[open] > .ui-accordion-trigger::after {
    MIGRATION WORKSPACE (components/migration/MigrationWorkspace.tsx)
 ═══════════════════════════════════════════════════════════════════════ */
 
+/*
+ * This block used to have a duplicate set of `.workspace-*` rules further
+ * down (near the animation/keyframes section), left over from an earlier
+ * styling pass. CSS's cascade quietly merged the two — non-conflicting
+ * properties from both applied at once, and conflicting ones were decided by
+ * source order rather than which block "looked current" — which is fragile
+ * and, for `.workspace-tabs-wrapper`'s bottom margin, actually was wrong on
+ * mobile (the later, non-responsive rule's margin silently beat the earlier
+ * responsive one). Consolidated into one definition per selector here; the
+ * second block is gone.
+ */
 .workspace-container {
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
   background-color: var(--background);
+  padding: 24px 32px;
+  animation: fadeInUp 0.3s ease-out;
+}
+@media (max-width: 768px) {
+  .workspace-container {
+    padding: 16px;
+  }
 }
 .workspace-breadcrumb-row {
   padding: 12px 16px 0;
+  margin-bottom: 16px;
 }
 @media (max-width: 768px) {
   .workspace-breadcrumb-row {
@@ -3033,58 +3079,22 @@ details[open] > .ui-accordion-trigger::after {
   }
 }
 .workspace-tabs-wrapper {
-  background-color: var(--primary-subtle);
-  border-radius: var(--radius-md);
-  margin: 16px 16px 8px;
-  padding: 6px 12px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
-  flex-wrap: wrap;
-  position: relative;
-}
-@media (max-width: 768px) {
-  .workspace-tabs-wrapper {
-    margin: 8px 8px 4px;
-    padding: 8px;
-  }
-}
-.workspace-tablist {
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 12px;
-  width: 100%;
-  max-width: 520px;
   flex-wrap: wrap;
-  border-bottom: none !important;
-}
-.workspace-tablist .ui-tab {
-  height: 32px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-}
-.workspace-tablist .ui-tab[aria-selected="true"] {
-  font-weight: 600;
-  box-shadow: var(--shadow-sm);
-  background-color: var(--surface);
-  border-color: var(--border);
-  border-bottom-color: var(--border);
-}
-.workspace-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 16px 24px;
+  position: relative;
+  margin: 16px 16px 24px;
 }
 @media (max-width: 768px) {
-  .workspace-content {
-    padding: 0 8px 16px;
+  .workspace-tabs-wrapper {
+    margin: 8px 8px 16px;
   }
 }
 .workspace-mobile-trigger {
   display: none;
+  flex-shrink: 0;
 }
 @media (max-width: 767px) {
   .workspace-mobile-trigger {
@@ -3093,23 +3103,57 @@ details[open] > .ui-accordion-trigger::after {
     left: 8px;
   }
 }
-
-.connector-required-gate {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  text-align: center;
-  padding: 48px 24px;
-  border-radius: var(--radius-md);
-  border: 1px dashed var(--border);
+.workspace-tablist {
   background-color: var(--surface-subtle);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: 100%;
+  border-bottom: none !important;
 }
-.connector-required-reason {
-  color: var(--text-muted);
-  max-width: 460px;
+.workspace-tablist [role="tab"] {
+  height: 32px;
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+  background: transparent;
+  position: relative;
 }
+.workspace-tablist [role="tab"]:hover {
+  color: var(--primary);
+  background-color: rgba(37, 84, 199, 0.04);
+}
+.workspace-tablist [role="tab"][data-state="active"],
+.workspace-tablist [role="tab"][aria-selected="true"] {
+  font-weight: 600;
+  background-color: var(--surface);
+  color: var(--primary);
+  border-color: var(--border);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.workspace-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 16px 24px;
+}
+@media (max-width: 768px) {
+  .workspace-content {
+    padding: 0 8px 16px;
+  }
+}
+
+/* .connector-required-gate / .connector-required-reason: the real
+   definitions are further down (Connector Required Gate) — this was an
+   earlier, fully-shadowed duplicate (every property it set was overridden by
+   the later block) and has been removed. */
 
 /* ═══════════════════════════════════════════════════════════════════════
    FADE-IN / SKELETONS / PROGRESS (components/ui/*)
@@ -4453,130 +4497,6 @@ details[open] > .ui-accordion-trigger::after {
   }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   SELECTION PAGE STYLES
-   ═══════════════════════════════════════════════════════════════════════ */
-
-.selection-page-root {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background-color: #f8fafc;
-}
-
-.selection-header {
-  height: 80px;
-  display: flex;
-  align-items: center;
-  padding: 0 40px;
-  background-color: white;
-  border-bottom: 1px solid #e2e8f0;
-  flex-shrink: 0;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 50;
-}
-
-.selection-logo {
-  height: 48px;
-  width: auto;
-  object-fit: contain;
-}
-
-.selection-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px;
-  gap: 60px;
-  margin-top: 80px; /* Offset for fixed header */
-}
-
-.selection-title-group {
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.selection-title {
-  font-size: 48px;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0;
-  letter-spacing: -0.02em;
-}
-
-.selection-brand-text {
-  color: #0078d4; /* Fluent brand color */
-}
-
-.selection-subtitle {
-  font-size: 20px;
-  color: #64748b;
-  max-width: 600px;
-  margin: 0 auto;
-  line-height: 1.5;
-}
-
-.selection-cards {
-  display: flex;
-  gap: 40px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.selection-card-icon-wrapper {
-  width: 96px;
-  height: 96px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #f1f5f9;
-  border-radius: 20px;
-  transition: background-color 0.3s ease;
-}
-
-.selection-card-icon {
-  width: 64px;
-  height: 64px;
-}
-
-.selection-card-title {
-  font-size: 24px;
-  font-weight: 600;
-  text-align: center;
-  color: #0f172a;
-}
-
-.selection-card {
-  width: 360px;
-  height: 280px;
-  padding: 40px !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 24px !important;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  background-color: white !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 24px !important;
-}
-
-.selection-card:hover {
-  transform: translateY(-12px);
-  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  border-color: #0078d4 !important;
-  background-color: #fafafa !important;
-}
-
 
 /* -----------------------------------------------------------------------
    VALIDATION MATCH/DIFF BADGES
@@ -5141,16 +5061,22 @@ html[data-compact='on'] {
   height: 100%;
   border-right: 1px solid var(--border);
   background-color: var(--surface);
-  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   overflow-y: auto;
   z-index: 20;
 }
 
+/*
+ * Collapsed state shrinks to a slim icon rail (matching the primary app
+ * sidebar's own compact width) rather than vanishing at width:0 — the panel
+ * previously used `transform: translateX(-100%)` here too, which slid it
+ * fully behind the main sidebar and made its own "expand" rail unreachable.
+ * The off-canvas slide-out behavior still applies on mobile, scoped to the
+ * media query below.
+ */
 .app-shell-sidebar-container.collapsed {
-  width: 0;
-  min-width: 0;
-  transform: translateX(-100%);
-  border-right: none;
+  width: 56px;
+  min-width: 56px;
   overflow: hidden;
 }
 
@@ -5355,76 +5281,9 @@ html[data-compact='on'] {
   box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
 }
 
-/* ─── Workspace Container & Tab Bar ─── */
-.workspace-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  overflow-y: auto;
-  padding: 24px 32px;
-  animation: fadeInUp 0.3s ease-out;
-}
-
-@media (max-width: 768px) {
-  .workspace-container {
-    padding: 16px;
-  }
-}
-
-.workspace-breadcrumb-row {
-  margin-bottom: 16px;
-}
-
-.workspace-tabs-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.workspace-mobile-trigger {
-  flex-shrink: 0;
-}
-
-.workspace-tablist {
-  background-color: var(--surface-subtle);
-  padding: 4px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  display: inline-flex;
-  gap: 4px;
-}
-
-.workspace-tablist [role="tab"] {
-  padding: 8px 20px;
-  border-radius: 8px;
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  border: none;
-  background: transparent;
-  position: relative;
-}
-
-.workspace-tablist [role="tab"]:hover {
-  color: var(--primary);
-  background-color: rgba(37, 84, 199, 0.04);
-}
-
-.workspace-tablist [role="tab"][data-state="active"],
-.workspace-tablist [role="tab"][aria-selected="true"] {
-  background-color: var(--surface);
-  color: var(--primary);
-  font-weight: 600;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-
-.workspace-content {
-  flex: 1;
-  min-height: 0;
-}
+/* ─── Workspace Container & Tab Bar ───
+   Consolidated into the single definition near the top of the
+   MIGRATION WORKSPACE section — see the note there. */
 
 /* ─── Connector Required Gate ─── */
 .connector-required-gate {
@@ -5503,6 +5362,3 @@ html[data-compact='on'] {
   color: var(--text-muted);
   margin-top: 2px;
 }
-
-
-

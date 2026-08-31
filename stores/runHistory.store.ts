@@ -25,6 +25,8 @@ export interface RunHistoryItem {
   site_type?: string
   raw_timestamp?: string
   run_no?: string
+  connection_id?: string
+  server_url?: string
 }
 
 interface RunHistoryPagination {
@@ -393,8 +395,27 @@ function mergeRunHistoryCache(existing: RunHistoryItem[], ...groups: RunHistoryI
   return sortByCreatedAtDesc(Array.from(cache.values()))
 }
 
+// run_no is stored as a string like "R-42" -- comparing it as a string sorts
+// "R-10" before "R-9" lexically, which reads as "not ordered by run number"
+// even though a sort was technically happening (by created_at). Parse the
+// numeric suffix and compare numerically; fall back to created_at when
+// either side has no parseable run_no, so unnumbered/partial entries don't
+// get sorted to an arbitrary end.
+function parseRunNo(runNo: string | undefined): number | null {
+  if (!runNo) return null
+  const match = String(runNo).match(/(\d+)/)
+  if (!match) return null
+  const n = Number(match[1])
+  return Number.isFinite(n) ? n : null
+}
+
 function sortByCreatedAtDesc(items: RunHistoryItem[]): RunHistoryItem[] {
   return [...items].sort((a, b) => {
+    const aNo = parseRunNo(a.run_no)
+    const bNo = parseRunNo(b.run_no)
+    if (aNo !== null && bNo !== null && aNo !== bNo) {
+      return bNo - aNo
+    }
     return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
   })
 }
@@ -403,38 +424,86 @@ export function mapRunHistoryItem(item: any, isPartial: boolean): RunHistoryItem
   const processed = item.payload?.processed_items || item.payload?.parsed_items || item.processed_items || item.parsed_items || []
   const first = processed[0] || {}
 
-  let displayWorkbookName = first.workbook_name || item.workbook_name || item.payload?.workbook_name || item.payload?.workbookName || ""
-  let displayWorkbookId = first.workbook_id || item.workbook_id || item.payload?.workbook_id || item.payload?.workbookId || ""
+  let displayWorkbookName =
+    first.workbook_name ||
+    first.app_name ||
+    item.workbook_name ||
+    item.app_name ||
+    item.payload?.workbook_name ||
+    item.payload?.app_name ||
+    item.payload?.workbookName ||
+    ""
+  let displayWorkbookId =
+    first.workbook_id ||
+    first.app_id ||
+    item.workbook_id ||
+    item.app_id ||
+    item.payload?.workbook_id ||
+    item.payload?.app_id ||
+    item.payload?.workbookId ||
+    ""
 
-  if (processed.length > 1) {
-    displayWorkbookName = `${processed.length} Workbooks`
+  const totalCount = item.total_apps || item.total_workbooks || (processed.length > 0 ? processed.length : 0)
+  if (totalCount > 1 || processed.length > 1) {
+    displayWorkbookName = `${totalCount || processed.length} Items`
     displayWorkbookId = "multiple"
   }
 
-  let rawStatus = item.status || "";
-  let parsedStatus = rawStatus;
-  const match = rawStatus.match(/^\(([^)]+)\)/);
+  const displayProjectName =
+    first.project_name ||
+    first.space_name ||
+    first.workspace_name ||
+    item.project_name ||
+    item.space_name ||
+    item.workspace_name ||
+    item.payload?.project_name ||
+    item.payload?.space_name ||
+    item.payload?.workspace_name ||
+    (item.workspace_id ? `Space (${item.workspace_id})` : "") ||
+    ""
+  const displayProjectId =
+    first.project_id ||
+    first.space_id ||
+    first.workspace_id ||
+    item.project_id ||
+    item.space_id ||
+    item.workspace_id ||
+    item.payload?.project_id ||
+    item.payload?.workspace_id ||
+    ""
+
+  const createdAt =
+    item.created_at ||
+    item.start_date_time ||
+    item.timestamp ||
+    item.payload?.timestamp ||
+    item.raw_timestamp ||
+    new Date().toISOString()
+
+  let rawStatus = item.status || ""
+  let parsedStatus = rawStatus
+  const match = rawStatus.match(/^\(([^)]+)\)/)
   if (match) {
-      parsedStatus = match[1];
+    parsedStatus = match[1]
   }
 
-  if (typeof parsedStatus === "string" && parsedStatus.includes("Total Workbooks:")) {
-      const isCompletedText = parsedStatus.includes("Migration Complete");
-      const failedMatch = parsedStatus.match(/Failed:\s*([1-9]\d*)/i);
-      const cancelledMatch = parsedStatus.match(/Cancelled:\s*([1-9]\d*)/i);
-      const pendingMatch = parsedStatus.match(/Pending:\s*([1-9]\d*)/i);
+  if (typeof parsedStatus === "string" && (parsedStatus.includes("Total Workbooks:") || parsedStatus.includes("Total Apps:"))) {
+    const isCompletedText = parsedStatus.includes("Migration Complete") || parsedStatus.includes("Migration Completed")
+    const failedMatch = parsedStatus.match(/Failed:\s*([1-9]\d*)/i)
+    const cancelledMatch = parsedStatus.match(/Cancelled:\s*([1-9]\d*)/i)
+    const pendingMatch = parsedStatus.match(/Pending:\s*([1-9]\d*)/i)
 
-      if (failedMatch) {
-          parsedStatus = "failed";
-      } else if (cancelledMatch) {
-          parsedStatus = "cancelled";
-      } else if (pendingMatch) {
-          parsedStatus = "pending";
-      } else if (isCompletedText) {
-          parsedStatus = "completed";
-      } else {
-          parsedStatus = "completed";
-      }
+    if (failedMatch) {
+      parsedStatus = "failed"
+    } else if (cancelledMatch) {
+      parsedStatus = "cancelled"
+    } else if (pendingMatch) {
+      parsedStatus = "pending"
+    } else if (isCompletedText) {
+      parsedStatus = "completed"
+    } else {
+      parsedStatus = "completed"
+    }
   }
 
   const parentStatus = parsedStatus.toLowerCase()
@@ -444,26 +513,48 @@ export function mapRunHistoryItem(item: any, isPartial: boolean): RunHistoryItem
     ...item,
     status: parsedStatus,
     run_id: item.run_id,
-    project_id: first.project_id || item.project_id || item.project_name || "",
-    project_name: first.project_name || item.project_name || "",
+    project_id: displayProjectId,
+    project_name: displayProjectName,
     workbook_id: displayWorkbookId,
     workbook_name: displayWorkbookName,
-    created_at: item.created_at,
-    overall_status: isPartial ? "SUCCESS" : (
-      isParentTerminalState ? parsedStatus : (first.final_status || parsedStatus || "UNKNOWN")
-    ),
-    assessment_status: first.steps?.assessment || "",
-    parsing_status: first.steps?.parsing || first.steps?.["Parsing Agent"] || "",
-    datalayer_status: first.steps?.datalayer || first.steps?.data_layer || first.steps?.["Data Layer"] || first.steps?.datalayer_agent || "",
-    mapping_status: first.steps?.mapping || first.steps?.["Mapping Agent"] || "",
-    generation_status: first.steps?.generation || first.steps?.report_generation || first.steps?.generation_agent || first.steps?.["Generation Agent"] || first.steps?.["Report Generation"] || "",
-    validation_status: first.steps?.validation || first.steps?.["Validation Agent"] || "",
-    run_no: item.run_no ? String(item.run_no) : (item.payload?.run_no ? String(item.payload.run_no) : (item.runNo ? String(item.runNo) : "")),
+    created_at: createdAt,
+    overall_status: isPartial
+      ? "SUCCESS"
+      : isParentTerminalState
+      ? parsedStatus
+      : first.final_status || parsedStatus || "UNKNOWN",
+    assessment_status: first.steps?.assessment || item.assessment_status || "",
+    parsing_status: first.steps?.parsing || first.steps?.["Parsing Agent"] || item.parsing_status || "",
+    datalayer_status:
+      first.steps?.datalayer ||
+      first.steps?.data_layer ||
+      first.steps?.["Data Layer"] ||
+      first.steps?.datalayer_agent ||
+      "",
+    mapping_status: first.steps?.mapping || first.steps?.["Mapping Agent"] || item.mapping_status || "",
+    generation_status:
+      first.steps?.generation ||
+      first.steps?.report_generation ||
+      first.steps?.generation_agent ||
+      first.steps?.["Generation Agent"] ||
+      first.steps?.["Report Generation"] ||
+      item.report_generation_status ||
+      "",
+    validation_status: first.steps?.validation || first.steps?.["Validation Agent"] || item.validation_status || "",
+    run_no: item.run_no
+      ? String(item.run_no)
+      : item.payload?.run_no
+      ? String(item.payload.run_no)
+      : item.runNo
+      ? String(item.runNo)
+      : "",
     processed_items: processed,
     execution_level: item.execution_level || (isPartial ? "partial" : ""),
-    project_type: item.project_type || "",
-    workbook_type: item.workbook_type || "",
+    project_type: item.project_type || item.workspace_type || "",
+    workbook_type: item.workbook_type || item.app_type || "",
     site_type: item.site_type || "",
-    raw_timestamp: item.payload?.timestamp || item.created_at,
+    raw_timestamp: item.payload?.timestamp || item.start_date_time || item.created_at || createdAt,
+    connection_id: first.connection_id || item.connection_id || item.payload?.connection_id || undefined,
+    server_url: first.server_url || item.server_url || item.payload?.server_url || undefined,
   }
 }

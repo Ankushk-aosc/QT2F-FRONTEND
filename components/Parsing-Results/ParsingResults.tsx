@@ -57,6 +57,7 @@ interface ParsingResultsProps {
   reportType?: string;
   dataModel?: string;
   selectedAppName?: string;
+  isPdfMode?: boolean;
 }
 
 interface TableRename {

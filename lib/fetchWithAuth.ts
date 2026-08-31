@@ -1,6 +1,12 @@
-// lib/fetchWithAuth.ts
-// Client-side authenticated fetch with automatic MSAL token refresh on 401.
-// Tokens are stored in sessionStorage (never localStorage) to reduce XSS exposure.
+// fetchWithAuth.ts
+// Client-side authenticated fetch with automatic token refresh on 401
+
+// No request here ever aborted on its own -- a Next.js API route stuck
+// waiting on a hung backend (see lib/api/httpClient.ts) left this call
+// pending in lockstep, so the component that awaited it just never
+// resolved. 60s gives the server-side timeout room to fire and respond with an error first,
+// while accommodating Render's ~50s free tier cold starts.
+const DEFAULT_TIMEOUT_MS = 60000;
 
 export async function fetchWithAuth<T = any>(
   url: string,
@@ -8,96 +14,123 @@ export async function fetchWithAuth<T = any>(
   tokenKey: string = "access_token"
 ): Promise<T> {
   if (typeof window === "undefined") {
-    throw new Error("fetchWithAuth must only be called on the client side.");
+    throw new Error("fetchWithAuth should only be used on the client side.");
   }
 
-  // Dynamically import MSAL wrapper to avoid SSR bundling
-  const { getActiveToken, getFabricToken } = await import(
-    "@/components/providers/MsalProviderWrapper"
-  );
+  // Dynamically import to avoid SSR issues
+  const { getActiveToken, getFabricToken } = await import("@/components/providers/MsalProviderWrapper");
 
-  // The token has to match the audience the caller asked for. Acquiring is
-  // keyed off `tokenKey` because this used to call `getActiveToken()`
-  // unconditionally: a caller asking for "fabric_access_token" got an
-  // API_SCOPE token instead, which Fabric rejects — and the wrong token was
-  // then cached *under the Fabric key*, so every later call reused it and the
-  // workspace pickers never loaded.
-  const acquireToken =
-    tokenKey === "fabric_access_token" ? getFabricToken : getActiveToken;
+  // Fabric-scoped calls must use the Fabric-audience acquirer — a plain
+  // bearer token is minted for a different audience and Fabric rejects it.
+  const acquireToken = (forceRefresh: boolean = false) =>
+    tokenKey === "fabric_access_token" ? getFabricToken(forceRefresh) : getActiveToken(forceRefresh);
 
   const attemptFetch = async (retryCount: number = 0): Promise<T> => {
-    // Read token from sessionStorage (XSS-safer than localStorage)
+    // Get current token (from storage or fresh if missing)
     let token = sessionStorage.getItem(tokenKey);
 
-    // Acquire fresh token if none stored
+    // If no token exists at all → acquire one
     if (!token) {
+      console.log(`[fetchWithAuth] No token found → acquiring new one`);
       token = await acquireToken();
-      if (token) {
-        sessionStorage.setItem(tokenKey, token);
-      }
+      sessionStorage.setItem(tokenKey, token);
     }
 
     if (!token) {
       throw new Error("Unable to acquire access token. Please sign in again.");
     }
 
-    const requestHeaders: HeadersInit = {
-      "Content-Type": "application/json",
+    const headers: HeadersInit = {
       ...options.headers,
       Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     };
 
-    const response = await fetch(url, {
-      ...options,
-      headers: requestHeaders,
-    });
+    console.log(`[fetchWithAuth] Requesting: ${url} (attempt ${retryCount + 1})`);
 
-    // ── 401: Clear stale token, refresh once, then retry ──
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+    } catch (err: any) {
+      if (err?.name === "AbortError") {
+        console.warn(`[fetchWithAuth] Timed out after ${DEFAULT_TIMEOUT_MS}ms: ${url}`);
+        throw new Error(`Request timed out after ${DEFAULT_TIMEOUT_MS / 1000}s. The backend may be down or unreachable.`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    // ────────────────────────────────────────────────
+    // Handle 401 → try to refresh token and retry (once)
+    // ────────────────────────────────────────────────
     if (response.status === 401) {
       if (retryCount >= 1) {
-        // Already retried — avoid infinite loop, force re-login
-        sessionStorage.removeItem(tokenKey);
-        throw new Error("Session expired. Please sign in again.");
+        // Already retried once → don't loop forever
+        console.warn(`[fetchWithAuth] 401 after retry → giving up: ${url}`);
+        throw new Error("Unauthorized: Invalid or expired token after refresh attempt");
       }
 
-      // Remove expired token and acquire a fresh one
+      console.warn(`[fetchWithAuth] 401 Unauthorized → attempting token refresh`);
+
+      // Clear old (probably expired) token
       sessionStorage.removeItem(tokenKey);
 
+      // forceRefresh MUST be true here. MSAL has no idea the server rejected
+      // the token, so as far as its cache is concerned the entry is still
+      // valid and a plain acquireTokenSilent hands back the very same string —
+      // the retry then fails identically and the request dies on a 401 that
+      // would have healed. Forcing the refresh redeems the refresh token and
+      // yields a genuinely new access token.
       try {
-        // Force-refresh through the same audience-correct acquirer, otherwise a
-        // 401 retry re-fetches the wrong token and fails identically.
-        const freshToken = await acquireToken(true);
-        if (freshToken) {
-          sessionStorage.setItem(tokenKey, freshToken);
-        }
+        token = await acquireToken(true);
+        sessionStorage.setItem(tokenKey, token);
       } catch (refreshErr) {
-        console.error("[fetchWithAuth] Token refresh failed:", refreshErr);
-        throw new Error("Failed to refresh access token. Please sign in again.");
+        console.warn("[fetchWithAuth] Token refresh failed", refreshErr);
+        // Rethrow the original: callers (and the session-expired handling in
+        // MsalProviderWrapper) need the AADSTS code to tell an expired session
+        // apart from a transient failure. Wrapping it in a generic Error threw
+        // that away.
+        throw refreshErr;
       }
 
+      // Retry the original request with new token
       return attemptFetch(retryCount + 1);
     }
 
-    // ── Non-2xx errors ──
+    // ────────────────────────────────────────────────
+    // Normal error handling
+    // ────────────────────────────────────────────────
     if (!response.ok) {
       let errorText = "";
       try {
         errorText = await response.text();
       } catch {
-        // Body already consumed or empty
+        // body already consumed or empty
       }
       throw new Error(
-        `Request failed [${response.status} ${response.statusText}]: ${errorText}`
+        `Request failed: ${response.status} ${response.statusText} - ${errorText}`
       );
     }
 
-    // ── Parse JSON ──
-    try {
-      const data = await response.json();
-      return data as T;
-    } catch {
-      // Some endpoints return 204 No Content or plain text
+    // ────────────────────────────────────────────────
+    // Parse JSON response
+    // ────────────────────────────────────────────────
+    const rawBody = await response.text();
+    if (!rawBody) {
       return {} as T;
+    }
+    try {
+      return JSON.parse(rawBody) as T;
+    } catch (parseErr) {
+      console.warn("[fetchWithAuth] Response is not JSON", parseErr);
+      throw new Error("Failed to parse JSON response from server");
     }
   };
 

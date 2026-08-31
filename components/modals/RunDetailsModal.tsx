@@ -98,14 +98,19 @@ export function RunDetailsModal({ isOpen, onOpenChange, runData }: RunDetailsMod
     Promise.allSettled(fetches).then(results => {
       console.log(`[RunDetailsModal] Pre-fetch complete (${results.length} calls):`, results.map(r => r.status))
     })
-  }, [isOpen, runData, fetchAssessmentData, fetchParsingResult, fetchDataLayerResult, fetchMappingResult, fetchGenerationResult, fetchValidationResult, showParsing, showMapping, showGeneration, showValidation, lite])
+    // Keyed on the primitive IDs the fetches actually use, not the whole
+    // `runData` object -- a parent re-render (e.g. background list polling)
+    // handing this a new object reference for the SAME run used to re-fire
+    // every fetch and reset the active tab below, which read as "opening a
+    // run's detail reloads everything".
+  }, [isOpen, runData?.project_id, runData?.workbook_id, runData?.run_id, fetchAssessmentData, fetchParsingResult, fetchDataLayerResult, fetchMappingResult, fetchGenerationResult, fetchValidationResult, showParsing, showMapping, showGeneration, showValidation, lite])
 
   // Auto-select the first available tab when modal opens or runData changes
   useEffect(() => {
     if (!isOpen || !runData) return
     // Always default to Assessment since it's always present
     setActiveTopTab("Assessment")
-  }, [isOpen, runData, runData?.run_id, runData?.workbook_id])
+  }, [isOpen, runData?.run_id, runData?.workbook_id])
 
   const showDataLayerTab = useMemo(() => {
     if (lite || !runData) return false
@@ -153,14 +158,20 @@ export function RunDetailsModal({ isOpen, onOpenChange, runData }: RunDetailsMod
         <div className="run-details-header">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <span className="run-details-title">
-              {runData.workbook_name ? `${runData.workbook_name} (${runData.project_name || 'Unknown Project'})` : (runData.workbook_id || "Run Details")}
+              {(runData.workbook_name || runData.application || runData.appName || runData.app_name || runData.folderName || runData.workbook_id || "Run Details")}
+              {runData.project_name ? ` (${runData.project_name})` : ""}
             </span>
-            {(runData.execution_level || runData.project_type || runData.workbook_type || runData.site_type) && (
+            {(runData.execution_level || runData.project_type || runData.workbook_type || runData.site_type || runData.server_url || runData.connection_id) && (
               <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "2px" }}>
                 {runData.execution_level && <Badge variant="outline" style={{ fontSize: "11px" }}>Execution: {runData.execution_level}</Badge>}
                 {runData.project_type && <Badge variant="outline" style={{ fontSize: "11px" }}>Project: {runData.project_type}</Badge>}
                 {runData.workbook_type && <Badge variant="outline" style={{ fontSize: "11px" }}>Workbook: {runData.workbook_type}</Badge>}
                 {runData.site_type && <Badge variant="outline" style={{ fontSize: "11px" }}>Site: {runData.site_type}</Badge>}
+                {(runData.server_url || runData.connection_id) && (
+                  <Badge variant="outline" style={{ fontSize: "11px" }} title={runData.connection_id ? `connection_id: ${runData.connection_id}` : undefined}>
+                    Qlik Connection: {runData.server_url || runData.connection_id}
+                  </Badge>
+                )}
 
                 {/* Validation Status Badge */}
                 {!lite && (() => {

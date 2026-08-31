@@ -94,6 +94,11 @@ export interface ProcessStatus {
     result?: ReportGenerationData | null | undefined;
     error?: string;
   };
+  validation: {
+    status: "pending" | "running" | "completed" | "failed" | "skipped";
+    result?: any;
+    error?: string;
+  };
 }
 
 export interface AppProcessState {

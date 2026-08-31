@@ -18,20 +18,21 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const env = getEnv();
-
-  if (!env.MSAL_CLIENT_SECRET) {
-    return NextResponse.json(
-      { error: "MSAL_CLIENT_SECRET is not configured; cannot seed refresh_token." },
-      { status: 500 }
-    );
-  }
-
   const baseUrl = await resolveBaseUrl();
-  const redirectUri = `${baseUrl}${CALLBACK_PATH}`;
-  const state = randomBytes(24).toString("hex");
 
   // Where to send the user after the RT is seeded (default dashboard).
   const returnTo = req.nextUrl.searchParams.get("returnTo") || "/dashboard";
+
+  if (!env.MSAL_CLIENT_SECRET) {
+    // Same graceful-degradation pattern as /api/auth/callback: bounce the
+    // user back into the app instead of stranding them on a raw JSON error.
+    // RT-seeding (Semantic Kernel long-run token renewal) just stays off.
+    console.warn("[auth/seed-rt] MSAL_CLIENT_SECRET not configured; skipping refresh_token seed.");
+    return NextResponse.redirect(`${baseUrl}${returnTo}?rt_seeded=0&reason=no_secret`);
+  }
+
+  const redirectUri = `${baseUrl}${CALLBACK_PATH}`;
+  const state = randomBytes(24).toString("hex");
   const loginHint = req.nextUrl.searchParams.get("login_hint") || undefined;
 
   const params = new URLSearchParams({

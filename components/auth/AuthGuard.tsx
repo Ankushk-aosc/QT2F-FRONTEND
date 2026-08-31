@@ -24,37 +24,52 @@ import { SIGNIN_ROUTE } from "@/lib/navigation"
  * and straight back. So the guard waits for one stable cycle before treating
  * "no account" as "not signed in".
  */
+import { useAuthStore } from "@/stores/auth.store"
+
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useIsAuthenticated()
   const { inProgress, accounts } = useMsal()
+  const isStoreAuthed = useAuthStore((s) => s.isAuthenticated)
+  const isEffectiveAuthed = isAuthenticated || accounts.length > 0 || isStoreAuthed
   const router = useRouter()
   const pathname = usePathname()
   const [authResolved, setAuthResolved] = useState(false)
 
   useEffect(() => {
+    if (isStoreAuthed || accounts.length > 0) {
+      setAuthResolved(true)
+      return
+    }
+
     if (inProgress !== InteractionStatus.None) {
       setAuthResolved(false)
       return
     }
 
-    const timer = setTimeout(() => setAuthResolved(true), 250)
+    const timer = setTimeout(() => setAuthResolved(true), 100)
     return () => clearTimeout(timer)
-  }, [inProgress, accounts.length])
+  }, [inProgress, accounts.length, isStoreAuthed])
 
   useEffect(() => {
-    if (authResolved && !isAuthenticated && inProgress === InteractionStatus.None && accounts.length === 0) {
-      // Carry the attempted path so sign-in can return them to it rather than
-      // dropping everyone on the dashboard.
+    if (authResolved && !isEffectiveAuthed && inProgress === InteractionStatus.None && accounts.length === 0) {
       const redirect = pathname ? `?redirect=${encodeURIComponent(pathname)}` : ""
       router.replace(`${SIGNIN_ROUTE}${redirect}`)
     }
-  }, [authResolved, isAuthenticated, inProgress, accounts.length, pathname, router])
+  }, [authResolved, isEffectiveAuthed, inProgress, accounts.length, pathname, router])
 
   const settling = !authResolved || inProgress !== InteractionStatus.None
-  if (settling || (!isAuthenticated && accounts.length === 0)) {
+  if (settling && !isStoreAuthed) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", width: "100%", backgroundColor: "var(--background)" }}>
         <Spinner size="large" label="Securing your session..." />
+      </div>
+    )
+  }
+
+  if (!isEffectiveAuthed) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", width: "100%", backgroundColor: "var(--background)" }}>
+        <Spinner size="large" label="Redirecting to sign-in..." />
       </div>
     )
   }

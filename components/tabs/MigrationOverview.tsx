@@ -517,83 +517,10 @@ export function MigrationOverview({ isPdfMode = false, onRequestPdf }: { isPdfMo
       return;
     }
 
-    // 3. Fire AI Generation (Exactly once per run)
+    // 3. Complete AI Insights state immediately using local calculation without calling external /api/generate-insights
     if (aiGenerationFiredForRun.current !== currentRunId && localInsightsData) {
       aiGenerationFiredForRun.current = currentRunId;
-      setAiGenerationState('aggregating_portfolio');
-      console.log(`[AI Insights Lifecycle] Portfolio Aggregation Started for Run: ${currentRunId}`);
-
-      // Run async generation outside the effect's cleanup cycle
-      (async () => {
-        // Intelligent token management & rich context
-        const sortedIds = [...currentWorkbookIds].sort((a, b) => {
-          const scoreA = assessmentData[currentRunId]?.[a]?.payload?.complexity?.complexity_score || 0;
-          const scoreB = assessmentData[currentRunId]?.[b]?.payload?.complexity?.complexity_score || 0;
-          return scoreB - scoreA;
-        });
-
-        const detailedLimit = 15;
-        const detailedIds = sortedIds.slice(0, detailedLimit);
-        
-        const workbookDetails = detailedIds.map(id => {
-          const payload = assessmentData[currentRunId]?.[id]?.payload || {};
-          const pData = parsingDataMap[id] || {};
-          return {
-            name: payload.workbook_name || id,
-            complexityRating: payload.complexity?.complexity_rating || "Medium",
-            complexityScore: payload.complexity?.complexity_score || 0,
-            legacyRisk: payload.legacy_risks?.has_legacy || false,
-            customSql: payload.custom_sql_details?.length || 0,
-            lods: pData.calculations?.filter((c:any) => c.is_lod)?.length || payload.lods_analysis?.total_count || 0,
-            challenges: (payload.complexity?.technical_challenges || []).map((c: any) => typeof c === 'string' ? c : c?.challenge),
-            hasParsingData: !!parsingDataMap[id],
-            hasMappingData: !!mappingActivitiesDone[id]
-          };
-        });
-
-        const aiPayload = {
-          portfolioTotals: {
-            totalWorkbooks: localInsightsData.totalWbs,
-            complexity: localInsightsData.complexity,
-            risk: localInsightsData.risk,
-            effortDrivers: localInsightsData.effortDrivers,
-            topBlockers: localInsightsData.topBlockers
-          },
-          workbookDetails,
-          truncatedWorkbooksCount: Math.max(0, currentWorkbookIds.length - detailedLimit)
-        };
-
-        const estimatedSize = JSON.stringify(aiPayload).length;
-        console.log(`[AI Insights Lifecycle] Portfolio Aggregation Completed. Estimated Prompt Size: ${estimatedSize} chars`);
-
-        setAiGenerationState('generating_ai');
-        
-        try {
-          console.log(`[AI Insights Lifecycle] AI Generation Started`);
-          const startTime = Date.now();
-          const res = await fetch('/api/generate-insights', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(aiPayload)
-          });
-
-          if (!res.ok) {
-            throw new Error(`Azure OpenAI Error: ${res.status}`);
-          }
-          const data = await res.json();
-          
-          console.log(`[AI Insights Lifecycle] AI Generation Completed in ${Date.now() - startTime}ms`);
-          
-          setCachedInsights(data);
-          try { sessionStorage.setItem(cacheKey, JSON.stringify(data)); } catch (e) { }
-          setAiGenerationState('completed');
-        } catch (err: any) {
-          console.error(`[AI Insights Lifecycle] Error:`, err);
-          setAiError(err.message);
-          setAiGenerationState('error');
-          aiGenerationFiredForRun.current = null; // Allow retry to work
-        }
-      })();
+      setAiGenerationState('completed');
     }
   }, [currentRunId, currentWorkbookIds, isAllAssessmentDone, localInsightsData, assessmentData, parsingDataMap, mappingActivitiesDone]);
 

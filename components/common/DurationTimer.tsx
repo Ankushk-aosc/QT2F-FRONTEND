@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react"
 import { formatDuration, parseDBTimestamp } from "@/lib/utils"
+import { useSharedTick } from "@/lib/useSharedTick"
 
 interface DurationTimerProps {
   startTime: any
@@ -19,7 +20,7 @@ interface DurationTimerProps {
 
 /**
  * A reactive timer component that shows duration.
- * For running processes, it ticks every second.
+ * For running processes, it ticks every second via a shared clock.
  * For completed processes, it shows the final duration based on end_time or last activity.
  */
 export function DurationTimer({ 
@@ -34,20 +35,15 @@ export function DurationTimer({
   runId,
   workbookId
 }: DurationTimerProps) {
-  const [now, setNow] = useState(Date.now())
   const isFinal = ["completed", "failed", "success", "error", "paused", "parsing", "pending", "unknown", "done", "stopped", "cancelled", "halted"].some(s => status.toLowerCase().includes(s))
+  const tick = useSharedTick(!isFinal)
+  const now = tick || Date.now()
   
   // If we are in a final state (like Validation Pending) but the API hasn't synced the duration yet,
   // we want to continue showing the loader until the duration arrives.
   const isWaitingForApiDuration = isFinal && !totalDuration && status.toLowerCase().includes("pending");
 
   const [savedEndTime, setSavedEndTime] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (isFinal) return
-    const interval = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(interval)
-  }, [isFinal])
 
   useEffect(() => {
     if (typeof window === "undefined") return

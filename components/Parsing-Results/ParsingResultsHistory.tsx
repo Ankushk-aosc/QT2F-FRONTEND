@@ -360,14 +360,14 @@ export default function ParsingResultsHistory({ data }: ParsingResultsHistoryPro
 
   useEffect(() => {
     try {
-      const storedData = data ? JSON.stringify(data.parsing || data) : localStorage.getItem("HistoryResults");
+      const storedData = data ? JSON.stringify(data?.parsing || data) : localStorage.getItem("HistoryResults");
       if (!storedData) {
         setError("No data found in local storage under 'HistoryResults'.");
         setIsLoading(false);
         return;
       }
 
-      const fullData = JSON.parse(storedData);
+      const fullData = JSON.parse(storedData) || {};
       let fetchedAppName = "Unknown Application";
       let fetchedReportType = "Unknown";
       let fetchedDataModel = "Unknown";
@@ -390,7 +390,7 @@ export default function ParsingResultsHistory({ data }: ParsingResultsHistoryPro
       setDataModel(fetchedDataModel);
 
       // Map the parsing data using the shared function
-      const rawParsingData = fullData.parsing || fullData;
+      const rawParsingData = fullData?.parsing || fullData;
       const { parsed, renames } = mapRawParsedToParsingData(rawParsingData);
       setParsingData(parsed);
       setTableRenames(renames.map((r: any) => ({ table_name: r.table_name || '', column_renames: (r.column_renames || []).map((c: any) => ({ previous_name: c.previous_name || '', renamed: c.renamed || '' })) })));
@@ -473,8 +473,8 @@ export default function ParsingResultsHistory({ data }: ParsingResultsHistoryPro
 
       let assessmentData;
       try {
-        assessmentData = JSON.parse(localData);
-        folderName = assessmentData.parsing?.folder_name || assessmentData.assessment?.report_name || "unknown";
+        assessmentData = JSON.parse(localData) || {};
+        folderName = assessmentData?.parsing?.folder_name || assessmentData?.assessment?.report_name || "unknown";
         if (folderName === "unknown" || !folderName) {
           throw new Error("Folder name not found in assessment data. Please complete the assessment again.");
         }

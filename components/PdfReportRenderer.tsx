@@ -427,7 +427,7 @@ export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
 
       // Memory Cooldown after overview
       addLog(`[Project Overview] 🧹 Cleanup start`);
-      await new Promise(r => setTimeout(r, 1200));
+      await new Promise(r => setTimeout(r, 50));
       addLog(`[Project Overview] ✅ Cleanup finish`);
 
       // 2. Process Workbooks sequentially
@@ -482,8 +482,7 @@ export function PdfReportRenderer({ onClose }: PdfReportRendererProps) {
           // This is the critical fix: cleanup must never precede capture.
           addLog(`[${wbShort}] 🧹 Cleanup start — unmounting workbook DOM`);
           setActiveWorkbookId(null);
-          // Cooldown: give browser GC time to reclaim canvas memory before next iteration
-          await new Promise(r => setTimeout(r, 1500));
+          await new Promise(r => setTimeout(r, 50));
           addLog(`[${wbShort}] ✅ Cleanup finish`);
         }
 

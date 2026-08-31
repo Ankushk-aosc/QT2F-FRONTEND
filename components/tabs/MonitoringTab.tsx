@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectItem } from "@/components/ui/select";
 import {
     RefreshCw,
-    BookOpen,
+    BookText,
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
@@ -1899,7 +1899,7 @@ export function MonitoringTab() {
         if (displayWorkbooks.length === 0) {
             return (
                 <div className="vl-empty-state" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-                    <BookOpen size={36} style={{ opacity: 0.35 }} />
+                    <BookText size={36} style={{ opacity: 0.35 }} />
                     <span style={{ color: "var(--text-muted)", fontSize: "14px" }}>No workbooks found for the selected run.</span>
                 </div>
             );

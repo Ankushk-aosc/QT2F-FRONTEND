@@ -28,24 +28,6 @@ export interface ParsingRunStatus {
 
 
 class ParsingService {
-  async startBatchParsing(
-    workbooks: Array<{ project_id: string; workbook_id: string }>,
-    userEmail: string
-  ): Promise<{ run_id: string }> {
-    if (!userEmail?.trim() || !userEmail.includes("@")) {
-      throw new ApplicationError("Valid email is required", "VALIDATION_ERROR", 400);
-    }
-
-    if (!workbooks?.length) {
-      throw new ApplicationError("At least one workbook is required", "VALIDATION_ERROR", 400);
-    }
-
-    return await fetchWithAuth<{ run_id: string }>("/api/parsing", {
-      method: "POST",
-      body: JSON.stringify({ items: workbooks, user_email: userEmail })
-    });
-  }
-
   async getRunStatus(runId: string): Promise<ParsingRunStatus> {
     if (!runId?.trim()) {
       throw new ApplicationError("Run ID is required", "VALIDATION_ERROR", 400);

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { httpClient } from "@/lib/api/httpClient";
 import { requireAuth, successResponse, errorResponse } from "@/lib/api/routeHelpers";
-import { resolveQlikEngineData, updateSemanticKernelState } from "@/lib/qlikExtractionHelper";
+import { updateSemanticKernelState } from "@/lib/qlikExtractionHelper";
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get("Authorization");
@@ -21,120 +21,53 @@ export async function POST(req: NextRequest) {
   const spaceId = body.workspace_id || body.space_id || "personal";
   const runId = body.run_id || folderName;
 
-  // Resolve real live data from Qlik Base Engine (/all/:appId)
-  const engineData = await resolveQlikEngineData(appId, body.engine_data || body.engineData, authHeader);
+  // No engine_data pre-fetch here: vl-q2f-assessment fetches Qlik app data
+  // itself (QLIK_DATASOURCES_API_URL, server-side) and its request schema
+  // has no field to accept caller-supplied data anyway -- confirmed a
+  // caller-supplied payload would be silently ignored. connection_id is
+  // passed through as-is; if omitted, the semantic-kernel pipeline endpoint
+  // resolves a default connection itself.
+  const connectionId = body.connection_id;
 
-  const tables = engineData.tables || {};
-  const dimensions = engineData.dimensions || [];
-  const measures = engineData.measures || [];
-  const sheets = engineData.sheets || [];
-  const connections = engineData.connections || [];
-  const metadata = engineData.metadata || {};
-
-  const tableEntries = Object.entries(tables);
-  const datasetsAndFields =
-    tableEntries.length > 0
-      ? tableEntries
-          .map(
-            ([tName, tObj]: [string, any]) =>
-              `${tName} (${(tObj?.fields || []).length} fields, ${(tObj?.fields || []).filter((f: any) => f.is_key).length} keys)`
-          )
-          .join("; ")
-      : "Default Model (1 table, 4 fields)";
-
-  const pageCount = sheets.length > 0 ? sheets.length : 1;
-  const kpiCount =
-    sheets.reduce((acc: number, s: any) => {
-      const visuals = s.visualizations || s.qData?.cells || s.cells || [];
-      return acc + visuals.filter((v: any) => v.type === "kpi").length;
-    }, 0) || (measures.length > 0 ? measures.length : 4);
-
-  const databaseName =
-    connections.length > 0
-      ? connections[0].name || connections[0].connection_type || "Microsoft Fabric Lakehouse"
-      : "Microsoft Fabric Lakehouse";
-
-  const rowCount = metadata?.data_model?.row_count;
-  const dataVolumeStr = rowCount
-    ? `${(rowCount / 1000).toFixed(0)}K rows`
-    : "Standard DirectLake (< 5M rows)";
-
-  const mongoPayload = {
-    folder_name: folderName,
-    app_id: appId,
-    space_id: spaceId,
-    app_name: appName,
-    run_id: runId,
-    assessment_result: {
-      complexity: "Medium",
-      supported_visuals_percentage: 96.5,
-      total_tables: tableEntries.length,
-      total_fields: tableEntries.reduce((acc, [_, t]) => acc + (t?.fields || []).length, 0),
-      total_sheets: pageCount,
-      total_measures: measures.length,
-      total_dimensions: dimensions.length,
-      unsupported_features: [],
-    },
-    ...body,
-  };
-
-  let mongoData: any = {};
+  // Real assessment: proxied through semantic-kernel, which calls the actual
+  // Groq/Azure-powered vl-q2f-assessment agent. No values are synthesized here.
+  let assessmentData: any;
   try {
-    mongoData = await httpClient.post<any>(
-      "/assessment",
-      mongoPayload,
+    assessmentData = await httpClient.post<any>(
+      "/qlik/assessment",
       {
-        apiType: "qlik-mongo",
+        app_id: appId,
+        run_id: runId,
+        folder_name: folderName,
+        workspace_id: spaceId,
+        connection_id: connectionId,
+      },
+      {
+        apiType: "semantic",
         headers: { Authorization: authHeader! },
       }
     );
   } catch (err: any) {
-    console.warn("[API /api/qlik/assessment] MongoDB upsert warning:", err.message);
+    return errorResponse(`Assessment failed: ${err.message}`, err.status || 502);
   }
 
-  // Update Semantic Kernel state in MongoDB
+  // No separate Mongo write here: vl-q2f-assessment already persists its own
+  // result (store_assessment_response, called with the same app_id/
+  // workspace_id/run_id vl-q2f-assessment received). A second, independent
+  // write from this route used a copy of those same identifiers that could
+  // drift from the backend's -- e.g. any normalization the backend applies
+  // before storing -- which silently created two divergent records per run
+  // instead of one, and was the direct cause of a later mapping-stage
+  // lookup finding no precise match and falling back to every historical
+  // parsing record for the app (see az-repo-mongodb-vl's find_by_identifier
+  // fallback fix). Single writer per stage now.
+
   await updateSemanticKernelState(runId, "assessment", "in_progress", authHeader);
 
-  // Format full AssessmentData response matching real extracted metadata
-  const assessmentData = {
+  return successResponse({
     report_name: appName,
     folder_name: folderName,
-    status: "completed",
-    results: [
-      { category: "Application Name", value: appName },
-      { category: "Report Name", value: appName },
-      { category: "File Type", value: "Qlik Sense Application (.qvf)" },
-      { category: "Database Name", value: databaseName },
-      { category: "Complexity", value: "Medium" },
-      { category: "Supported Visuals Percentage", value: "96.5%" },
-      {
-        category: "Power BI Replicability",
-        value: {
-          recommendation: "High Replicability",
-          priority: "Ready for Direct Migration",
-          details: [
-            "Bar Charts, Line Charts, KPI Cards, and Table visual types map directly to Fabric Power BI equivalents.",
-            "Qlik hypercubes translate into DirectLake Star Schema tables.",
-            "All master dimensions and measures converted to DAX formulas.",
-          ],
-        },
-      },
-      { category: "Total Pages", value: pageCount },
-      { category: "KPI", value: kpiCount },
-      { category: "Business Criticality", value: "High" },
-      { category: "Metric Documentation", value: "Documented" },
-      { category: "Dimensional Model", value: "Star Schema" },
-      { category: "Data Model", value: "Relational Star Schema" },
-      { category: "Datasets and Fields", value: datasetsAndFields },
-      { category: "Data Sensitivity", value: "Internal" },
-      { category: "Data Volume", value: dataVolumeStr },
-      { category: "Migration Challenges", value: "Low - Standard visual types and aggregation models" },
-      { category: "Query Complexity", value: "Standard DirectLake aggregation" },
-      { category: "Screenshots", value: "[]" },
-      { category: "Unsupported Data Types", value: "None" },
-    ],
-    ...mongoData,
-  };
-
-  return successResponse(assessmentData);
+    ...assessmentData,
+    status: assessmentData?.status === "error" ? "failed" : "completed",
+  });
 }

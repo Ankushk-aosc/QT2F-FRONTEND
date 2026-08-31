@@ -154,7 +154,6 @@ export async function captureElementToPdfBlob(
         // Cleanup search canvas
         searchCanvas.width = 0;
         searchCanvas.height = 0;
-        // @ts-ignore
         searchCanvas = null;
       }
 
@@ -210,7 +209,6 @@ export async function captureElementToPdfBlob(
   const blob = pdf.output('blob');
   
   // Try to free jsPDF instance memory
-  // @ts-ignore
   pdf = null;
   
   return blob;

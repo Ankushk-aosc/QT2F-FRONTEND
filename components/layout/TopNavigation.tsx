@@ -1,29 +1,20 @@
 "use client"
 
 import React, { useState } from "react"
-import { Bell, HelpCircle, LogOut, Menu as MenuIcon } from "lucide-react"
+import { Bell, HelpCircle, LogOut, Menu as MenuIcon, Shuffle } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Tooltip } from "@/components/ui/tooltip"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { NAV_ITEMS, isNavItemActive } from "@/lib/navigation"
+import { useUIStore } from "@/stores/ui.store"
 
-/**
- * The content-area header: notifications, help, and the account menu.
- *
- * Primary navigation lives in `AppSidebar` only — this used to repeat the same
- * `NAV_ITEMS` links, which meant two competing navigation systems. The mobile
- * menu below is the exception: the sidebar is hidden under 900px, so the
- * hamburger is the only nav at that width.
- *
- * The bell and help button are deliberately inert: this deployment has no
- * notification feed and no help destination, so they announce that rather than
- * showing a count or linking nowhere. No badge is ever rendered.
- */
 export function TopNavigation() {
   const { user, logout } = useAuth()
+  const { workspace, setWorkspace } = useUIStore()
+  const router = useRouter()
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false)
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
   const pathname = usePathname()
@@ -34,13 +25,91 @@ export function TopNavigation() {
 
   const userDisplayName = user?.name || user?.email || "User"
 
+  const handleSwitchPlatform = (target: "qlik" | "tableau") => {
+    setWorkspace(target)
+    if (pathname.startsWith("/migrations")) {
+      router.push(`/migrations/${target}`)
+    }
+  }
+
   const handleLogout = () => {
     logout()
     setIsUserDropdownOpen(false)
   }
 
   return (
-    <header className="topnav-header">
+    <header className="topnav-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      {/* Platform Switcher */}
+      <div className="topnav-left-section" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            background: "var(--surface-subtle, rgba(0,0,0,0.04))",
+            padding: "3px 4px",
+            borderRadius: "8px",
+            border: "1px solid var(--border, rgba(0,0,0,0.08))",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => handleSwitchPlatform("qlik")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "4px 10px",
+              borderRadius: "6px",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: workspace === "qlik" ? 600 : 500,
+              background: workspace === "qlik" ? "#009845" : "transparent",
+              color: workspace === "qlik" ? "#ffffff" : "var(--text-secondary, #64748b)",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <span
+              style={{
+                width: "7px",
+                height: "7px",
+                borderRadius: "50%",
+                background: workspace === "qlik" ? "#ffffff" : "#009845",
+              }}
+            />
+            Qlik Sense
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSwitchPlatform("tableau")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "4px 10px",
+              borderRadius: "6px",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: workspace === "tableau" ? 600 : 500,
+              background: workspace === "tableau" ? "#e97627" : "transparent",
+              color: workspace === "tableau" ? "#ffffff" : "var(--text-secondary, #64748b)",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <span
+              style={{
+                width: "7px",
+                height: "7px",
+                borderRadius: "50%",
+                background: workspace === "tableau" ? "#ffffff" : "#e97627",
+              }}
+            />
+            Tableau
+          </button>
+        </div>
+      </div>
+
       <div className="topnav-right-section">
         <Popover open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen}>
           <PopoverTrigger asChild>

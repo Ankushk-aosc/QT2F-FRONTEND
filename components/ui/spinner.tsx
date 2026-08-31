@@ -12,13 +12,15 @@ const SIZE_PX: Record<string, number> = {
 export interface SpinnerProps {
   size?: "tiny" | "extra-small" | "small" | "medium" | "large" | "extra-large"
   label?: string
+  className?: string
+  style?: React.CSSProperties
 }
 
 /** A CSS-only loading indicator — one rotating ring, no library. */
-export function Spinner({ size = "medium", label }: SpinnerProps) {
+export function Spinner({ size = "medium", label, className, style }: SpinnerProps) {
   const px = SIZE_PX[size] ?? 28
   return (
-    <div style={{ display: "inline-flex", flexDirection: label ? "column" : "row", alignItems: "center", gap: "8px" }}>
+    <div className={className} style={{ display: "inline-flex", flexDirection: label ? "column" : "row", alignItems: "center", gap: "8px", ...style }}>
       <div
         role="status"
         aria-label={label || "Loading"}

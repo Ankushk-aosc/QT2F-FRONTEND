@@ -28,6 +28,7 @@ export interface InvokeBatchRequest {
   }>;
   model?: string;
   deployment_type?: string;
+  department_repo?: string;
   fabric_group_id?: string;
   group_id?: string;
   workspace_id?: string;
@@ -60,6 +61,16 @@ export async function POST(req: NextRequest) {
     // has to follow the declared source rather than assuming Tableau — which
     // previously rejected every Qlik item with "missing project_id".
     const isQlik = body.source_type?.trim().toLowerCase() === "qlik";
+    
+    if (!isQlik) {
+      body.source_type = "tableau";
+      body.department_repo = "Tableau_Migrated";
+      body.deployment_type = body.deployment_type || "DIRECT_FABRIC";
+    }
+
+    if (!body.fabric_group_id && body.group_id) {
+      body.fabric_group_id = body.group_id;
+    }
 
     if (!email?.trim()) {
       return NextResponse.json({ error: "email is required" }, { status: 400 });
@@ -112,15 +123,22 @@ export async function POST(req: NextRequest) {
     const data = await httpClient.post<InvokeBatchResponse>(
       "/invoke-batch",
       body,
-      { apiType: "semantic" }
+      { 
+         apiType: "semantic",
+         headers: { Authorization: authHeader }
+      }
     );
 
     return NextResponse.json(data, { status: 200 });
   } catch (err: any) {
     console.error("[API /api/migration/invoke-batch] Error:", err);
+    let details = err.message;
+    if (details === "fetch failed") {
+       details = "Failed to reach the Semantic Kernel backend. Ensure the server is running and accessible at the configured URL.";
+    }
     return NextResponse.json(
-      { error: "Failed to invoke batch migration", details: err.message },
-      { status: 500 }
+      { error: "Failed to invoke batch migration", details: details, status: err.status || 502 },
+      { status: err.status || 502 }
     );
   }
 }

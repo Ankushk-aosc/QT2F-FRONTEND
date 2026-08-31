@@ -29,7 +29,7 @@ export const SETTINGS_SCHEMA_VERSION = 1;
 
 export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   companyName: "",
-  platformName: "Switchblade Unified Platform",
+  platformName: "MigrateIQ",
   logoUrl: "",
   language: "en-AU",
   timezone: "UTC",

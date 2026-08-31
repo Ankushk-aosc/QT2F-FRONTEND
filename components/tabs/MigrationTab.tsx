@@ -203,7 +203,7 @@ export function MigrationTab() {
   }
 
   const [scope, setScope] = useState<MigrationScope>("selected")
-  const [activeSubTab, setActiveSubTab] = useState<SubTab>("configurations")
+  const [activeSubTab, setActiveSubTab] = useState<SubTab>("results")
   // isGeneratingPdf lives here (not in MigrationOverview) so the floating
   // minimized widget is NOT destroyed when the user switches sub-tabs.
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
@@ -1811,32 +1811,49 @@ export function MigrationTab() {
       </div>
 
       <div className={styles.buttonContainer}>
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "16px" }}>
-          <Button
-            size="lg"
-            className={styles.largeButton}
-            onClick={isParsingPaused || isValidationPaused || (currentRunId && !isProcessing && !isStarting) ? handleReload : debouncedStart}
-            disabled={isStarting || (isProcessing && !isParsingPaused && !isValidationPaused) || (!isReady && !currentRunId)}
-          >
-            {isParsingPaused || isValidationPaused ? <CheckCircle2 /> : (isStarting || isProcessing ? <Spinner size="tiny" /> : currentRunId ? <RefreshCw /> : <Play />)}
-            {isStarting ? "Starting..." : isParsingPaused ? "Quit" : hasAnyGenerationFailure ? "Generation Failed" : isValidationPaused ? "Completed" : isProcessing ? `Processing` : currentRunId ? "Start New Migration" : mode === 'single' ? "Start Assessment" : isLiteMode() ? "Assess" : "Migrate"}
-          </Button>
-
-          {isParsingPaused && !hasContinued && !isLiteMode() && (
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "16px", flexWrap: "wrap" }}>
+          {isStarting || (isProcessing && !isParsingPaused && !isValidationPaused) ? (
+            <Button size="lg" className={styles.largeButton} disabled style={{ minWidth: "200px" }}>
+              <Spinner size="tiny" />
+              {isStarting ? "Starting..." : "Migrating..."}
+            </Button>
+          ) : hasAnyGenerationFailure || error ? (
+            <Button size="lg" className={styles.largeButton} disabled style={{ minWidth: "200px", backgroundColor: "#ef4444", color: "#ffffff", opacity: 0.9 }}>
+              <X />
+              {hasAnyGenerationFailure ? "Report Generation Failed" : "Migration Failed"}
+            </Button>
+          ) : isValidationPaused || (currentRunId && !isProcessing && !isStarting) || isParsingPaused ? (
+            <Button size="lg" className={styles.largeButton} disabled style={{ minWidth: "200px", backgroundColor: "#22c55e", color: "#ffffff", opacity: 0.9 }}>
+              <CheckCircle2 />
+              Migration Completed
+            </Button>
+          ) : (
             <Button
               size="lg"
-              disabled={!isAllParsingDone || isResuming}
-              onClick={handleResumeClick}
-              className={cx(styles.largeButton, isAllParsingDone && !isResuming && styles.pulseButton)}
-              style={{ paddingLeft: "32px", paddingRight: "32px" }}
+              className={styles.largeButton}
+              onClick={debouncedStart}
+              disabled={!isReady}
+              style={{ minWidth: "200px" }}
             >
-              {isResuming ? <Spinner size="tiny" /> : <ArrowRight />}
-              {isResuming ? "Processing..." : "Continue to Full Analysis"}
+              <Play />
+              Migrate
+            </Button>
+          )}
+
+          {(isValidationPaused || (currentRunId && !isProcessing && !isStarting) || isParsingPaused || hasAnyGenerationFailure || error) && (
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={handleReload}
+              className={styles.largeButton}
+              style={{ minWidth: "200px", border: "2px solid #2563eb", color: "#2563eb" }}
+            >
+              <RefreshCw />
+              Start New Migration
             </Button>
           )}
         </div>
       </div>
-
 
       {migrationStartedLocal && (
         <div style={{ marginTop: "32px" }}>
@@ -1872,26 +1889,27 @@ export function MigrationTab() {
         </div>
       )}
 
-      <div className={styles.subTabsWrapper}>
-        <style>{`
-          .vl-subtabs-scroll-wrapper::-webkit-scrollbar {
-            display: none;
-          }
-        `}</style>
-        <Tabs
-          value={activeSubTab}
-          onValueChange={(value) => { if (value === "results" && !canAccessResults) return; setActiveSubTab(value as SubTab) }}
-        >
-          <TabsList className={cx(styles.subTabList, "vl-subtabs-scroll-wrapper")}>
-            <TabsTrigger value="configurations" className={cx(styles.subTabBase, activeSubTab === "configurations" && styles.subTabSelected)}>Configurations</TabsTrigger>
-            <TabsTrigger value="overview" className={cx(styles.subTabBase, activeSubTab === "overview" && styles.subTabSelected, !canAccessResults && styles.subTabDisabled)} disabled={!canAccessResults}>Migration Overview</TabsTrigger>
-            <TabsTrigger value="results" className={cx(styles.subTabBase, activeSubTab === "results" && styles.subTabSelected, !canAccessResults && styles.subTabDisabled)} disabled={!canAccessResults}>Results</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-      {activeSubTab === "configurations" && <ConfigurationsContent />}
-      {activeSubTab === "overview" && <MigrationOverview onRequestPdf={() => setIsGeneratingPdf(true)} />}
-      {activeSubTab === "results" && <ResultTab />}
+      {canAccessResults && (
+        <>
+          <div className={styles.subTabsWrapper}>
+            <style>{`
+              .vl-subtabs-scroll-wrapper::-webkit-scrollbar {
+                display: none;
+              }
+            `}</style>
+            <Tabs value={activeSubTab} onValueChange={(value) => setActiveSubTab(value as SubTab)}>
+              <TabsList className={cx(styles.subTabList, "vl-subtabs-scroll-wrapper")}>
+                {/* <TabsTrigger value="configurations" className={cx(styles.subTabBase, activeSubTab === "configurations" && styles.subTabSelected)}>Configurations</TabsTrigger> */}
+                {/* <TabsTrigger value="overview" className={cx(styles.subTabBase, activeSubTab === "overview" && styles.subTabSelected, !canAccessResults && styles.subTabDisabled)} disabled={!canAccessResults}>Migration Overview</TabsTrigger> */}
+                <TabsTrigger value="results" className={cx(styles.subTabBase, activeSubTab === "results" && styles.subTabSelected)}>Results</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+          {/* {activeSubTab === "configurations" && <ConfigurationsContent />} */}
+          {/* {activeSubTab === "overview" && <MigrationOverview onRequestPdf={() => setIsGeneratingPdf(true)} />} */}
+          {activeSubTab === "results" && <ResultTab />}
+        </>
+      )}
 
       {/* PdfReportRenderer is rendered at MigrationTab level so the minimized
           floating widget remains visible even when the user navigates away from

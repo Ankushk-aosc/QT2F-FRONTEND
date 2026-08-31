@@ -19,6 +19,9 @@ interface UIStore {
   toggleNav: () => void
   migrationMode: MigrationMode
   setMigrationMode: (mode: MigrationMode) => void
+  /** Feature toggle for stages beyond Parsing (Mapping onward). */
+  fullProcessingEnabled: boolean
+  setFullProcessingEnabled: (enabled: boolean) => void
 // ... (Assessment Continuation Flow remains below)
 
   // --- Assessment Continuation Flow ---
@@ -65,7 +68,7 @@ export const useUIStore = create<UIStore>((set, get) => ({
   setWorkspace: (workspace) => set({ workspace }),
   activeTab: "Migration",
   setActiveTab: (tab) => set({ activeTab: tab }),
-  isSidebarOpen: true, // Default to true for desktop
+  isSidebarOpen: false,
   setSidebarOpen: (open) => set({ isSidebarOpen: open }),
   isNavOpen: true,
   setNavOpen: (open) => set({ isNavOpen: open }),
@@ -79,6 +82,8 @@ export const useUIStore = create<UIStore>((set, get) => ({
   },
   migrationMode: MIGRATION_MODE.STANDARD,
   setMigrationMode: (migrationMode) => set({ migrationMode }),
+  fullProcessingEnabled: typeof window !== "undefined" && process.env.NEXT_PUBLIC_ENABLE_FULL_PROCESSING === "1",
+  setFullProcessingEnabled: (fullProcessingEnabled) => set({ fullProcessingEnabled }),
 
   // --- Assessment Continuation Flow ---
   mode: 'full',

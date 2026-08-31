@@ -32,24 +32,6 @@ export interface RunStatus {
 
 
 class AssessmentService {
-  async startBatchAssessment(
-    workbooks: Array<{ project_id: string; workbook_id: string }>,
-    userEmail: string
-  ): Promise<{ run_id: string }> {
-    if (!userEmail?.trim() || !userEmail.includes("@")) {
-      throw new ApplicationError("Valid email is required", "VALIDATION_ERROR", 400);
-    }
-
-    if (!workbooks?.length) {
-      throw new ApplicationError("At least one workbook is required", "VALIDATION_ERROR", 400);
-    }
-
-    return await fetchWithAuth<{ run_id: string }>("/api/assessment", {
-      method: "POST",
-      body: JSON.stringify({ items: workbooks, user_email: userEmail })
-    });
-  }
-
   async getRunStatus(runId: string): Promise<RunStatus> {
     if (!runId?.trim()) {
       throw new ApplicationError("Run ID is required", "VALIDATION_ERROR", 400);

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { httpClient } from "@/lib/api/httpClient";
 import { requireAuth, successResponse, errorResponse } from "@/lib/api/routeHelpers";
-import { resolveQlikEngineData, updateSemanticKernelState } from "@/lib/qlikExtractionHelper";
+import { updateSemanticKernelState } from "@/lib/qlikExtractionHelper";
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get("Authorization");
@@ -20,144 +20,40 @@ export async function POST(req: NextRequest) {
   const appId = body.app_id || "app-1";
   const spaceId = body.workspace_id || body.space_id || "personal";
   const runId = body.run_id || folderName;
+  const connectionId = body.connection_id;
 
-  // Resolve real live data from Qlik Base Engine (/all/:appId)
-  const engineData = await resolveQlikEngineData(appId, body.engine_data || body.engineData, authHeader);
-
-  const tables = engineData.tables || {};
-  const tableEntries = Object.entries(tables);
-  const measures = engineData.measures || [];
-  const dimensions = engineData.dimensions || [];
-
-  // Table mappings to Fabric
-  const tableMappings =
-    tableEntries.length > 0
-      ? tableEntries.map(([tName, tObj]: [string, any], idx: number) => ({
-          source_table: tName,
-          target_table: idx === 0 ? `${tName.toLowerCase()}_fact` : `dim_${tName.toLowerCase()}`,
-          status: "mapped",
-          columns_count: (tObj?.fields || []).length,
-        }))
-      : [
-          { source_table: "Main", target_table: "main_fact", status: "mapped", columns_count: 4 },
-        ];
-
-  // DAX measures conversion
-  const daxMeasures =
-    measures.length > 0
-      ? measures.map((m: any) => {
-          const mName = m.name || m.label || "Measure";
-          const expr = m.expression || m.qMeasure?.qDef || "Sum(Amount)";
-          const tableName = (m.tables && m.tables[0]) || tableEntries[0]?.[0] || "fact";
-          // Convert Qlik syntax to DAX
-          const dax = expr
-            .replace(/Sum\((.*?)\)/gi, `SUM('${tableName}'[$1])`)
-            .replace(/Count\((.*?)\)/gi, `COUNTROWS('${tableName}')`)
-            .replace(/Avg\((.*?)\)/gi, `AVERAGE('${tableName}'[$1])`);
-          return {
-            qlik_measure: expr,
-            dax_formula: `${mName} = ${dax}`,
-          };
-        })
-      : [
-          { qlik_measure: "Sum(Amount)", dax_formula: "Total Amount = SUM('main_fact'[Amount])" },
-          { qlik_measure: "Count(ID)", dax_formula: "Total Count = COUNTROWS('main_fact')" },
-        ];
-
-  // Dimensions
-  const dimensionReports =
-    dimensions.length > 0
-      ? dimensions.map((d: any) => {
-          const dName = d.name || d.title || "Dimension";
-          const tableName = (d.tables && d.tables[0]) || tableEntries[0]?.[0] || "fact";
-          return {
-            qlik_dimension: dName,
-            dax_column: `'${tableName}'[${dName}]`,
-          };
-        })
-      : [
-          { qlik_dimension: "Category", dax_column: "'main_fact'[Category]" },
-        ];
-
-  // Relationships
-  const relationshipReports =
-    engineData.relationships && engineData.relationships.length > 0
-      ? engineData.relationships.map((r: any) => ({
-          from: `'${r.table1}'[${r.field1}]`,
-          to: `'${r.table2}'[${r.field2}]`,
-          cardinality: r.cardinality === "many-to-one" ? "Many-to-One" : "One-to-Many",
-        }))
-      : [];
-
-  const totalFields = tableEntries.reduce(
-    (acc, [_, tObj]: [string, any]) => acc + (tObj?.fields || []).length,
-    0
-  );
-
-  const mongoPayload = {
-    folder_name: folderName,
-    app_id: appId,
-    space_id: spaceId,
-    app_name: appName,
-    run_id: runId,
-    mapping_result: {
-      status: "success",
-      workbook_metadata: {
-        app_id: appId,
-        app_name: appName,
-        run_id: runId,
-      },
-      tables: tableMappings,
-      measures: daxMeasures,
-      relationships: relationshipReports,
-    },
-    ...body,
-  };
-
-  let mongoData: any = {};
+  // Real mapping: proxied through semantic-kernel to the actual vl-q2f-mapping
+  // agent. vl-q2f-mapping re-fetches the parsing output it needs by
+  // app_id/workspace_id/run_id itself, so the parsing stage must have
+  // completed and been stored before this call.
+  let mappedData: any;
   try {
-    mongoData = await httpClient.post<any>("/mapping", mongoPayload, {
-      apiType: "qlik-mongo",
-      headers: { Authorization: authHeader! },
-    });
+    mappedData = await httpClient.post<any>(
+      "/qlik/mapping",
+      {
+        app_id: appId,
+        run_id: runId,
+        workspace_id: spaceId,
+        connection_id: connectionId,
+      },
+      {
+        apiType: "semantic",
+        headers: { Authorization: authHeader! },
+      }
+    );
   } catch (err: any) {
-    console.warn("[API /api/qlik/mapping] MongoDB upsert warning:", err.message);
+    return errorResponse(`Mapping failed: ${err.message}`, err.status || 502);
   }
 
-  // Update Semantic Kernel state in MongoDB
+  // No separate Mongo write here: vl-q2f-mapping already persists its own
+  // result (store_mapping_response). Same reasoning as assessment/parsing --
+  // a second independent writer using a copy of the identifiers risked
+  // diverging from the backend's own record instead of matching it exactly.
+
   await updateSemanticKernelState(runId, "mapping", "in_progress", authHeader);
 
-  // Format full MappedData structure expected by UI components
-  const mappedData = {
-    status: "success",
-    file_data: {
-      file_name: appName,
-      database_name: "Microsoft Fabric Lakehouse",
-      database_platform: "Microsoft Fabric DirectLake",
-    },
-    mapping_report: {
-      file_name: appName,
-      mapped_fields: totalFields || 10,
-      mapped_percentage: 100,
-      total_fields: totalFields || 10,
-      total_tables: tableMappings.length,
-      table_mappings: tableMappings,
-      unmapped_fields: [],
-    },
-    dax_measures_report: {
-      total_measures: daxMeasures.length,
-      measures: daxMeasures,
-    },
-    dimensions_report: {
-      total_dimensions: dimensionReports.length,
-      dimensions: dimensionReports,
-    },
-    relationships_report: {
-      total_relationships: relationshipReports.length,
-      relationships: relationshipReports,
-    },
-    ...mongoData,
-  };
-
-  return successResponse(mappedData);
+  return successResponse({
+    status: mappedData?.status || "success",
+    ...mappedData,
+  });
 }

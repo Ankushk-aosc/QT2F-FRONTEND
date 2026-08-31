@@ -27,7 +27,7 @@ export function AboutSection() {
     >
       <SettingsGroup title="Build">
         <SettingRow label="Platform" hint="Unified Qlik and Tableau migration platform.">
-          <span>Switchblade Unified Platform</span>
+          <span>MigrateIQ</span>
         </SettingRow>
 
         <SettingRow label="Application version" hint="Read from the running build at runtime.">

@@ -10,7 +10,6 @@ import {
   Home,
   LifeBuoy,
   Settings as SettingsIcon,
-  ShieldCheck,
   Shuffle,
   type LucideIcon,
 } from "lucide-react"
@@ -21,7 +20,6 @@ import { useSettingsStore } from "@/stores/settings.store"
 import { useDashboardStore } from "@/stores/dashboard.store"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip } from "@/components/ui/tooltip"
-import { SystemHealthCard } from "@/components/common/SystemHealthCard"
 
 const NAV_ICONS: Record<string, LucideIcon> = {
   home: Home,
@@ -40,7 +38,6 @@ const NAV_ICONS: Record<string, LucideIcon> = {
  */
 const SECONDARY_ITEMS: ReadonlyArray<{ id: string; label: string; icon: LucideIcon }> = [
   { id: "help-center", label: "Help Center", icon: LifeBuoy },
-  { id: "system-status", label: "System Status", icon: ShieldCheck },
 ]
 
 interface AppSidebarProps {
@@ -89,12 +86,12 @@ export function AppSidebar({ compact: compactForRoute = false }: AppSidebarProps
   return (
     <aside className={className} aria-label="Primary">
       <div className="app-sidebar-brand">
-        <Link href="/dashboard" aria-label="Switchblade home">
+        <Link href="/dashboard" aria-label="MigrateIQ home">
           <Image
-            src="/Switchblade_Logo.png"
-            alt="Switchblade"
-            width={360}
-            height={65}
+            src={compact ? "/MigrateIQ_Icon.svg" : "/MigrateIQ_Logo.svg"}
+            alt="MigrateIQ"
+            width={compact ? 24 : 180}
+            height={compact ? 24 : 32}
             className="app-sidebar-logo"
             priority
           />
@@ -102,7 +99,7 @@ export function AppSidebar({ compact: compactForRoute = false }: AppSidebarProps
       </div>
 
       <nav className="app-sidebar-nav">
-        {NAV_ITEMS.map((item) => {
+        {NAV_ITEMS.filter((item) => item.id !== "monitoring").map((item) => {
           const active = isNavItemActive(pathname, item)
           const Icon = NAV_ICONS[item.id] ?? Home
           // A migration in progress locks Settings so the connections it is
@@ -135,28 +132,6 @@ export function AppSidebar({ compact: compactForRoute = false }: AppSidebarProps
         })}
       </nav>
 
-      <div className="app-sidebar-section">
-        <span className={compact ? "app-sidebar-visually-hidden" : "app-sidebar-section-title"}>
-          Quick Actions
-        </span>
-        <Link
-          href="/migrations/qlik"
-          className="app-sidebar-quick-action"
-          title={compact ? "New Qlik Migration" : undefined}
-        >
-          <span className="app-sidebar-quick-action-glyph">Q</span>
-          {label("New Qlik Migration")}
-        </Link>
-        <Link
-          href="/migrations/tableau"
-          className="app-sidebar-quick-action"
-          title={compact ? "New Tableau Migration" : undefined}
-        >
-          <span className="app-sidebar-quick-action-glyph">T</span>
-          {label("New Tableau Migration")}
-        </Link>
-      </div>
-
       <div className="app-sidebar-secondary">
         {SECONDARY_ITEMS.map(({ id, label: itemLabel, icon: Icon }) => (
           <Tooltip key={id} content={`${itemLabel} is not available yet`}>
@@ -172,8 +147,6 @@ export function AppSidebar({ compact: compactForRoute = false }: AppSidebarProps
           </Tooltip>
         ))}
       </div>
-
-      {!compact && <SystemHealthCard />}
 
       {user && (
         <div className="app-sidebar-user" title={compact ? userDisplayName : undefined}>

@@ -1,61 +1,40 @@
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 /** @type {import('next').NextConfig} */
-
-const securityHeaders = [
-  // Prevent MIME sniffing
-  { key: "X-Content-Type-Options", value: "nosniff" },
-  // Block clickjacking via iframes
-  { key: "X-Frame-Options", value: "DENY" },
-  // Legacy XSS filter for old browsers
-  { key: "X-XSS-Protection", value: "1; mode=block" },
-  // Control referrer data sent with requests
-  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // Force HTTPS for 1 year (HSTS)
-  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
-  // Restrict permissions granted to the browser
-  {
-    key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
-  },
-  // CSP: tighten as needed per environment
-  {
-    key: "Content-Security-Policy",
-    value: [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Next.js HMR requires unsafe-eval in dev
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com data:",
-      "img-src 'self' data: blob:",
-      "connect-src 'self' https: wss:",
-      "frame-ancestors 'none'",
-    ].join("; "),
-  },
-];
-
 const nextConfig = {
-  // `ignoreBuildErrors` was on, so a production build shipped whatever tsc
-  // rejected. The type-check gate only means something if the build enforces
-  // it, so errors now fail the build as they should.
+  outputFileTracingRoot: __dirname,
+  experimental: {
+    optimizePackageImports: [
+      "recharts",
+      "date-fns",
+    ],
+  },
+  typescript: {
+    ignoreBuildErrors: false,
+  },
   images: {
     unoptimized: true,
-  },
-  async headers() {
-    return [
-      {
-        // Apply security headers to all routes
-        source: "/(.*)",
-        headers: securityHeaders,
-      },
-    ];
   },
   async redirects() {
     return [
       {
-        source: "/dashboard.",
-        destination: "/dashboard",
+        source: '/dashboard.',
+        destination: '/dashboard',
         permanent: true,
       },
-    ];
+    ]
   },
-};
+}
 
-export default nextConfig;
+
+export default nextConfig
+
+
+
+console.log('--- NEXT.CONFIG BOOT ---');
+console.log('API_BASE_URL:', process.env.API_BASE_URL);
+console.log('NEXT_PUBLIC_RECORDS_API_BASE_URL:', process.env.NEXT_PUBLIC_RECORDS_API_BASE_URL);

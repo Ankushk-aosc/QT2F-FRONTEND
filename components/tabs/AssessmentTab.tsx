@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import React, { useState, useEffect } from "react"
 import { useUIStore } from "@/stores/ui.store"
+import AssessmentResultsView from "@/components/Assessment-Results/AssessmentResultsView"
 
 const WEIGHT_MAP: Record<string, number> = { regular: 400, medium: 500, semibold: 600, bold: 700 }
 const SIZE_MAP: Record<number, number> = { 100: 10, 200: 12, 300: 14, 400: 16, 500: 20, 600: 24, 700: 28, 800: 32, 900: 40, 1000: 68 }
@@ -2043,6 +2044,13 @@ export function AssessmentTab({ selectedWorkbookId, projectId: propProjectId, ru
   }
 
   const payload = assessment.payload
+
+  // If this is a Qlik assessment result (has results array of category items), render AssessmentResultsView
+  if ((payload?.results && Array.isArray(payload.results)) || Array.isArray(payload) || (assessment?.results && Array.isArray(assessment.results))) {
+    const qlikData = payload?.results ? payload : (Array.isArray(payload) ? { results: payload } : assessment)
+    const appName = payload?.workbook_name || assessment?.workbook_name || ""
+    return <AssessmentResultsView assessmentData={qlikData} appName={appName} isPdfMode={isPdfMode} />
+  }
 
   // Robust fallback for last_modified_at — check payload, then document-level fields
   const rawLastModified =

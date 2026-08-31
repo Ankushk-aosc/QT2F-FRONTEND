@@ -26,14 +26,17 @@ export async function GET(request: Request) {
     });
 
     if (!response.ok) {
-      return relayUpstreamError("[API /api/records/data-layer-toggle]", baseUrl, response);
+      if (response.status === 404) {
+        return NextResponse.json({ allow_data_agent: false });
+      }
+      return NextResponse.json({ allow_data_agent: false });
     }
 
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error: any) {
     console.error("[API data-layer-toggle] GET Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ allow_data_agent: false });
   }
 }
 

@@ -24,6 +24,7 @@ export interface DropdownOptionSelectData {
 }
 
 export function Dropdown({
+  id,
   children,
   placeholder,
   selectedOptions,
@@ -32,7 +33,9 @@ export function Dropdown({
   className,
   style,
   multiselect,
+  ...rest
 }: {
+  id?: string;
   children?: React.ReactNode;
   placeholder?: string;
   value?: string;
@@ -44,6 +47,7 @@ export function Dropdown({
   multiselect?: boolean;
   /** Accepted for API compatibility with the previous Fluent usage; not otherwise used. */
   positioning?: string;
+  [key: string]: any;
 }) {
   const options: { value: string; text: string; disabled?: boolean }[] = [];
   Children.forEach(children, (child) => {
@@ -60,6 +64,7 @@ export function Dropdown({
   if (multiselect) {
     return (
       <select
+        id={id}
         multiple
         className={["ui-input", className].filter(Boolean).join(" ")}
         style={style}
@@ -69,6 +74,7 @@ export function Dropdown({
           const values = Array.from(e.target.selectedOptions).map((o) => o.value);
           onOptionSelect?.(e, { selectedOptions: values });
         }}
+        {...rest}
       >
         {options.map((o) => (
           <option key={o.value ?? o.text} value={o.value} disabled={o.disabled}>
@@ -83,6 +89,7 @@ export function Dropdown({
 
   return (
     <select
+      id={id}
       className={["ui-input", className].filter(Boolean).join(" ")}
       style={style}
       disabled={disabled}
@@ -91,6 +98,7 @@ export function Dropdown({
         const opt = options.find((o) => o.value === e.target.value);
         onOptionSelect?.(e, { optionValue: e.target.value, optionText: opt?.text, selectedOptions: [e.target.value] });
       }}
+      {...rest}
     >
       {placeholder && (
         <option value="" disabled hidden>

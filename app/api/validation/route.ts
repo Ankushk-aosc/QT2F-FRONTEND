@@ -1,104 +1,62 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
+import { httpClient } from '@/lib/api/httpClient';
+import { RECORDS_PATHS, resultPath, normalizeRunResult } from '@/lib/api/runContract';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest) {
-    try {
-        const authHeader = req.headers.get("Authorization");
+/**
+ * Reads one app's validation result:
+ *
+ *   GET {RECORDS_BASE}/validation/{app_id}?run_id=...&workspace_id=...
+ *
+ * This route file did not exist. validationStore.fetchValidationResult calls
+ * `GET /api/validation?...`, Next answered with its 404 page, and the store's
+ * catch maps any 404 to "worker hasn't finished yet" and stores null -- so the
+ * Validation tab rendered its waiting state permanently, with nothing in the
+ * console to suggest the route was simply absent.
+ *
+ * Unlike the other four stages, the upstream path here is inferred from the
+ * shared convention rather than confirmed against a live response: validation
+ * is absent from the segment list in app/api/history-results/route.ts. The
+ * record key `validation_result` IS confirmed, by the reads in
+ * components/tabs/MigrationValidationView. If upstream turns out to serve this
+ * elsewhere, RECORDS_PATHS.VALIDATION is the one line to change.
+ */
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const appId = searchParams.get('app_id') || searchParams.get('workbook_id');
+    const workspaceId =
+      searchParams.get('workspace_id') || searchParams.get('project_id');
+    const runId = searchParams.get('run_id');
 
-        if (!authHeader) {
-            return NextResponse.json({ error: "Unauthorized: Missing Authorization header" }, { status: 401 });
-        }
-
-        let { searchParams } = new URL(req.url);
-        let projectId = searchParams.get("project_id");
-        let workbookId = searchParams.get("workbook_id");
-        let runId = searchParams.get("run_id");
-
-        const query = `project_id=${projectId}&workbook_id=${workbookId}&run_id=${runId}`;
-
-        if (!projectId || !workbookId || !runId) {
-            return NextResponse.json({ error: "Missing project_id, workbook_id, or run_id" }, { status: 400 });
-        }
-
-        const logsBase = process.env.LOGS_API_BASE;
-        const validationBase = process.env.VALIDATION_API_URL;
-
-        const candidateUrls: string[] = [];
-
-        if (logsBase) {
-            const base = logsBase.replace(/\/$/, "");
-            // LOGS_API_BASE is ".../api", not ".../api/records" — the records
-            // segment has to be spelled out to reach /api/records/validation.
-            candidateUrls.push(`${base}/records/validation?${query}`);
-        }
-
-        if (validationBase) {
-            const base = validationBase.replace(/\/$/, "");
-            candidateUrls.push(`${base}/validation?${query}`);
-            candidateUrls.push(`${base}/api/records/validation?${query}`);
-        }
-
-        if (candidateUrls.length === 0) {
-            throw new Error("Neither LOGS_API_BASE nor VALIDATION_API_URL is defined");
-        }
-
-        console.log(`[API /api/validation] Trying ${candidateUrls.length} URL(s) for run=${runId}`);
-
-        let lastError: any = null;
-        for (const targetUrl of candidateUrls) {
-            try {
-                console.log(`[API /api/validation] Submitting: ${targetUrl}`);
-
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 15000);
-
-                const response = await fetch(targetUrl, {
-                    method: "GET",
-                    headers: {
-                        "Authorization": authHeader,
-                        "Accept": "application/json",
-                    },
-                    cache: "no-store",
-                    signal: controller.signal,
-                });
-                clearTimeout(timeout);
-
-                if (!response.ok) {
-                    let errorBody = "";
-                    try { errorBody = await response.text(); } catch { }
-                    console.warn(`[API /api/validation] ${targetUrl} returned ${response.status}: ${errorBody}`);
-                    lastError = { status: response.status, message: errorBody };
-                    continue; // Try next URL
-                }
-
-                const data = await response.json();
-                console.log(`[API /api/validation] ✅ Successfully reached ${targetUrl}`);
-                console.log(`[API /api/validation] Response data snippet:`, JSON.stringify(data).substring(0, 200));
-                return NextResponse.json(data, { status: 200 });
-
-            } catch (fetchErr: any) {
-                const reason = fetchErr.name === 'AbortError' ? 'Request timed out (15s)' : fetchErr.message || 'fetch failed';
-                console.warn(`[API /api/validation] ${targetUrl} connection error: ${reason}`);
-                lastError = { status: 503, message: reason };
-                continue;
-            }
-        }
-
-        console.error(`[API /api/validation] All endpoints failed to return payload. Last Error:`, lastError);
-        return NextResponse.json(
-            {
-                error: "Backend returned 404 or unreachable",
-                details: lastError?.message || "All endpoints exhausted/failed",
-                attempted_urls: candidateUrls,
-                last_status_code: lastError?.status
-            },
-            { status: lastError?.status || 503 }
-        );
-
-    } catch (err: any) {
-        console.error("[API /api/validation GET] Fatal Error:", err.message);
-        const status = err.status || 500;
-        return NextResponse.json({ error: err.message || "Failed to fetch validation data" }, { status });
+    if (!appId) {
+      return NextResponse.json(
+        { error: 'app_id (or workbook_id) is required' },
+        { status: 400 }
+      );
     }
+    if (!runId) {
+      return NextResponse.json({ error: 'run_id is required' }, { status: 400 });
+    }
+    if (!workspaceId) {
+      return NextResponse.json(
+        { error: 'workspace_id (or project_id) is required' },
+        { status: 400 }
+      );
+    }
+
+    const data = await httpClient.get<unknown>(
+      resultPath(RECORDS_PATHS.VALIDATION, { appId, workspaceId, runId }),
+      { apiType: 'logs' }
+    );
+
+    return NextResponse.json(normalizeRunResult(data, 'validation'), { status: 200 });
+  } catch (err: any) {
+    console.error('[API /api/validation GET] Error:', err?.message);
+    return NextResponse.json(
+      { error: err?.message ?? 'Failed to fetch validation result' },
+      { status: err?.status || 500 }
+    );
+  }
 }

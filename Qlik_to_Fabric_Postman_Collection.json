@@ -1,0 +1,434 @@
+{
+  "info": {
+    "_postman_id": "qlik-to-fabric-unified-api-collection",
+    "name": "Qlik to Fabric - Microservices & Bots Collection",
+    "description": "Complete Postman collection for testing all 8 Qlik to Fabric backend services, agents, and orchestrators locally.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Qlik Base API (Port 3002)",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3002/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3002",
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Get Qlik Spaces",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3002/getSpaces",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3002",
+              "path": ["getSpaces"]
+            }
+          }
+        },
+        {
+          "name": "Get Apps by Space ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3002/getApps/personal",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3002",
+              "path": ["getApps", "personal"]
+            }
+          }
+        },
+        {
+          "name": "Get All App Metadata",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3002/apps/c86997a0-06dc-449e-b9b5-f481c19b0200/all",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3002",
+              "path": ["apps", "c86997a0-06dc-449e-b9b5-f481c19b0200", "all"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Cosmos / Mongo DB API (Port 8008)",
+      "item": [
+        {
+          "name": "Swagger Docs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8008/docs",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8008",
+              "path": ["docs"]
+            }
+          }
+        },
+        {
+          "name": "Get Saved Qlik Connections",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8008/qlik",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8008",
+              "path": ["qlik"]
+            }
+          }
+        },
+        {
+          "name": "Get Run History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8008/run-history",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8008",
+              "path": ["run-history"]
+            }
+          }
+        },
+        {
+          "name": "Get Semantic Kernel Records",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8008/api/records/semantic-kernel",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8008",
+              "path": ["api", "records", "semantic-kernel"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Assessment Agent (Port 8003)",
+      "item": [
+        {
+          "name": "Swagger Docs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8003/docs",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8003",
+              "path": ["docs"]
+            }
+          }
+        },
+        {
+          "name": "Start Assessment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"folder_name\": \"Crypto_Market_Analytics_20260825100000\",\n  \"app_name\": \"Crypto Market Analytics\",\n  \"run_id\": \"qlik_run_20260825100000\",\n  \"workspace_id\": \"personal\",\n  \"app_id\": \"c86997a0-06dc-449e-b9b5-f481c19b0200\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8003/start-assessment",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8003",
+              "path": ["start-assessment"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Parsing Agent (Port 8001)",
+      "item": [
+        {
+          "name": "Swagger Docs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8001/docs",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8001",
+              "path": ["docs"]
+            }
+          }
+        },
+        {
+          "name": "Parse Qlik Application",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"run_id\": \"qlik_run_20260825100000\",\n  \"workspace_id\": \"personal\",\n  \"app_id\": \"c86997a0-06dc-449e-b9b5-f481c19b0200\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8001/parse",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8001",
+              "path": ["parse"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Mapping Agent (Port 8002)",
+      "item": [
+        {
+          "name": "Swagger Docs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8002/docs",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8002",
+              "path": ["docs"]
+            }
+          }
+        },
+        {
+          "name": "Generate Schema & Visual Mapping",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"run_id\": \"qlik_run_20260825100000\",\n  \"workspace_id\": \"personal\",\n  \"app_id\": \"c86997a0-06dc-449e-b9b5-f481c19b0200\",\n  \"is_direct_query\": false\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8002/api/mapping",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8002",
+              "path": ["api", "mapping"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Report Generation / TMDL Agent (Port 8005)",
+      "item": [
+        {
+          "name": "Swagger Docs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8005/docs",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8005",
+              "path": ["docs"]
+            }
+          }
+        },
+        {
+          "name": "Generate TMDL / Fabric Report",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"run_id\": \"qlik_run_20260825100000\",\n  \"workspace_id\": \"personal\",\n  \"app_id\": \"c86997a0-06dc-449e-b9b5-f481c19b0200\",\n  \"folder_name\": \"Crypto_Market_Analytics_20260825100000\",\n  \"target_workspace\": \"Fabrics-Workspace-Dev\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8005/report-generation",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8005",
+              "path": ["report-generation"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Semantic Kernel Orchestrator (Port 8080)",
+      "item": [
+        {
+          "name": "Swagger Docs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/docs",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["docs"]
+            }
+          }
+        },
+        {
+          "name": "Process Qlik Space (Batch Migration)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"subscriptions@aosc.com\",\n  \"source_type\": \"cloud\",\n  \"workspace_id\": [\"personal\"],\n  \"deployment_type\": \"fabric\",\n  \"fabric_group_id\": \"c5068f11-011c-4648-a151-231f32581819\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/qlik/process-space",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["qlik", "process-space"]
+            }
+          }
+        },
+        {
+          "name": "Pipeline Stage: Assessment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"folder_name\": \"Crypto_Market_Analytics_20260825100000\",\n  \"app_name\": \"Crypto Market Analytics\",\n  \"run_id\": \"qlik_run_20260825100000\",\n  \"workspace_id\": \"personal\",\n  \"app_id\": \"c86997a0-06dc-449e-b9b5-f481c19b0200\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/qlik/assessment",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["qlik", "assessment"]
+            }
+          }
+        },
+        {
+          "name": "Pipeline Stage: Parsing",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"run_id\": \"qlik_run_20260825100000\",\n  \"workspace_id\": \"personal\",\n  \"app_id\": \"c86997a0-06dc-449e-b9b5-f481c19b0200\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/qlik/parsing",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["qlik", "parsing"]
+            }
+          }
+        },
+        {
+          "name": "Pipeline Stage: Mapping",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"run_id\": \"qlik_run_20260825100000\",\n  \"workspace_id\": \"personal\",\n  \"app_id\": \"c86997a0-06dc-449e-b9b5-f481c19b0200\",\n  \"is_direct_query\": false\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/qlik/mapping",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["qlik", "mapping"]
+            }
+          }
+        },
+        {
+          "name": "Pipeline Stage: Report Generation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"run_id\": \"qlik_run_20260825100000\",\n  \"workspace_id\": \"personal\",\n  \"app_id\": \"c86997a0-06dc-449e-b9b5-f481c19b0200\",\n  \"folder_name\": \"Crypto_Market_Analytics_20260825100000\",\n  \"target_workspace\": \"Fabrics-Workspace-Dev\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/qlik/report-generation",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["qlik", "report-generation"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

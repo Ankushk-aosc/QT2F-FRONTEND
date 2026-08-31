@@ -68,19 +68,30 @@ export function MonitoringOverview() {
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
-  const load = useCallback(async () => {
+  // Load only the data needed by the visible view. Historical runs can be a
+  // much larger response and are not required to render the Active Run tab.
+  const loadActive = useCallback(async () => {
     if (!email) return
-    await Promise.all([fetchActiveRuns(email), fetchHistoricalRuns(undefined, email, { page: 1, pageSize: 10 })])
-  }, [email, fetchActiveRuns, fetchHistoricalRuns])
+    await fetchActiveRuns(email)
+  }, [email, fetchActiveRuns])
+
+  const loadHistory = useCallback(async () => {
+    if (!email) return
+    await fetchHistoricalRuns(undefined, email, { page: 1, pageSize: 10 })
+  }, [email, fetchHistoricalRuns])
 
   useEffect(() => {
-    load()
-  }, [load])
+    void loadActive()
+  }, [loadActive])
+
+  useEffect(() => {
+    if (tab === "history") void loadHistory()
+  }, [loadHistory, tab])
 
   // Auto refresh re-runs the same fetches the Refresh button does; it does not
   // touch the migration pipeline's own polling.
-  const loadRef = useRef(load)
-  loadRef.current = load
+  const loadRef = useRef<() => Promise<void>>(loadActive)
+  loadRef.current = tab === "active" ? loadActive : loadHistory
   useEffect(() => {
     if (!autoRefresh) return
     const id = setInterval(() => void loadRef.current(), AUTO_REFRESH_MS)
@@ -89,7 +100,7 @@ export function MonitoringOverview() {
 
   const handleRefresh = async () => {
     setRefreshing(true)
-    await load()
+    await loadRef.current()
     setRefreshing(false)
   }
 

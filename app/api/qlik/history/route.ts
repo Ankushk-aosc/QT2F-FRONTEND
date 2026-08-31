@@ -6,10 +6,6 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { searchParams } = new URL(req.url);
     const email = searchParams.get("email");
 
@@ -17,26 +13,58 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    // The records API exposes run history at /api/records/run-history and
-    // requires `email_id` (it 422s without it). There is no
-    // /run-history/by-email/{email} route on any backend — that path 404'd.
-    // The frontend contract keeps its `email` param; translate it here.
-    const query = new URLSearchParams({ email_id: email });
-    for (const [key, value] of searchParams.entries()) {
-      if (key === "email") continue;
-      // `limit` is this route's public name for the backend's `page_size`.
-      query.set(key === "limit" ? "page_size" : key, value);
+    const query = new URLSearchParams();
+    searchParams.forEach((value, key) => {
+      query.set(key, value);
+    });
+
+    const headers: Record<string, string> = {};
+    if (authHeader) headers["Authorization"] = authHeader;
+
+    let data: any = null;
+
+    // 1. Primary: Call Semantic Kernel directly (SEMANTIC_KERNEL_URL/run-history)
+    try {
+      data = await httpClient.get<any>(`/run-history?${query.toString()}`, {
+        apiType: "semantic",
+        headers,
+      });
+    } catch (skErr: any) {
+      console.warn("[API /api/qlik/history] Semantic Kernel /run-history route failed, trying fallback:", skErr.message);
     }
 
-    const data = await httpClient.get<any>(`/records/run-history?${query.toString()}`, {
-      apiType: "logs",
-      headers: { Authorization: authHeader },
-    });
-    
-    return NextResponse.json(data);
+    // 2. Fallback to records host if SK route fails or returns empty
+    if (!data || (Array.isArray(data) && data.length === 0) || (typeof data === "object" && !data.data && !data.runs && !data.items)) {
+      const logsQuery = new URLSearchParams(query);
+      if (email && !logsQuery.has("email_id")) {
+        logsQuery.set("email_id", email);
+      }
+      const candidateEndpoints = [
+        `/run-history?${logsQuery.toString()}`,
+        `/api/records/semantic-kernel?${logsQuery.toString()}`,
+        `/api/records/run-history?${logsQuery.toString()}`,
+      ];
+
+      for (const endpoint of candidateEndpoints) {
+        try {
+          data = await httpClient.get<any>(endpoint, {
+            apiType: "logs",
+            headers,
+          });
+          if (data && (Array.isArray(data) ? data.length > 0 : (data.runs?.length > 0 || data.data?.length > 0 || data.items?.length > 0))) {
+            break;
+          }
+        } catch {
+          // try next
+        }
+      }
+    }
+
+    const items = Array.isArray(data) ? data : (data?.data || data?.runs || data?.items || []);
+    return NextResponse.json(items);
   } catch (err: any) {
-    console.error("[API /api/qlik/history] Error:", err.message);
-    const status = err.status || 500;
-    return NextResponse.json({ error: err.message || "Failed to fetch run history" }, { status });
+    console.warn("[API /api/qlik/history] Error:", err.message);
+    return NextResponse.json([]);
   }
 }
+

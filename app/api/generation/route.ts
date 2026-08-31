@@ -1,111 +1,62 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
+import { httpClient } from '@/lib/api/httpClient';
+import { RECORDS_PATHS, resultPath, normalizeRunResult } from '@/lib/api/runContract';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest) {
-    try {
-        const authHeader = req.headers.get("Authorization");
+/**
+ * Reads one app's report-generation result:
+ *
+ *   GET {RECORDS_BASE}/report-generation/{app_id}?run_id=...&workspace_id=...
+ *
+ * This route file did not exist. generationService.getWorkbookResult calls
+ * `GET /api/generation?...`, which Next answered with its 404 page; the store
+ * treats any 404 as "not ready yet", so the Generation tab in Run Details sat
+ * empty forever and looked like a run still in progress rather than a missing
+ * route.
+ *
+ * Note the path mismatch this route bridges: the client calls the stage
+ * "generation", upstream serves it under "/report-generation". The record's
+ * inner key is `report_result` to match (see RESULT_KEYS).
+ *
+ * Parameter aliasing matches the assessment/parsing routes -- the stores were
+ * written against Tableau's vocabulary and still send workbook_id/project_id.
+ */
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const appId = searchParams.get('app_id') || searchParams.get('workbook_id');
+    const workspaceId =
+      searchParams.get('workspace_id') || searchParams.get('project_id');
+    const runId = searchParams.get('run_id');
 
-        if (!authHeader) {
-            return NextResponse.json({ error: "Unauthorized: Missing Authorization header" }, { status: 401 });
-        }
-
-        let { searchParams } = new URL(req.url);
-        let projectId = searchParams.get("project_id");
-        let workbookId = searchParams.get("workbook_id");
-        let runId = searchParams.get("run_id");
-
-        const query = `project_id=${projectId}&workbook_id=${workbookId}&run_id=${runId}`;
-
-        if (!projectId || !workbookId || !runId) {
-            return NextResponse.json({ error: "Missing project_id, workbook_id, or run_id" }, { status: 400 });
-        }
-
-        const logsBase = process.env.LOGS_API_BASE;
-        const generationBase = process.env.GENERATION_API_URL; // Optional, similar to validation
-
-        const candidateUrls: string[] = [];
-
-        if (logsBase) {
-            const base = logsBase.replace(/\/$/, "");
-            // LOGS_API_BASE is ".../api", not ".../api/records" — the records
-            // segment has to be spelled out to reach /api/records/generation.
-            candidateUrls.push(`${base}/records/generation?${query}`);
-        }
-
-        if (generationBase) {
-            const base = generationBase.replace(/\/$/, "");
-            candidateUrls.push(`${base}/generation?${query}`);
-            candidateUrls.push(`${base}/api/records/generation?${query}`);
-        }
-
-        if (candidateUrls.length === 0) {
-            return NextResponse.json(
-                {
-                    error: "Server configuration error: no backend base URL configured",
-                    details: "Set LOGS_API_BASE or GENERATION_API_URL in environment"
-                },
-                { status: 500 }
-            );
-        }
-
-        console.log(`[API /api/generation] Trying ${candidateUrls.length} URL(s) for run=${runId}`);
-
-        let lastError: any = null;
-        for (const targetUrl of candidateUrls) {
-            try {
-                console.log(`[API /api/generation] Submitting: ${targetUrl}`);
-
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 15000);
-
-                const response = await fetch(targetUrl, {
-                    method: "GET",
-                    headers: {
-                        "Authorization": authHeader,
-                        "Accept": "application/json",
-                    },
-                    cache: "no-store",
-                    signal: controller.signal,
-                });
-                clearTimeout(timeout);
-
-                if (!response.ok) {
-                    let errorBody = "";
-                    try { errorBody = await response.text(); } catch { }
-                    console.warn(`[API /api/generation] ${targetUrl} returned ${response.status}: ${errorBody}`);
-                    lastError = { status: response.status, message: errorBody };
-                    continue; // Try next URL
-                }
-
-                const data = await response.json();
-                console.log(`[API /api/generation] ✅ Successfully reached ${targetUrl}`);
-                console.log(`[API /api/generation] Response data snippet:`, JSON.stringify(data).substring(0, 200));
-                
-                return NextResponse.json(data, { status: 200 });
-
-            } catch (fetchErr: any) {
-                const reason = fetchErr.name === 'AbortError' ? 'Request timed out (15s)' : fetchErr.message || 'fetch failed';
-                console.warn(`[API /api/generation] ${targetUrl} connection error: ${reason}`);
-                lastError = { status: 503, message: reason };
-                continue;
-            }
-        }
-
-        console.error(`[API /api/generation] All endpoints failed to return payload. Last Error:`, lastError);
-        return NextResponse.json(
-            {
-                error: "Backend returned 404 or unreachable",
-                details: lastError?.message || "All endpoints exhausted/failed",
-                attempted_urls: candidateUrls,
-                last_status_code: lastError?.status
-            },
-            { status: lastError?.status || 503 }
-        );
-
-    } catch (err: any) {
-        console.error("[API /api/generation GET] Fatal Error:", err.message);
-        const status = err.status || 500;
-        return NextResponse.json({ error: err.message || "Failed to fetch generation data" }, { status });
+    if (!appId) {
+      return NextResponse.json(
+        { error: 'app_id (or workbook_id) is required' },
+        { status: 400 }
+      );
     }
+    if (!runId) {
+      return NextResponse.json({ error: 'run_id is required' }, { status: 400 });
+    }
+    if (!workspaceId) {
+      return NextResponse.json(
+        { error: 'workspace_id (or project_id) is required' },
+        { status: 400 }
+      );
+    }
+
+    const data = await httpClient.get<unknown>(
+      resultPath(RECORDS_PATHS.REPORT_GENERATION, { appId, workspaceId, runId }),
+      { apiType: 'logs' }
+    );
+
+    return NextResponse.json(normalizeRunResult(data, 'generation'), { status: 200 });
+  } catch (err: any) {
+    console.error('[API /api/generation GET] Error:', err?.message);
+    return NextResponse.json(
+      { error: err?.message ?? 'Failed to fetch generation result' },
+      { status: err?.status || 500 }
+    );
+  }
 }

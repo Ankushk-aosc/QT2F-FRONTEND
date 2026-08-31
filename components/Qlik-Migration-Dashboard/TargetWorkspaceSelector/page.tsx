@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
-import { Database, ChevronDown, Loader2, AlertCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import React, { useState } from "react";
+import { Dropdown, Option } from "@/components/ui/dropdown";
+import { Label } from "@/components/ui/label";
 
 interface Workspace {
   id: string;
@@ -13,97 +13,127 @@ interface TargetWorkspaceSelectorProps {
   selectedWorkspace: string;
   onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   workspaces: Workspace[];
-  isProcessing: boolean;
-  hasProcessed: boolean;
   isLoadingWorkspaces?: boolean;
   loadError?: string | null;
   onRetry?: () => void;
+  isProcessing: boolean;
+  hasProcessed: boolean;
+  /** False until the Qlik source side (space + apps, or spaces) is fully picked. */
+  isSourceConfigured?: boolean;
+}
+
+function ConfirmationPopup({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-80 rounded-lg bg-white p-6 text-center shadow-lg">
+        <h2 className="mb-4 text-lg font-bold">Start New Processing?</h2>
+        <p className="mb-4">Do you want to start new processing?</p>
+        <div className="flex justify-center gap-4">
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary-hover"
+          >
+            OK
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-md bg-surface-subtle px-4 py-2 text-foreground hover:bg-border"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function TargetWorkspaceSelectorContent({
   selectedWorkspace,
   onChange,
   workspaces,
-  isProcessing,
-  isLoadingWorkspaces = false,
-  loadError = null,
+  isLoadingWorkspaces,
+  loadError,
   onRetry,
+  isProcessing,
+  hasProcessed,
 }: TargetWorkspaceSelectorProps) {
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedId = e.target.value;
-    const selectedWorkspaceData = workspaces.find((ws) => ws.id === selectedId);
+  const [showConfirmPopup, setShowConfirmPopup] = useState(false);
 
+  // The upstream handler only ever reads e.target.value, so hand it a
+  // matching shape rather than re-typing the whole prop chain.
+  const handleSelect = (selectedId: string) => {
+    const selectedWorkspaceData = workspaces.find((ws) => ws.id === selectedId);
     if (selectedWorkspaceData) {
       localStorage.setItem(
         "selected_workspace",
-        JSON.stringify({
-          id: selectedWorkspaceData.id,
-          displayName: selectedWorkspaceData.displayName,
-        })
+        JSON.stringify({ id: selectedWorkspaceData.id, displayName: selectedWorkspaceData.displayName })
       );
     }
-
-    onChange(e);
+    if (hasProcessed && !isProcessing) {
+      setShowConfirmPopup(true);
+    } else {
+      onChange({ target: { value: selectedId } } as React.ChangeEvent<HTMLSelectElement>);
+    }
   };
 
-  const placeholderText = workspaces.length > 0
-    ? "Select a workspace"
-    : isLoadingWorkspaces
-    ? "Loading workspaces..."
-    : "No workspaces available — check the Fabric connection";
+  const handleConfirm = () => {
+    setShowConfirmPopup(false);
+    window.location.reload();
+  };
+
+  const handleCancel = () => {
+    setShowConfirmPopup(false);
+  };
 
   return (
-    <div className="space-y-1.5 w-full">
-      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-        Target Fabric Workspace
-      </label>
-      <div className="relative">
-        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-          {isLoadingWorkspaces ? (
-            <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />
-          ) : (
-            <Database className="w-4 h-4 text-indigo-500" />
-          )}
-        </div>
-        <select
-          value={selectedWorkspace}
-          onChange={handleChange}
+    <>
+      <div>
+        <Label className="text-success">Target Fabric Workspace</Label>
+        {!isLoadingWorkspaces && loadError && (
+          <div className="mb-2 rounded bg-destructive/10 p-2 text-xs text-destructive flex items-center justify-between">
+            <span>{loadError}</span>
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="font-medium underline ml-2 hover:opacity-80"
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        )}
+        <Dropdown
+          placeholder="Select target workspace"
+          selectedOptions={selectedWorkspace ? [selectedWorkspace] : []}
+          onOptionSelect={(_, d) => handleSelect(d.optionValue as string)}
           disabled={isProcessing || isLoadingWorkspaces}
-          className={cn(
-            "w-full pl-9 pr-10 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-sm font-medium text-slate-900 dark:text-slate-100 shadow-xs appearance-none transition-all duration-200",
-            "hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-slate-50/50 dark:hover:bg-slate-800/40",
-            "focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500",
-            (isProcessing || isLoadingWorkspaces) && "opacity-60 cursor-not-allowed bg-slate-100 dark:bg-slate-800",
-            loadError && !isLoadingWorkspaces && "border-rose-300 dark:border-rose-800"
-          )}
+          className="w-full truncate"
         >
-          <option value="" disabled>
-            {placeholderText}
-          </option>
-          {workspaces.map((ws) => (
-            <option key={ws.id} value={ws.id}>
-              {ws.displayName}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-      </div>
-
-      {loadError && !isLoadingWorkspaces && (
-        <div className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 mt-1">
-          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-          <span>{loadError}</span>
-          {onRetry && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="text-xs font-semibold underline hover:no-underline ml-1 text-rose-700 dark:text-rose-300"
-            >
-              Retry
-            </button>
+          {isLoadingWorkspaces ? (
+            <Option disabled key="loading">Loading workspaces...</Option>
+          ) : workspaces.length === 0 ? (
+            <Option disabled key="no-data">No workspaces available — check the Fabric connection</Option>
+          ) : (
+            [...workspaces]
+              .sort((a, b) => {
+                const nameA = (a.displayName || "").toLowerCase();
+                const nameB = (b.displayName || "").toLowerCase();
+                if (nameA === "my workspace") return -1;
+                if (nameB === "my workspace") return 1;
+                return nameA.localeCompare(nameB);
+              })
+              .map((ws) => (
+                <Option key={ws.id} value={ws.id} text={ws.displayName || ""}>
+                  {ws.displayName}
+                </Option>
+              ))
           )}
-        </div>
-      )}
-    </div>
+        </Dropdown>
+      </div>
+      {showConfirmPopup && <ConfirmationPopup onConfirm={handleConfirm} onCancel={handleCancel} />}
+    </>
   );
 }

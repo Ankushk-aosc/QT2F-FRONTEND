@@ -180,7 +180,7 @@ export function GeneralSection() {
           <SettingRow label="Platform Name" hint="Displayed in the navigation bar and page titles." stacked>
             <DraftInput
               value={general.platformName}
-              placeholder="Switchblade Unified Platform"
+              placeholder="MigrateIQ"
               onCommit={(platformName) => void updateSettings({ general: { platformName } })}
             />
           </SettingRow>

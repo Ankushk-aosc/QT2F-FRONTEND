@@ -74,6 +74,36 @@ export interface ProcessQlikSpaceInput {
   deployment_type: string
   fabric_group_id?: string
   model?: string
+  connection_id?: string
+  items?: Array<{
+    app_id: string
+    app_name?: string
+    workspace_id: string
+    workspace_name?: string
+  }>
+}
+
+export interface InvokeBatchInput {
+  email: string;
+  source_type: string;
+  deployment_type: string;
+  fabric_group_id?: string;
+  fabric_access_token?: string;
+  connection_id?: string;
+  run_validation?: boolean;
+  model?: string;
+  department_repo?: string;
+  site_id?: string | null;
+  items: Array<{
+    workspace_id?: string;
+    workspace_name?: string;
+    app_id?: string;
+    app_name?: string;
+    project_id?: string;
+    project_name?: string;
+    workbook_id?: string;
+    workbook_name?: string;
+  }>;
 }
 
 class SemanticKernelService {
@@ -119,6 +149,13 @@ class SemanticKernelService {
       method: "POST",
       body: JSON.stringify({ ...input, workspace_id: spaceIds }),
     })
+  }
+
+  async invokeBatch(input: InvokeBatchInput): Promise<{ run_id?: string; runId?: string; message?: string }> {
+    return fetchWithAuth("/api/migration/invoke-batch", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 }
 

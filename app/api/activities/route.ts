@@ -1,140 +1,114 @@
-﻿// app/api/activities/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
-import { getErrorMessage } from "@/lib/error-handler";
-import { validateTokenAudience } from "@/lib/token-validation";
+import { httpClient } from "@/lib/api/httpClient";
+import { RECORDS_PATHS } from "@/lib/api/runContract";
+import { normalizeAgentActions } from "@/lib/agentActivity";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
+/**
+ * Agent activity feed:
+ *
+ *   GET {RECORDS_BASE}/agent-actions?run_id=&workspace_id=&app_id=&agent_name=
+ *
+ * This route did not exist. agent.store's activity loader and
+ * agentActivityService both call /api/activities, so every one of those
+ * requests was a 404 -- the red rows in the Network panel. The store paginates
+ * with limit/offset, so a single stage produced a burst of failures rather than
+ * one.
+ *
+ * Parameter names come from the Tableau-era stores and are mapped onto the
+ * current contract, the same aliasing the assessment and parsing routes use:
+ *
+ *   workbook_id | app_id       -> app_id
+ *   project_id  | workspace_id -> workspace_id   (the QLIK SPACE)
+ *   run_id, agent_name         -> passed through
+ *   limit, offset              -> forwarded when present
+ *
+ * agent_name is not validated against the known set here: the callers supply it
+ * verbatim and rejecting an unexpected value would turn a working feed into a
+ * 400. Upstream is the authority on which names it serves.
+ */
 export async function GET(req: NextRequest) {
   try {
-    // â”€â”€ Query parameters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const { searchParams } = new URL(req.url);
-    const project_id = searchParams.get("project_id");
-    const run_id = searchParams.get("run_id");
-    const agent_name = searchParams.get("agent_name");
-    const workbook_id = searchParams.get("workbook_id");
 
-    // Optional
-    const limit = searchParams.get("limit");
-    const offset = searchParams.get("offset");
-    const from_timestamp = searchParams.get("from_timestamp");
-    const to_timestamp = searchParams.get("to_timestamp");
+    const appId = searchParams.get("app_id") || searchParams.get("workbook_id");
+    const workspaceId =
+      searchParams.get("workspace_id") || searchParams.get("project_id");
+    const runId = searchParams.get("run_id");
+    const agentName = searchParams.get("agent_name");
 
-    // â”€â”€ Authorization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      console.error("[API activities] Missing Authorization header");
-      return NextResponse.json(
-        { error: "Unauthorized: Missing Authorization header" },
-        { status: 401 }
-      );
+    if (!runId) {
+      return NextResponse.json({ error: "run_id is required" }, { status: 400 });
     }
 
-    // â”€â”€ Required parameters validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    if (!project_id || !run_id || !agent_name || !workbook_id) {
-      console.error("[API activities] Missing required parameters", {
-        project_id,
-        run_id,
-        agent_name,
-        workbook_id,
-      });
-      return NextResponse.json(
-        { error: "Missing required fields: project_id, run_id, agent_name, workbook_id" },
-        { status: 400 }
-      );
+    const query = new URLSearchParams();
+    if (runId) query.set("run_id", runId);
+    if (workspaceId) {
+      query.set("workspace_id", workspaceId);
+      query.set("project_id", workspaceId);
+    }
+    if (appId) {
+      query.set("app_id", appId);
+      query.set("workbook_id", appId);
+    }
+    if (agentName) query.set("agent_name", agentName);
+
+    for (const key of ["limit", "offset"]) {
+      const value = searchParams.get(key);
+      if (value) query.set(key, value);
     }
 
-    // Optional token audience check (continues even if invalid)
-    const token = authHeader.replace(/^Bearer\s+/i, "");
-    if (!validateTokenAudience(token)) {
-      console.warn("[API activities] Invalid token audience â€“ proceeding anyway");
-    }
+    let data: any = null;
 
-    // â”€â”€ Build target URL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const logsBase = process.env.LOGS_API_BASE;
-    if (!logsBase) {
-      console.error("[API activities] LOGS_API_BASE is not defined in environment");
-      return NextResponse.json(
-        { error: "Server configuration error: LOGS_API_BASE missing" },
-        { status: 500 }
-      );
-    }
-
-    const baseUrl = logsBase.replace(/\/$/, "");           // remove trailing slash if any
-    // LOGS_API_BASE is ".../api", so the "records/" segment must be explicit here.
-    const targetUrl = new URL(`${baseUrl}/records/activities`);
-
-    // Forward all relevant query parameters
-    targetUrl.searchParams.append("project_id", project_id);
-    targetUrl.searchParams.append("run_id", run_id);
-    targetUrl.searchParams.append("agent_name", agent_name);
-    targetUrl.searchParams.append("workbook_id", workbook_id);
-
-    if (limit) targetUrl.searchParams.append("limit", limit);
-    if (offset) targetUrl.searchParams.append("offset", offset);
-    if (from_timestamp) targetUrl.searchParams.append("from_timestamp", from_timestamp);
-    if (to_timestamp) targetUrl.searchParams.append("to_timestamp", to_timestamp);
-
-    console.log(`[API activities] Forwarding to: ${targetUrl.toString()}`);
-
-    // â”€â”€ Proxy request to backend (with timeout) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
-
-    let response: Response;
+    // 1. Qlik Agent Actions API: {{SEMANTIC_KERNEL_URL}}/agent-actions?run_id=...
     try {
-      response = await fetch(targetUrl.toString(), {
-        method: "GET",
-        headers: {
-          "Authorization": authHeader,
-          "Accept": "application/json",
-        },
-        cache: "no-store",
-        signal: controller.signal,
-      });
-    } catch (fetchErr: any) {
-      clearTimeout(timeout);
-      // â˜… Network error (DNS, connection refused, timeout)
-      const reason = fetchErr.name === 'AbortError' ? 'Request timed out (30s)' : fetchErr.message || 'fetch failed';
-      console.warn(`[API activities] Backend unreachable: ${reason}`);
-      return NextResponse.json(
-        { error: "Backend unreachable", details: reason },
-        { status: 503 }  // â˜… 503 Service Unavailable (not 500)
+      data = await httpClient.get<unknown>(
+        `/agent-actions?${query.toString()}`,
+        { apiType: "semantic" }
       );
-    }
-    clearTimeout(timeout);
-
-    console.log(`[API activities] Backend responded with status ${response.status}`);
-
-    if (!response.ok) {
-      let errorBody = "";
+    } catch {
       try {
-        errorBody = await response.text();
-        console.error("[API activities] Backend error:", errorBody.substring(0, 800));
-      } catch { }
-
-      return NextResponse.json(
-        {
-          error: `Backend returned ${response.status}`,
-          status: response.status,
-          details: errorBody || "No details available",
-        },
-        { status: response.status }
-      );
+        data = await httpClient.get<unknown>(
+          `/agent-actions?${query.toString()}`,
+          { apiType: "logs" }
+        );
+      } catch {}
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    // 2. Tableau Agent Actions API: {{SEMANTIC_KERNEL_URL}}/api/records/activities?run_id=...
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+      try {
+        data = await httpClient.get<unknown>(
+          `/api/records/activities?${query.toString()}`,
+          { apiType: "semantic" }
+        );
+      } catch {
+        try {
+          data = await httpClient.get<unknown>(
+            `/api/records/activities?${query.toString()}`,
+            { apiType: "logs" }
+          );
+        } catch {}
+      }
+    }
 
+    // 3. Fallback to RECORDS_PATHS.AGENT_ACTIONS
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+      try {
+        data = await httpClient.get<unknown>(
+          `${RECORDS_PATHS.AGENT_ACTIONS}?${query.toString()}`,
+          { apiType: "logs" }
+        );
+      } catch {}
+    }
+
+    return NextResponse.json(normalizeAgentActions(data || []), { status: 200 });
   } catch (err: any) {
-    console.error("[API activities] Unexpected error:", err);
+    console.error("[API /api/activities] Error:", err?.message);
     return NextResponse.json(
-      {
-        error: "Failed to fetch agent activities",
-        details: getErrorMessage(err),
-      },
-      { status: 500 }
+      { error: err?.message ?? "Failed to fetch agent activities" },
+      { status: err?.status || 500 }
     );
   }
 }

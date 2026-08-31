@@ -18,7 +18,7 @@ export async function serverFetchWithAuth(
 
     if (!response.ok) {
         let errorText = "";
-        try { errorText = await response.text(); } catch {}
+        try { errorText = await response.text(); } catch { /* body already consumed or unreadable */ }
         const err = new Error(`Request failed: ${response.status} ${response.statusText} - ${errorText}`);
         (err as any).status = response.status;
         throw err;

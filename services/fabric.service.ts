@@ -1,8 +1,5 @@
 // services/fabric.service.ts
-import { ApplicationError } from "@/lib/error-handler";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
-
-
 
 export interface FabricCredentials {
   tenantId: string;
@@ -28,19 +25,10 @@ export interface FabricLakehouse {
 class FabricService {
   private baseUrl: string = "/api/fabric"; // Always use local proxy
   private credentials: FabricCredentials | null = null;
-  private accessToken: string = "";
-  // We keep correct structure but remove stateful token management in preparation for hook usage or stateless calls
-  // However, existing component code calls `initialize(getToken)`.
-  // We must support that signature OR update component.
-  // Given instructions: "No duplicate HTTP clients" and "Every API call automatically sends Authorization".
-  // The Component passes a callback `getToken`.
-  // We should ignore that callback and use our centralized `fetchWithAuth` which gets token from `MsalProviderWrapper`.
-
   private initialized: boolean = false;
 
   initialize(getToken: () => Promise<string>): void {
     // Deprecated: We use fetchWithAuth now which internally gets token.
-    // Keeping this method signature to avoid breaking component call sites immediately.
     this.initialized = true;
   }
 
@@ -48,18 +36,53 @@ class FabricService {
     return this.initialized;
   }
 
-  async initializeConnection(): Promise<FabricCredentials> {
-    // Call via local API proxy
-    const credentials = await fetchWithAuth<FabricCredentials>(`${this.baseUrl}/connect`, {
-      method: "POST"
-    }, "fabric_access_token");
+  /**
+   * Ensures a valid Fabric-scoped MSAL token (https://api.fabric.microsoft.com/.default)
+   * is stored in sessionStorage["fabric_access_token"] BEFORE we call fetchWithAuth.
+   *
+   * ROOT-CAUSE FIX: fetchWithAuth falls back to getActiveToken() when the key is empty.
+   * getActiveToken() acquires the BACKEND API scope token, NOT the Fabric scope.
+   * Forwarding that to https://api.fabric.microsoft.com returns HTTP 401.
+   * We must pre-populate sessionStorage with the correct Fabric token here.
+   */
+  private async _ensureFabricToken(): Promise<void> {
+    if (typeof window === "undefined") return;
+    try {
+      const { getFabricToken } = await import(
+        "@/components/providers/MsalProviderWrapper"
+      );
+      // Silent acquire — stores result in sessionStorage["fabric_access_token"]
+      await getFabricToken();
+    } catch (err) {
+      // Non-fatal: if a cached token exists it will still be used by fetchWithAuth.
+      // If there is no token at all, fetchWithAuth will surface the 401 to the caller.
+      console.warn("[FabricService] Could not pre-acquire Fabric token:", err);
+    }
+  }
 
-    this.credentials = { ...credentials, isConnected: true, connectionTime: new Date().toISOString() };
+  async initializeConnection(): Promise<FabricCredentials> {
+    await this._ensureFabricToken();
+    const credentials = await fetchWithAuth<FabricCredentials>(
+      `${this.baseUrl}/connect`,
+      { method: "POST" },
+      "fabric_access_token"
+    );
+    this.credentials = {
+      ...credentials,
+      isConnected: true,
+      connectionTime: new Date().toISOString(),
+    };
     return this.credentials!;
   }
 
   async getWorkspaces(): Promise<FabricWorkspace[]> {
-    const data = await fetchWithAuth<any>(`${this.baseUrl}/workspaces`, {}, "fabric_access_token");
+    // CRITICAL: Pre-acquire the Fabric-scoped token before fetchWithAuth reads sessionStorage.
+    await this._ensureFabricToken();
+    const data = await fetchWithAuth<any>(
+      `${this.baseUrl}/workspaces`,
+      {},
+      "fabric_access_token"
+    );
     return Array.isArray(data) ? data : (data.workspaces || []);
   }
 
@@ -68,6 +91,7 @@ class FabricService {
   }
 
   async getLakehouses(workspaceId: string): Promise<FabricLakehouse[]> {
+    await this._ensureFabricToken();
     const data = await fetchWithAuth<any>(
       `${this.baseUrl}/lakehouses?workspaceId=${encodeURIComponent(workspaceId)}`,
       {},

@@ -1,17 +1,17 @@
-import { redirect } from "next/navigation"
+import { redirect } from "next/navigation";
 
 /**
- * The application has one entry point.
+ * The bare domain root has no content of its own.
  *
- * This used to be a "choose your migration path" screen that sat in front of
- * sign-in and set the Qlik/Tableau workspace. It was a second landing surface
- * before the real one, and the choice it captured is now an ordinary setting
- * (Administration Center → Workspace), changeable at any time rather than only
- * once before authenticating.
- *
- * Everything therefore starts at the dashboard. The protected layout sends
- * anyone without a session to /signin and back again afterwards.
+ * It used to render a standalone "Choose Your Migration Path" picker here —
+ * duplicate of `/migrations` (same Qlik/Tableau choice, worse: fixed-pixel
+ * cards with no responsive breakpoints, an external icons8.com image, and a
+ * leftover hardcoded Fluent-blue accent color) and, because it sits outside
+ * both the `(auth)` and `(protected)` route groups, reachable without
+ * signing in at all. `/dashboard` is behind `AuthGuard`, so this now always
+ * resolves through the real auth check instead of offering a second,
+ * unguarded entry point.
  */
 export default function RootPage() {
-  redirect("/dashboard")
+  redirect("/dashboard");
 }

@@ -135,7 +135,12 @@ export function mapParsingPayload(rawDoc: any): ParsingPayload {
     const formatting = data.formatting_and_styling || {}
     const security = data.security || {}
 
-    const { dimensions: dimList, measures: measList } = classifyFields(calcsAndLods)
+    // Support flat Qlik JSON structure alongside grouped Tableau JSON structure (Clean HMR)
+    const rawTables: any[] = Array.isArray(data.tables) && data.tables.length > 0
+        ? data.tables
+        : (dsAndConn.tables && Array.isArray(dsAndConn.tables) ? dsAndConn.tables : deepSearchByKey(rawDoc, 'tables'));
+
+    const { dimensions: dimList, measures: measList } = classifyFields(data, calcsAndLods, rawTables)
 
     const calculations = mapCalculations(calcsAndLods)
     const lods = calculations.filter(c => c.is_lod)
@@ -143,8 +148,8 @@ export function mapParsingPayload(rawDoc: any): ParsingPayload {
     const lod_include = lods.filter(c => c.lod_type?.toLowerCase() === "include").length
     const lod_exclude = lods.filter(c => c.lod_type?.toLowerCase() === "exclude").length
 
-    const datasources: any[] = dsAndConn.datasources ?? []
-    const sources = datasources.map((ds: any) => mapSource(ds, dsAndConn))
+    const rawDatasources: any[] = data.datasources || dsAndConn.datasources || []
+    const sources = rawDatasources.map((ds: any) => mapSource(ds, dsAndConn, rawTables))
     const live = sources.filter((s: DataSource) => s.mode === "Live").length
     const extract = sources.filter((s: DataSource) => s.mode === "Extract").length
 
@@ -158,8 +163,8 @@ export function mapParsingPayload(rawDoc: any): ParsingPayload {
             parameters: Array.isArray(sql.parameters) ? sql.parameters : []
         }));
 
-    const rawSheets: any[] = sheetsAndVis.sheets ?? []
-    const rawDashboards: any[] = dashStories.dashboards ?? []
+    const rawSheets: any[] = data.sheets || sheetsAndVis.sheets || []
+    const rawDashboards: any[] = data.dashboards || dashStories.dashboards || []
 
     let rawStories: any[] = [];
     const extractStories = (source: any) => {
@@ -273,10 +278,7 @@ export function mapParsingPayload(rawDoc: any): ParsingPayload {
     else if (data.embedded_assets && Array.isArray(data.embedded_assets.hyper_previews) && data.embedded_assets.hyper_previews.length > 0) rawHyperPreviews = data.embedded_assets.hyper_previews;
     else rawHyperPreviews = deepSearchByKey(rawDoc, 'hyper_previews');
 
-    let rawTables: any[] = [];
-    if (Array.isArray(data.tables) && data.tables.length > 0) rawTables = data.tables;
-    else if (dsAndConn.tables && Array.isArray(dsAndConn.tables)) rawTables = dsAndConn.tables;
-    else rawTables = deepSearchByKey(rawDoc, 'tables');
+
 
     const mappedHyperPreviews: HyperPreview[] = rawHyperPreviews.map((hp: any) => ({
         hyper_file: hp.hyper_file || "Unknown Hyper File",
@@ -382,11 +384,62 @@ function createEmptyPayload(): ParsingPayload {
     }
 }
 
-function classifyFields(calcsAndLods: any) {
+function classifyFields(data: any, calcsAndLods: any, rawTables: any[] = []) {
     const dims: FieldDef[] = []
     const meas: FieldDef[] = []
-    const calcFields = calcsAndLods.calculated_fields || {}
 
+    // 1. Direct fields object
+    if (data?.fields) {
+        if (Array.isArray(data.fields.dimensions)) dims.push(...data.fields.dimensions);
+        if (Array.isArray(data.fields.measures)) meas.push(...data.fields.measures);
+    }
+
+    // 2. Direct dimensions / measures arrays
+    if (Array.isArray(data?.dimensions)) {
+        data.dimensions.forEach((d: any) => {
+            const name = typeof d === 'string' ? d : (d.name || d.field_name || "Unknown");
+            if (!dims.some(x => x.name === name)) {
+                dims.push(typeof d === 'object' ? d : { name, data_type: 'string', source: '—', default_aggregation: '—', usage_count: 1 });
+            }
+        });
+    }
+    if (Array.isArray(data?.measures)) {
+        data.measures.forEach((m: any) => {
+            const name = typeof m === 'string' ? m : (m.name || m.field_name || "Unknown");
+            if (!meas.some(x => x.name === name)) {
+                meas.push(typeof m === 'object' ? m : { name, data_type: 'number', source: '—', default_aggregation: 'Sum', usage_count: 1 });
+            }
+        });
+    }
+
+    // 3. Extract fields from tables (e.g. Qlik table fields)
+    if (Array.isArray(rawTables)) {
+        rawTables.forEach((t: any) => {
+            const fields = t.fields || t.columns || [];
+            if (Array.isArray(fields)) {
+                fields.forEach((f: any) => {
+                    const fieldName = f.Name || f.name || "Unknown";
+                    const dt = String(f.dataType || f.datatype || f.type || "").toUpperCase();
+                    const nature = String(f.nature || "").toUpperCase();
+                    const fieldDef: FieldDef = {
+                        name: fieldName,
+                        data_type: f.dataType || f.datatype || "string",
+                        source: t.table_name || t.name || "Table",
+                        default_aggregation: "—",
+                        usage_count: 1
+                    };
+                    if (dt === "NUMBER" || dt === "DECIMAL" || dt === "INTEGER" || nature === "INTEGER" || nature === "DECIMAL") {
+                        if (!meas.some(m => m.name === fieldName)) meas.push(fieldDef);
+                    } else {
+                        if (!dims.some(d => d.name === fieldName)) dims.push(fieldDef);
+                    }
+                });
+            }
+        });
+    }
+
+    // 4. Fallback to Tableau calculations_and_lods
+    const calcFields = calcsAndLods?.calculated_fields || {}
     for (const [key, val] of Object.entries(calcFields) as [string, any][]) {
         const deps = Array.isArray(val.dependencies) && val.dependencies.length > 0
             ? `deps: ${val.dependencies.join(", ")}`
@@ -403,8 +456,11 @@ function classifyFields(calcsAndLods: any) {
             usage_count: val.usage_count !== undefined ? val.usage_count : 0,
             formula: val.formula || "—"
         }
-        if (val.type === "measure") meas.push(field)
-        else if (val.type === "dimension") dims.push(field)
+        if (val.type === "measure") {
+            if (!meas.some(m => m.name === field.name)) meas.push(field);
+        } else if (val.type === "dimension") {
+            if (!dims.some(d => d.name === field.name)) dims.push(field);
+        }
     }
     return { dimensions: dims, measures: meas }
 }
@@ -414,26 +470,30 @@ function countPhysicalTables(dsAndConn: any): number {
     return tables.filter((t: any) => t.relation_type === "physical_table" || t.type === "table").length
 }
 
-function mapSource(ds: any, dsAndConn: any): DataSource {
+function mapSource(ds: any, dsAndConn: any, rawTables: any[] = []): DataSource {
     const conn: any = Array.isArray(ds.connections) ? (ds.connections[0] ?? {}) : {}
 
-    const allTables: any[] = dsAndConn.logical_tables?.tables?.tables ?? []
+    const allTables: any[] = dsAndConn?.logical_tables?.tables?.tables ?? []
     const standardTables = allTables
         .filter((t: any) => t.datasource === ds.name)
         .map((t: any) => t.table_name as string)
 
-    const customSqlEntries: any[] = dsAndConn.custom_sql ?? dsAndConn.logical_tables?.custom_sql ?? dsAndConn.logical_tables?.tables?.custom_sql ?? []
+    const customSqlEntries: any[] = dsAndConn?.custom_sql ?? dsAndConn?.logical_tables?.custom_sql ?? dsAndConn?.logical_tables?.tables?.custom_sql ?? []
     const matchingCustomSqls = customSqlEntries.filter((sql: any) => sql.datasource_id === ds.id || sql.datasource === ds.name)
     const customSqlTables = matchingCustomSqls.map((sql: any) => sql.table_name as string).filter(Boolean)
 
-    const combinedTables = Array.from(new Set([...standardTables, ...customSqlTables]))
+    let combinedTables = Array.from(new Set([...standardTables, ...customSqlTables]))
+    if (combinedTables.length === 0 && Array.isArray(rawTables)) {
+        combinedTables = rawTables.map((t: any) => t.table_name || t.name).filter(Boolean);
+    }
+
     return {
-        id: ds.id,
-        name: ds.name ?? "Unknown Source",
-        type: ds.connection_type ?? conn.type ?? "Unknown",
-        mode: ds.mode === "live" ? "Live" : "Extract",
-        server: (conn.server && conn.server.trim() !== "") ? conn.server : "—",
-        schema: conn.schema ?? conn.database ?? null,
+        id: ds.id || ds.datasource_id || "ds",
+        name: ds.name ?? ds.connector_type ?? "Unknown Source",
+        type: ds.connection_type ?? ds.connector_type ?? conn.type ?? "File/QIX",
+        mode: (ds.mode === "live" ? "Live" : (ds.mode === "extract" ? "Extract" : "File")) as any,
+        server: (conn.server && conn.server.trim() !== "") ? conn.server : (ds.server || "—"),
+        schema: conn.schema ?? conn.database ?? ds.database ?? null,
         custom_sql: matchingCustomSqls.length > 0,
         tables: combinedTables,
         connections: Array.isArray(ds.connections) ? ds.connections : [],

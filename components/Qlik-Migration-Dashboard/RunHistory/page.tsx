@@ -18,6 +18,9 @@ import AssessmentResults from "@/components/Assessment-Results/AssessmentResults
 import ParsingResults from "@/components/Parsing-Results/ParsingResultsHistory";
 import MappingResults from "@/components/Mapping-Results/MappingResultsHistory";
 import ReportGenerationResults from "@/components/ReportGeneration-Results/ReportGenerationResultsHistory";
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import { resolveUserEmail } from "@/lib/userEmail";
+import { useAuthStore } from "@/stores/auth.store";
 import { AssessmentData, MappedData, ParsedData, ReportGenerationData } from "@/types/assessment";
 
 interface RunHistoryItem {
@@ -109,30 +112,17 @@ const AppRunResults: React.FC<AppRunResultsProps> = ({
     const fetchResults = async () => {
       setIsLoading(true);
       try {
-     const fetchWithToken = (url: string) =>
-  fetch(url, {
-    headers: {
-      'Authorization': `Bearer ${backendToken}`,
-      'Content-Type': 'application/json',
-    },
-  });
+        const [assessmentJson, parsingJson, mappingJson, reportGenJson] = await Promise.all([
+          fetchWithAuth<any>(`/api/qlik/history-results?type=assessment&folder=${encodeURIComponent(folderName)}`).catch(() => null),
+          fetchWithAuth<any>(`/api/qlik/history-results?type=parsing&folder=${encodeURIComponent(folderName)}`).catch(() => null),
+          fetchWithAuth<any>(`/api/qlik/history-results?type=mapping&folder=${encodeURIComponent(folderName)}`).catch(() => null),
+          fetchWithAuth<any>(`/api/qlik/history-results?type=report-generation&folder=${encodeURIComponent(folderName)}`).catch(() => null),
+        ]);
 
-const [assessmentRes, parsingRes, mappingRes, reportGenRes] = await Promise.all([
-  fetchWithToken(`/api/history-results?type=assessment&folder=${encodeURIComponent(folderName)}`),
-  fetchWithToken(`/api/history-results?type=parsing&folder=${encodeURIComponent(folderName)}`),
-  fetchWithToken(`/api/history-results?type=mapping&folder=${encodeURIComponent(folderName)}`),
-  fetchWithToken(`/api/history-results?type=report-generation&folder=${encodeURIComponent(folderName)}`),
-]);
-
-        const assessmentJson = assessmentRes.ok ? await assessmentRes.json() : null;
-        const parsingJson = parsingRes.ok ? await parsingRes.json() : null;
-        const mappingJson = mappingRes.ok ? await mappingRes.json() : null;
-        const reportGenJson = reportGenRes.ok ? await reportGenRes.json() : null;
-
-        setAssessmentData(assessmentJson ? (assessmentJson[0]?.assessment_result as AssessmentData) : null);
-        setParsingData(parsingJson ? (parsingJson[0]?.parsing_result as ParsedData) : null);
-        setMappingData(mappingJson ? (mappingJson[0]?.mapping_result as MappedData) : null);
-        setReportGenData(reportGenJson ? (reportGenJson[0]?.report_result as ReportGenerationData) : null);
+        setAssessmentData(assessmentJson ? (assessmentJson[0]?.assessment_result || assessmentJson?.assessment_result || assessmentJson) as AssessmentData : null);
+        setParsingData(parsingJson ? (parsingJson[0]?.parsing_result || parsingJson?.parsing_result || parsingJson) as ParsedData : null);
+        setMappingData(mappingJson ? (mappingJson[0]?.mapping_result || mappingJson?.mapping_result || mappingJson) as MappedData : null);
+        setReportGenData(reportGenJson ? (reportGenJson[0]?.report_result || reportGenJson?.report_result || reportGenJson) as ReportGenerationData : null);
 
         const historyResults = {
           assessment: assessmentJson ? assessmentJson[0]?.assessment_result : null,
@@ -320,15 +310,12 @@ export const RunHistory: React.FC<{ backendToken: string }> = ({ backendToken })
       if (fetchingRef.current) return;
       if (abortControllerRef.current) abortControllerRef.current.abort();
 
-      if (!accounts || accounts.length === 0) {
-        toast.error("Please log in to view run history.");
-        setRunHistory([]);
-        return;
-      }
+      const userEmail =
+        resolveUserEmail(accounts?.[0]) ||
+        useAuthStore.getState().user?.email ||
+        (typeof window !== "undefined" ? localStorage.getItem("user_email") || "" : "");
 
-      let userEmail = accounts[0]?.username || accounts[0]?.homeAccountId?.split(".")[0];
       if (!userEmail) {
-        toast.error("User email not found. Please log in again.");
         setRunHistory([]);
         return;
       }
@@ -346,18 +333,9 @@ export const RunHistory: React.FC<{ backendToken: string }> = ({ backendToken })
         queryParams.append("page_size", pageSize.toString());
 
         const apiUrl = `/api/qlik/history?email=${encodeURIComponent(userEmail)}&${queryParams}`;
-        const response = await fetch(apiUrl, {
-          signal: abortControllerRef.current.signal,
-          headers: {
-            Authorization: `Bearer ${backendToken}`,
-            "Content-Type": "application/json",
-          },
-        });
+        const data = await fetchWithAuth<any>(apiUrl);
 
-        if (!response.ok) throw new Error(`API request failed: ${response.status}`);
-
-        const data = await response.json();
-        if (!Array.isArray(data)) {
+        if (!data || !Array.isArray(data)) {
           setRunHistory([]);
           setHasMore(false);
           if (trimmedSearchQuery) toast.info(`No results found for "${trimmedSearchQuery}"`);
@@ -373,83 +351,98 @@ export const RunHistory: React.FC<{ backendToken: string }> = ({ backendToken })
 
         const formattedDataPromises = data.map(async (item: any) => {
           try {
-            const folderResponse = await fetch(
-              `/api/qlik/history-by-folder?folder=${encodeURIComponent(item.folder_name)}`,
-              {
-                signal: abortControllerRef.current?.signal,
-                headers: {
-                  Authorization: `Bearer ${backendToken}`,
-                  "Content-Type": "application/json",
-                },
-              }
-            ); 
-
             let status: "success" | "failed" | "in_progress" = "in_progress";
             let statusDetails: any = {};
 
-            if (folderResponse.ok) {
-              const folderData = await folderResponse.json();
-              const runDetails = folderData[0];
+            const folderIdentifier = item.folder_name || item.app_id || item.run_id;
+            if (folderIdentifier) {
+              try {
+                const folderData = await fetchWithAuth<any>(
+                  `/api/qlik/history-by-folder?folder=${encodeURIComponent(folderIdentifier)}`
+                );
 
-              statusDetails = {
-                unbuildingStatus: runDetails?.unbuilding_status,
-                assessmentStatus: runDetails?.assessment_status,
-                parsingStatus: runDetails?.parsing_status,
-                mappingStatus: runDetails?.mapping_status,
-                reportGenerationStatus: runDetails?.report_generation_status,
-                unbuildingMessage: runDetails?.unbuilding_message,
-                assessmentMessage: runDetails?.assessment_message,
-                parsingMessage: runDetails?.parsing_message,
-                mappingMessage: runDetails?.mapping_message,
-                reportGenerationMessage: runDetails?.report_generation_message,
-              };
+                if (folderData) {
+                  const runDetails = Array.isArray(folderData) ? folderData[0] : folderData;
 
-              if (["failed", "error"].includes(runDetails?.unbuilding_status)) status = "failed";
-              else if (runDetails?.report_generation_status === "success") status = "success";
-              else if (
-                ["failed", "error"].includes(runDetails?.parsing_status) ||
-                ["failed", "error"].includes(runDetails?.mapping_status) ||
-                ["failed", "error"].includes(runDetails?.assessment_status) ||
-                ["failed", "error"].includes(runDetails?.report_generation_status)
-              ) {
-                status = "failed";
-              } else if (
-                runDetails?.unbuilding_status === "success" &&
-                runDetails?.assessment_status === "success" &&
-                runDetails?.parsing_status === "success" &&
-                runDetails?.mapping_status === "success" &&
-                runDetails?.report_generation_status === "success"
-              ) {
-                status = "success";
+                  statusDetails = {
+                    unbuildingStatus: runDetails?.unbuilding_status || item.unbuilding_status,
+                    assessmentStatus: runDetails?.assessment_status || item.assessment_status,
+                    parsingStatus: runDetails?.parsing_status || item.parsing_status,
+                    mappingStatus: runDetails?.mapping_status || item.mapping_status,
+                    reportGenerationStatus: runDetails?.report_generation_status || item.report_generation_status,
+                    unbuildingMessage: runDetails?.unbuilding_message || item.unbuilding_message,
+                    assessmentMessage: runDetails?.assessment_message || item.assessment_message,
+                    parsingMessage: runDetails?.parsing_message || item.parsing_message,
+                    mappingMessage: runDetails?.mapping_message || item.mapping_message,
+                    reportGenerationMessage: runDetails?.report_generation_message || item.report_generation_message,
+                  };
+
+                  if (["failed", "error"].includes(runDetails?.unbuilding_status)) status = "failed";
+                  else if (runDetails?.report_generation_status === "success") status = "success";
+                  else if (
+                    ["failed", "error"].includes(runDetails?.parsing_status) ||
+                    ["failed", "error"].includes(runDetails?.mapping_status) ||
+                    ["failed", "error"].includes(runDetails?.assessment_status) ||
+                    ["failed", "error"].includes(runDetails?.report_generation_status)
+                  ) {
+                    status = "failed";
+                  } else if (
+                    runDetails?.unbuilding_status === "success" &&
+                    runDetails?.assessment_status === "success" &&
+                    runDetails?.parsing_status === "success" &&
+                    runDetails?.mapping_status === "success" &&
+                    runDetails?.report_generation_status === "success"
+                  ) {
+                    status = "success";
+                  }
+                }
+              } catch {
+                // Ignore folder detail fetch error
               }
             }
 
-            const parsedStartTime = parseFolderTimestamp(item.folder_name);
-            const fallbackStartTime = item.start_time || item.timestamp || item.created_at || new Date().toISOString();
+            const rawStatus = (item.status || "").toLowerCase();
+            if (rawStatus.includes("completed") || rawStatus.includes("success")) {
+              status = "success";
+            } else if (rawStatus.includes("failed") || rawStatus.includes("error") || rawStatus.includes("cancelled")) {
+              status = "failed";
+            }
+
+            const parsedStartTime = item.folder_name ? parseFolderTimestamp(item.folder_name) : null;
+            const fallbackStartTime = item.start_time || item.start_date_time || item.timestamp || item.created_at || new Date().toISOString();
             const startTime = parsedStartTime || fallbackStartTime;
 
             // Timeout logic: If in_progress and >10 mins elapsed, mark as failed
             if (status === "in_progress") {
               const start = new Date(startTime);
               const elapsedMs = Date.now() - start.getTime();
-              if (elapsedMs > 5 * 60 * 1000) { // 10 minutes
+              if (elapsedMs > 10 * 60 * 1000) {
                 status = "failed";
                 statusDetails.timeoutMessage = "Migration interrupted as the session was reset";
               }
             }
 
+            const appName =
+              item.app_name ||
+              item.application ||
+              item.project_name ||
+              item.payload?.app_name ||
+              item.payload?.project_name ||
+              (item.folder_name ? removeTimestampFromFolderName(item.folder_name) : "") ||
+              "Qlik Sense Application";
+
             return {
-              id: item.id || `run-${Math.random().toString(36).substr(2, 9)}`,
-              application: removeTimestampFromFolderName(item.folder_name) || "Unknown App",
-              folderName: item.folder_name || "",
+              id: item.id || item.run_id || `run-${Math.random().toString(36).substr(2, 9)}`,
+              application: appName,
+              folderName: item.folder_name || item.app_id || item.run_id || "",
               status,
               startTime,
-              endTime: item.endTime,
-              duration: calculateDuration(startTime, item.endTime),
-              sourceSpace: item.source_space || "Unknown",
-              targetWorkspace: item.target_workspace || "Unknown",
-              processedItems: item.processed_items || 0,
-              errors: item.error_count || item.errors || 0,
+              endTime: item.endTime || item.end_date_time,
+              duration: item.time_duration || item.time_elapsed || calculateDuration(startTime, item.endTime || item.end_date_time),
+              sourceSpace: item.source_space || item.workspace_name || item.space_name || item.payload?.space_name || "Qlik Cloud",
+              targetWorkspace: item.target_workspace || item.fabric_workspace || item.payload?.fabric_workspace || "Microsoft Fabric",
+              processedItems: item.total_apps || item.processed_items || item.processedItems || 1,
+              errors: item.total_failed || item.error_count || item.errors || 0,
               reportUrl: item.report_url,
               ...statusDetails,
             } as RunHistoryItem;

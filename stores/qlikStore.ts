@@ -80,6 +80,7 @@ export const useQlikStore = create<QlikStore>((set, get) => ({
         parsing: { status: "pending", step: 1 },
         mapping: { status: "pending", step: 1 },
         reportGeneration: { status: "pending" },
+        validation: { status: "pending" },
       };
       return {
         processStates: {
@@ -110,11 +111,40 @@ export const useQlikStore = create<QlikStore>((set, get) => ({
   })),
   fetchAgentActions: async (appId, folderName, agentName) => {
     try {
+      const storageKey = `migrateiq:qlik-agent-actions:${appId}:${folderName}:${agentName}`;
+      const current = get().activities[appId]?.[agentName] || [];
+
+      // Restore the last known snapshot after a tab or route remount. This is
+      // display continuity only; the API response remains the source of truth.
+      if (current.length === 0 && typeof window !== "undefined") {
+        try {
+          const cached = JSON.parse(localStorage.getItem(storageKey) || "null");
+          if (Array.isArray(cached) && cached.length > 0) {
+            get().setActivities(appId, agentName, cached);
+          }
+        } catch {
+          // Ignore malformed local cache and continue with the API request.
+        }
+      }
+
       const data = await fetchWithAuth<any>(
         `/api/qlik/agent-actions?folderName=${encodeURIComponent(folderName)}&agentName=${encodeURIComponent(agentName)}`
       );
       const actions = Array.isArray(data) ? data : [];
-      get().setActivities(appId, agentName, actions);
+
+      // A temporarily empty poll must not erase actions already displayed.
+      // This is especially important when the backend writes the final action
+      // asynchronously after the stage endpoint has returned.
+      if (actions.length > 0 || current.length === 0) {
+        get().setActivities(appId, agentName, actions);
+        if (actions.length > 0 && typeof window !== "undefined") {
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(actions));
+          } catch {
+            // Storage quota/private-mode errors must not break polling.
+          }
+        }
+      }
     } catch (e) {
       console.error("Failed to fetch actions:", e);
     }

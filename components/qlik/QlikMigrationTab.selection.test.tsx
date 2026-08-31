@@ -24,6 +24,14 @@ vi.mock("@/services/qlik.service", () => ({
     getHistory: vi.fn(),
     getHistoryResults: vi.fn(),
   },
+  qlikService: {
+    initializeConnection: vi.fn(async () => []),
+    storeQlikUrl: vi.fn(async () => {}),
+  },
+  QLIKServiceInstance: {
+    initializeConnection: vi.fn(async () => []),
+    storeQlikUrl: vi.fn(async () => {}),
+  },
 }));
 
 vi.mock("@/services/fabric.service", () => ({
@@ -114,19 +122,20 @@ describe("QlikMigrationTab — the selection flow", () => {
 
     // Pick one — this is the interaction that broke.
     // The <label>s are not associated with their <select>s, so select by
-    // position: the space picker is the first combobox on the screen.
-    const spacePicker = screen.getAllByRole("combobox")[0];
+    // filtering for select elements.
+    const selects = screen.getAllByRole("combobox").filter((el) => el.tagName.toLowerCase() === "select");
+    const spacePicker = selects[0];
     await userEvent.selectOptions(spacePicker, "personal");
 
     await waitFor(() => expect(getApps).toHaveBeenCalledWith("personal"));
 
     // Open the applications dropdown and pick one.
-    await userEvent.click(screen.getByText("Select applications"));
+    await userEvent.click(screen.getByPlaceholderText("Select applications"));
     const appOption = await screen.findByText("FleetVision");
     await userEvent.click(appOption);
 
     // Pick a target workspace.
-    const workspacePicker = screen.getAllByRole("combobox")[1];
+    const workspacePicker = selects[1];
     await userEvent.selectOptions(workspacePicker, "ws-1");
 
     const depthError = errors.find((e) => String(e).includes("Maximum update depth"));

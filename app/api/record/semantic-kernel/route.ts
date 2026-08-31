@@ -1,7 +1,16 @@
+// Proxy for the run-record list that MonitoringTab / monitoring.store read to
+// find active runs. Ported from vl-t2f-frontend's app/api/record/semantic-kernel
+// route; the upstream path differs because the Container Apps backend serves
+// this under /api/records/... rather than the old host's bare /semantic-kernel.
+//
+// Verified live: GET /api/records/semantic-kernel?email_id=...&page=1&page_size=50
+// returns 200 with a JSON array.
 import { NextRequest, NextResponse } from "next/server";
 import { httpClient } from "@/lib/api/httpClient";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
+
+const UPSTREAM_PATH = "/api/records/semantic-kernel";
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,28 +28,20 @@ export async function GET(req: NextRequest) {
     if (email_id) query.set("email_id", email_id);
     if (run_id) query.set("run_id", run_id);
     query.set("page", page);
+    // Both spellings are sent because the two backend generations disagree on it.
     query.set("page_size", page_size);
     query.set("pageSize", page_size);
 
-    // Optional filters
-    const status = searchParams.get("status");
-    const search = searchParams.get("search");
-    const created_on = searchParams.get("created_on");
-    const created_from = searchParams.get("created_from");
-    const created_to = searchParams.get("created_to");
+    // Optional filters, forwarded only when present.
+    for (const key of ["status", "search", "created_on", "created_from", "created_to"]) {
+      const value = searchParams.get(key);
+      if (value) query.set(key, value);
+    }
 
-    if (status) query.set("status", status);
-    if (search) query.set("search", search);
-    if (created_on) query.set("created_on", created_on);
-    if (created_from) query.set("created_from", created_from);
-    if (created_to) query.set("created_to", created_to);
-
-    const data = await httpClient.get<any[]>(
-      `/records/semantic-kernel?${query.toString()}`,
-      { apiType: "logs" } 
-    );
-
-
+    // apiType "logs" resolves to API_BASE_URL, the Cosmos-backed records host.
+    const data = await httpClient.get<any[]>(`${UPSTREAM_PATH}?${query.toString()}`, {
+      apiType: "logs",
+    });
 
     return NextResponse.json(data, { status: 200 });
   } catch (err: any) {

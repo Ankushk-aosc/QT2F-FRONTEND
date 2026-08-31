@@ -1149,7 +1149,7 @@ export function generateMigrationReportHTML(data: MigrationReportData): string {
 <div id="pdf-content">
 <!-- print-only header for downloaded pdf -->
 <div class="print-only" style="justify-content: space-between; align-items: flex-start; margin-bottom: 24px; border-bottom: 2px solid ${COLORS.borderGray}; padding-bottom: 12px;">
-  <img src="${typeof window !== 'undefined' ? window.location.origin : ''}/Switchblade_Logo.png" alt="VectorLab Logo" style="height: 36px; object-fit: contain;" />
+  <img src="${typeof window !== 'undefined' ? window.location.origin : ''}/MigrateIQ_Logo.svg" alt="MigrateIQ Logo" style="height: 36px; object-fit: contain;" />
   <div style="text-align: right; font-size: 11px; color: ${COLORS.subText};">
     <div><strong>Generated At:</strong> ${new Date().toLocaleString()}</div>
   </div>

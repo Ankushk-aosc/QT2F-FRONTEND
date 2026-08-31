@@ -51,7 +51,24 @@ interface QlikApp {
   spaceId?: string;
 }
 
+/**
+ * Returns the Authorization header for calls to the Qlik engine backend.
+ *
+ * The engine proxies requests to Qlik Cloud using a Qlik API key — it does
+ * NOT accept the user's Entra/MSAL Bearer token. The stored `apiKey` secret
+ * is resolved into `context.secrets` by the service layer before the adapter
+ * runs, so we read it from there.
+ *
+ * Fallback: if for some reason the secret is missing (e.g. first-time test
+ * before secrets are written), forward the user token so the engine can at
+ * least return a meaningful 401 rather than a confusing empty-header error.
+ */
 function authHeaders(context: DiscoveryContext): Record<string, string> {
+  const apiKey = context.secrets?.["apiKey"];
+  if (apiKey) {
+    return { Authorization: `Bearer ${apiKey}` };
+  }
+  // Fallback to user token (will likely 401 at the engine, but surfaces a clear error)
   return { Authorization: context.authHeader };
 }
 
@@ -99,12 +116,13 @@ async function fetchApps(context: DiscoveryContext, spaceId: string): Promise<Ql
  * `SQL_BASE_URL` and 404'd on every call — and because the failure is swallowed
  * below, it did so silently, leaving the tenant URL never actually published.
  */
-async function publishCloudUrl(context: DiscoveryContext): Promise<void> {
+async function publishCloudUrl(context: DiscoveryContext): Promise<{ connectionId: string | null }> {
   const cloudUrl = String(context.connection.values.cloudUrl ?? "");
-  if (!cloudUrl) return;
+  if (!cloudUrl) return { connectionId: null };
 
   try {
-    await httpClient.post("/qlik", { server_url: cloudUrl }, { apiType: "qlik-mongo" });
+    const res = await httpClient.post<any>("/qlik", { server_url: cloudUrl }, { apiType: "qlik-mongo" });
+    return { connectionId: res?.connectionId || null };
   } catch (error) {
     // Names the target so the next silent failure is greppable rather than a
     // bare "could not publish" with no indication of where it went.
@@ -112,6 +130,20 @@ async function publishCloudUrl(context: DiscoveryContext): Promise<void> {
       "[QlikAdapter] Could not publish the cloud URL to POST {QLIK_MONGO_DB_URL}/qlik:",
       toErrorMessage(error, "unknown"),
     );
+    return { connectionId: null };
+  }
+}
+
+async function fetchConnectionDetails(connectionId: string, context: DiscoveryContext): Promise<{ apiKey: string | null; serverUrl: string | null }> {
+  try {
+    const res = await httpClient.get<any>(`/connectionDetails/${connectionId}`, {
+      apiType: "qlik",
+      headers: { Authorization: context.authHeader },
+    });
+    return { apiKey: res?.apiKey || null, serverUrl: res?.serverUrl || res?.server_url || null };
+  } catch (error) {
+    console.warn("[QlikAdapter] Failed to fetch connection details:", toErrorMessage(error, "unknown"));
+    return { apiKey: null, serverUrl: null };
   }
 }
 
@@ -120,7 +152,17 @@ export const qlikBackendAdapter: DiscoveryAdapter = {
 
   async test(context: DiscoveryContext): Promise<ConnectionTestResult> {
     try {
-      await publishCloudUrl(context);
+      const { connectionId } = await publishCloudUrl(context);
+      if (connectionId) {
+        const details = await fetchConnectionDetails(connectionId, context);
+        if (details.apiKey) {
+          context.secrets = { ...(context.secrets || {}), apiKey: details.apiKey };
+        }
+        if (details.serverUrl) {
+          context.connection.values.cloudUrl = details.serverUrl;
+        }
+      }
+
       const spaces = await fetchSpaces(context);
 
       // The tenant is not returned by the backend, so derive it from the URL the
@@ -157,6 +199,17 @@ export const qlikBackendAdapter: DiscoveryAdapter = {
   },
 
   async discover(context: DiscoveryContext): Promise<MetadataCollection[]> {
+    const { connectionId } = await publishCloudUrl(context);
+    if (connectionId) {
+      const details = await fetchConnectionDetails(connectionId, context);
+      if (details.apiKey) {
+        context.secrets = { ...(context.secrets || {}), apiKey: details.apiKey };
+      }
+      if (details.serverUrl) {
+        context.connection.values.cloudUrl = details.serverUrl;
+      }
+    }
+
     const spaces = await fetchSpaces(context);
 
     const spaceItems: MetadataItem[] = spaces.map((space) => ({
