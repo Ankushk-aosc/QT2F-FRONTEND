@@ -1,6 +1,7 @@
 import { create } from "zustand"
 import { fetchWithAuth } from "@/lib/fetchWithAuth"
 import { getTimeframeBoundaries } from "@/lib/utils"
+import { RUN_STATUS_POLL_INTERVAL_MS, DEFAULT_PAGE_SIZE } from "@/lib/constants"
 import { useUIStore } from "./ui.store"
 
 export interface RunHistoryItem {
@@ -81,8 +82,6 @@ interface RunHistoryState {
   stopAllPolling: () => void
 }
 
-const DEFAULT_PAGE_SIZE = 10
-
 // Registry for active polling timers. Stored outside Zustand to prevent re-renders on timer updates.
 const activePolls: Record<string, NodeJS.Timeout> = {}
 
@@ -139,7 +138,7 @@ export const useRunHistoryStore = create<RunHistoryState>((set, get) => ({
         }
 
         if (!item || !item.status) {
-           activePolls[runId] = setTimeout(poll, 5000)
+           activePolls[runId] = setTimeout(poll, RUN_STATUS_POLL_INTERVAL_MS)
            return
         }
 
@@ -172,13 +171,13 @@ export const useRunHistoryStore = create<RunHistoryState>((set, get) => ({
             return
         }
 
-        let delay = 5000
+        let delay = RUN_STATUS_POLL_INTERVAL_MS
         if (typeof document !== 'undefined' && document.hidden) {
             delay = 60000
         } else {
             const createdAt = new Date(mappedItem.created_at || mappedItem.raw_timestamp || Date.now()).getTime()
             const elapsed = Date.now() - createdAt
-            if (elapsed < 2 * 60 * 1000) delay = 5000
+            if (elapsed < 2 * 60 * 1000) delay = RUN_STATUS_POLL_INTERVAL_MS
             else if (elapsed < 10 * 60 * 1000) delay = 10000
             else delay = 20000
         }
@@ -186,7 +185,7 @@ export const useRunHistoryStore = create<RunHistoryState>((set, get) => ({
         activePolls[runId] = setTimeout(poll, delay)
       } catch (err) {
         console.error(`[RunHistory] Polling failed for run_id ${runId}:`, err)
-        let delay = 5000
+        let delay = RUN_STATUS_POLL_INTERVAL_MS
         if (typeof document !== 'undefined' && document.hidden) delay = 60000
         activePolls[runId] = setTimeout(poll, delay)
       }

@@ -29,6 +29,7 @@ import type {
   ConnectorRole,
   MetadataKind,
 } from "@/types/connectors";
+import { DEFAULT_TABLEAU_TOKEN_NAME } from "@/lib/constants";
 
 export interface ConnectorDefinition {
   id: ConnectorId;
@@ -303,7 +304,7 @@ const TABLEAU: ConnectorDefinition = {
           label: "Token name",
           type: "text",
           required: true,
-          defaultValue: "TableauToken",
+          defaultValue: DEFAULT_TABLEAU_TOKEN_NAME,
           hint: "The name given to the personal access token in Tableau.",
         },
         {

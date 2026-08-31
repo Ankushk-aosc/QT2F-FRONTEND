@@ -175,14 +175,20 @@ function MDataTable<Row extends Record<string, any>>({ cols, rows, pageSize = IT
   )
 }
 
+// Confidence-match score bands (0-100, higher = better). Independent from
+// the unrelated 0-100 *risk* score in AssessmentTab.tsx, where higher means
+// worse -- the two are not the same scale despite both being percentages.
+const CONFIDENCE_SCORE_HIGH = 90;
+const CONFIDENCE_SCORE_MEDIUM = 70;
+
 const renderConfidenceReview = (score: number | null, notes: string | null, link?: string | null) => {
   if (score === null && !notes) return <span style={{ color: "#94a3b8", fontStyle: "italic", fontSize: "13px" }}>—</span>;
 
   let scoreColor = "#64748b";
   let scoreBg = "#f8fafc";
   if (score !== null) {
-    if (score >= 90) { scoreColor = "#16a34a"; scoreBg = "#dcfce7"; }
-    else if (score >= 70) { scoreColor = "#ca8a04"; scoreBg = "#fef08a"; }
+    if (score >= CONFIDENCE_SCORE_HIGH) { scoreColor = "#16a34a"; scoreBg = "#dcfce7"; }
+    else if (score >= CONFIDENCE_SCORE_MEDIUM) { scoreColor = "#ca8a04"; scoreBg = "#fef08a"; }
     else { scoreColor = "#dc2626"; scoreBg = "#fee2e2"; }
   }
 

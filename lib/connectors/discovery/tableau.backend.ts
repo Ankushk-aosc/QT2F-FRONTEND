@@ -13,6 +13,7 @@ import "server-only";
  */
 
 import { httpClient } from "@/lib/api/httpClient";
+import { DEFAULT_TABLEAU_TOKEN_NAME, DISCOVERY_TABLEAU_TOKEN_NAME } from "@/lib/constants";
 import type { MetadataCollection, MetadataItem } from "@/types/connectors";
 
 import {
@@ -70,13 +71,13 @@ function credentialFields(context: DiscoveryContext): Record<string, string> {
     email: context.userEmail,
     TABLEAU_SERVER_URL: String(values.serverUrl ?? ""),
     TABLEAU_SITE_NAME: String(values.site ?? ""),
-    TABLEAU_TOKEN_NAME: String(values.patName || "token"),
+    TABLEAU_TOKEN_NAME: String(values.patName || DISCOVERY_TABLEAU_TOKEN_NAME),
     server_url: String(values.serverUrl ?? ""),
     site_name: String(values.site ?? ""),
-    token_name: String(values.patName || "token"),
+    token_name: String(values.patName || DISCOVERY_TABLEAU_TOKEN_NAME),
     tableau_server_url: String(values.serverUrl ?? ""),
     tableau_site_name: String(values.site ?? ""),
-    tableau_token_name: String(values.patName || "token"),
+    tableau_token_name: String(values.patName || DISCOVERY_TABLEAU_TOKEN_NAME),
   };
 
   const secret = context.secrets.patSecret;
@@ -160,7 +161,7 @@ async function registerConnection(context: DiscoveryContext): Promise<string> {
     connection_name: context.connection.connectionName || "Tableau",
     tableau_server_url: String(values.serverUrl ?? ""),
     tableau_site_name: String(values.site ?? ""),
-    tableau_token_name: String(values.patName || "token"),
+    tableau_token_name: String(values.patName || DISCOVERY_TABLEAU_TOKEN_NAME),
     tcm_base_url: env === "cloud" ? String(values.tcmBaseUrl ?? "") : "",
   };
 
@@ -312,7 +313,7 @@ export const tableauBackendAdapter: DiscoveryAdapter = {
     console.log("[Tableau Discovery] Testing connection with:", {
       serverUrl: String(values.serverUrl ?? "").substring(0, 50),
       site: String(values.site ?? ""),
-      patName: String(values.patName ?? "TableauToken"),
+      patName: String(values.patName ?? DEFAULT_TABLEAU_TOKEN_NAME),
       hasPatSecret: !!context.secrets.patSecret,
       envType: envType(context),
       userEmail: context.userEmail,

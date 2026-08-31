@@ -1,12 +1,14 @@
 // fetchWithAuth.ts
 // Client-side authenticated fetch with automatic token refresh on 401
 
+import { DEFAULT_REQUEST_TIMEOUT_MS } from "@/lib/constants";
+
 // No request here ever aborted on its own -- a Next.js API route stuck
 // waiting on a hung backend (see lib/api/httpClient.ts) left this call
 // pending in lockstep, so the component that awaited it just never
 // resolved. 60s gives the server-side timeout room to fire and respond with an error first,
 // while accommodating Render's ~50s free tier cold starts.
-const DEFAULT_TIMEOUT_MS = 60000;
+const DEFAULT_TIMEOUT_MS = DEFAULT_REQUEST_TIMEOUT_MS;
 
 export async function fetchWithAuth<T = any>(
   url: string,

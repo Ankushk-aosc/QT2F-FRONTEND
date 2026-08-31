@@ -9,6 +9,7 @@ import { useGenerationStore } from '@/stores/generation.store'
 import { useDashboardStore } from '@/stores/dashboard.store'
 import { useUIStore } from '@/stores/ui.store'
 import { AGENT_NAME_VARIANTS, matchesAgent } from '@/lib/agentNames'
+import { RUN_STATUS_POLL_INTERVAL_MS } from '@/lib/constants'
 import { isLiteMode } from '@/lib/config'
 
 // ─────────────────────────────────────────────
@@ -283,7 +284,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       generationTriggered: {},
       validationTriggered: {},
     })
-    setTimeout(() => get().startPolling(), 5000)
+    setTimeout(() => get().startPolling(), RUN_STATUS_POLL_INTERVAL_MS)
   },
 
   setCurrentRunId: (runId) => set({ currentRunId: runId }),

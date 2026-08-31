@@ -1,6 +1,7 @@
 // app/api/migration/process-site/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { RT_COOKIE } from "@/lib/auth/serverAuth";
+import { DEFAULT_TABLEAU_TOKEN_NAME } from "@/lib/constants";
 
 export const dynamic = 'force-dynamic';
 
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
       email: email.trim(),
       tableau_server_url: tableau_server_url.trim(),
       tableau_site_name: (tableau_site_name || "").trim(),
-      tableau_token_name: body.tableau_token_name?.trim() || "TableauToken",
+      tableau_token_name: body.tableau_token_name?.trim() || DEFAULT_TABLEAU_TOKEN_NAME,
     };
 
     if (group_id && group_id.trim()) {

@@ -39,6 +39,9 @@ import { NameReconciliationTable } from "./migration-validation/NameReconciliati
 const WEIGHT_MAP: Record<string, number> = { regular: 400, medium: 500, semibold: 600, bold: 700 };
 const SIZE_MAP: Record<number, number> = { 100: 10, 200: 12, 300: 14, 400: 16, 500: 20, 600: 24, 700: 28, 800: 32, 900: 40, 1000: 68 };
 
+/** Early-exit threshold for the best-candidate heuristic search below. */
+const EXCELLENT_MATCH_SCORE = 60;
+
 function Text({
     weight,
     size,
@@ -382,8 +385,12 @@ export function MigrationValidationView({ status, migrationData, extractionStatu
                 if (score > maxScore) {
                     maxScore = score;
                     bestCandidate = item;
-                    // Excellent match threshold
-                    if (score > 60) return item;
+                    // Early-exit once this candidate's heuristic score clears
+                    // EXCELLENT_MATCH_SCORE -- unrelated to the 0-100 percentage
+                    // score bands used elsewhere (AssessmentTab, MappingTab):
+                    // this is an unbounded points total from the ad-hoc
+                    // weighting above, not a percentage.
+                    if (score > EXCELLENT_MATCH_SCORE) return item;
                 }
             }
 

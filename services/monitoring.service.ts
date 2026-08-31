@@ -1,5 +1,6 @@
 // services/monitoring.service.ts
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -82,6 +83,8 @@ class MonitoringService {
     async fetchLogs(params: MonitoringLogsParams): Promise<LogEntry[]> {
         const { projectId, workbookId, runId } = params;
 
+        // Deliberately larger than DEFAULT_PAGE_SIZE: this fetches the full
+        // log history for one run in a single request, not a paged table.
         const query = new URLSearchParams({
             project_id: projectId,
             workbook_id: workbookId,
@@ -115,7 +118,7 @@ class MonitoringService {
         projectId?: string,
         email?: string,
         page = 1,
-        pageSize = 10
+        pageSize = DEFAULT_PAGE_SIZE
     ): Promise<PaginatedResult<HistoricalRun>> {
         const query = new URLSearchParams();
         if (projectId) query.append("project_id", projectId);

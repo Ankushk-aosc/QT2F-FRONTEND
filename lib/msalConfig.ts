@@ -3,6 +3,7 @@
 // 🚨 NO direct process.env access - all config from /api/auth/config
 
 import { Configuration, PublicClientApplication } from "@azure/msal-browser";
+import { fabricApiScopes } from "@/lib/auth-constants";
 
 // Fetch MSAL config from server
 async function fetchMsalConfig() {
@@ -90,12 +91,9 @@ export async function getLoginRequest() {
   return { scopes };
 }
 
-// Fabric API scopes
-export const fabricApiScopes = [
-  "https://api.fabric.microsoft.com/Workspace.Read.All",
-  "https://api.fabric.microsoft.com/Workspace.GitCommit.All",
-  "https://api.fabric.microsoft.com/Workspace.GitUpdate.All",
-];
+// Fabric API scopes -- re-exported from lib/auth-constants.ts, the single
+// source of truth for this list (this file previously kept its own copy).
+export { fabricApiScopes };
 
 export const loginRequestFabric = {
   scopes: fabricApiScopes,

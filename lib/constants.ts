@@ -1,3 +1,50 @@
+/**
+ * Default Tableau personal-access-token name used across the app (service
+ * fallbacks, UI form defaults, connector registry, migration payloads).
+ *
+ * Kept separate from DISCOVERY_TABLEAU_TOKEN_NAME below: the discovery
+ * adapter (lib/connectors/discovery/tableau.backend.ts) intentionally
+ * defaults to a different value as of a deliberate, recent fix. Previously
+ * both defaults were scattered as duplicate string literals across 15+
+ * call sites with no indication the difference was intentional -- these two
+ * named constants are the single source of truth for each, so a future
+ * change to either only has to happen in one place.
+ */
+export const DEFAULT_TABLEAU_TOKEN_NAME = "TableauToken";
+
+/** See DEFAULT_TABLEAU_TOKEN_NAME above -- used only by the discovery adapter. */
+export const DISCOVERY_TABLEAU_TOKEN_NAME = "token";
+
+/**
+ * Default bound for outbound requests to our own API routes and their
+ * upstream backends. 60s accommodates Render's ~50s free tier cold starts --
+ * see lib/fetchWithAuth.ts and lib/api/httpClient.ts, which both used to
+ * define this same value independently.
+ */
+export const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
+
+/**
+ * Baseline interval for polling a run/agent's status while it's active.
+ * Reimplemented as the same literal independently in stores/runHistory.store.ts,
+ * stores/agent.store.ts, components/tabs/ParsingTab.tsx and
+ * components/qlik/QlikMigrationTab.tsx -- this is the one shared source.
+ * Backoff tiers beyond this baseline (e.g. runHistory.store.ts's adaptive
+ * 10s/20s/60s steps for long-running or backgrounded polls) are specific to
+ * that call site and stay local.
+ */
+export const RUN_STATUS_POLL_INTERVAL_MS = 5000;
+
+/**
+ * Default page size for the "historical runs" list, shared by
+ * stores/runHistory.store.ts, stores/monitoring.store.ts,
+ * services/monitoring.service.ts and stores/dashboard.store.ts -- these
+ * previously each declared their own "10" independently. Other page sizes in
+ * the monitoring subsystem (e.g. the active-runs list, or a single run's
+ * full log fetch) serve different endpoints with deliberately different
+ * sizes and are commented locally rather than unified here.
+ */
+export const DEFAULT_PAGE_SIZE = 10;
+
 export const MIGRATION_MODE = {
   LITE: "0",
   STANDARD: "1",

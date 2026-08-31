@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import "server-only";
+import { DEFAULT_REQUEST_TIMEOUT_MS } from "@/lib/constants";
 
 export type ApiType =
     | "QLIK"
@@ -29,7 +30,7 @@ export interface RequestOptions extends RequestInit {
 // Next.js route handler indefinitely, which is what made components stall
 // on screen with no error and no way to recover short of a page reload.
 // Set to 60s to accommodate Render's ~50s free tier cold starts.
-const DEFAULT_TIMEOUT_MS = 60000;
+const DEFAULT_TIMEOUT_MS = DEFAULT_REQUEST_TIMEOUT_MS;
 
 // Internal helper to perform the request
 async function request<T>(endpoint: string, method: HttpMethod, options: RequestOptions = {}): Promise<T> {
@@ -80,7 +81,7 @@ async function request<T>(endpoint: string, method: HttpMethod, options: Request
             baseUrl = env.TABLEAU_API_URL;
             break;
         case "semantic":
-            baseUrl = env.SEMANTIC_KERNEL_URL || "http://127.0.0.1:8080";
+            baseUrl = env.SEMANTIC_KERNEL_URL;
             break;
         case "logs":
         case "records":
@@ -88,7 +89,7 @@ async function request<T>(endpoint: string, method: HttpMethod, options: Request
             baseUrl = env.API_BASE_URL;
             break;
         case "fabric":
-            baseUrl = env.FABRIC_API_BASE_URL || "https://api.fabric.microsoft.com/v1";
+            baseUrl = env.FABRIC_API_BASE_URL;
             break;
         default:
             baseUrl = env.API_BASE_URL;

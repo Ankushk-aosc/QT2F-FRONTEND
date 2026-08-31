@@ -3,6 +3,7 @@ import { monitoringService, type LogEntry, type MonitoringSummary } from "@/serv
 import { create } from "zustand";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { useAuthStore } from "@/stores/auth.store";
+import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -74,7 +75,7 @@ function cacheKey(workbookId: string, runId: string) {
 let latestHistoricalRunsRequestId = 0;
 
 function getPageSizeFromSummary(state: MonitoringState) {
-    return state.historicalRunsPagination.pageSize || 10;
+    return state.historicalRunsPagination.pageSize || DEFAULT_PAGE_SIZE;
 }
 
 function shouldTraceMonitoringPagination() {
@@ -96,7 +97,7 @@ export const useMonitoringStore = create<MonitoringState>((set, get) => ({
     summaryQueryKey: null,
     historicalRunsPagination: {
         page: 1,
-        pageSize: 10,
+        pageSize: DEFAULT_PAGE_SIZE,
         total: 0,
         totalPages: 1,
     },
@@ -107,7 +108,7 @@ export const useMonitoringStore = create<MonitoringState>((set, get) => ({
     fetchHistoricalRuns: async (projectId?: string, email?: string, options?: { page?: number; pageSize?: number; force?: boolean; silent?: boolean }) => {
         const state = get();
         const page = Math.max(1, options?.page ?? 1);
-        const pageSize = Math.max(1, options?.pageSize ?? 10);
+        const pageSize = Math.max(1, options?.pageSize ?? DEFAULT_PAGE_SIZE);
         const force = options?.force ?? false;
         const silent = options?.silent ?? false;
         const queryKey = `${projectId || ""}|${email || ""}|${page}|${pageSize}`;
@@ -225,7 +226,7 @@ export const useMonitoringStore = create<MonitoringState>((set, get) => ({
         if (!silent) set({ loadingSummary: true });
         try {
             const summary = await monitoringService.fetchMonitoringSummary(email, projectId);
-            const pageSize = state.historicalRunsPagination.pageSize || 10;
+            const pageSize = state.historicalRunsPagination.pageSize || DEFAULT_PAGE_SIZE;
             const totalPages = Math.max(1, Math.ceil(summary.total_runs / Math.max(1, pageSize)));
             
             set({
@@ -326,6 +327,9 @@ export const useMonitoringStore = create<MonitoringState>((set, get) => ({
 
         set({ loadingActiveRuns: true });
         try {
+            // Deliberately larger than DEFAULT_PAGE_SIZE: this lists every
+            // currently-active run for the badge/summary view, not a paged
+            // table, so it needs enough headroom to not silently truncate.
             const query = new URLSearchParams({
                 email_id: email,
                 page: "1",

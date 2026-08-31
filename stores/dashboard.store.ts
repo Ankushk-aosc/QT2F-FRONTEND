@@ -6,6 +6,7 @@ import type { Application, LogEntry, AgentResult, RunHistoryItem, AgentType, App
 import { migrationService } from "@/services/migration.service"
 import { useAuthStore } from "@/stores/auth.store"
 import { useRunHistoryStore } from "@/stores/runHistory.store"
+import { DEFAULT_PAGE_SIZE } from "@/lib/constants"
 
 interface DashboardStore {
   selectedSite: string
@@ -252,7 +253,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     // Auto-refresh the run history via the runHistory API
     const user = useAuthStore.getState().user;
     if (user?.email) {
-      useRunHistoryStore.getState().fetchRunHistory(user.email, { page: 1, pageSize: 10, force: true, silent: true });
+      useRunHistoryStore.getState().fetchRunHistory(user.email, { page: 1, pageSize: DEFAULT_PAGE_SIZE, force: true, silent: true });
     }
   },
 

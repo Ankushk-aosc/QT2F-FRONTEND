@@ -5,6 +5,7 @@
 
 import { ApplicationError } from "@/lib/error-handler";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import { DEFAULT_TABLEAU_TOKEN_NAME } from "@/lib/constants";
 
 export interface TableauCredentials {
   CONNECTION_NAME?: string;
@@ -52,7 +53,7 @@ export interface GetWorkbooksPayload {
  
 class TableauService {
   private siteName: string = "";
-  private tokenName: string = "TableauToken";
+  private tokenName: string = DEFAULT_TABLEAU_TOKEN_NAME;
   private projectId: string = "";
 
   setCredentials(siteName: string, tokenName: string, projectId: string = "") {
@@ -74,7 +75,7 @@ class TableauService {
           CONNECTION_NAME: c.connection_name || c.CONNECTION_NAME || "",
           TABLEAU_SERVER_URL: c.tableau_server_url || c.TABLEAU_SERVER_URL || "",
           TABLEAU_SITE_NAME: c.tableau_site_name || c.TABLEAU_SITE_NAME || "",
-          TABLEAU_TOKEN_NAME: c.tableau_token_name || c.TABLEAU_TOKEN_NAME || "TableauToken",
+          TABLEAU_TOKEN_NAME: c.tableau_token_name || c.TABLEAU_TOKEN_NAME || DEFAULT_TABLEAU_TOKEN_NAME,
           TCM_BASE_URL: c.tcm_base_url || c.TCM_BASE_URL || c.tcmBaseUrl || "",
           tcm_base_url: c.tcm_base_url || c.TCM_BASE_URL || c.tcmBaseUrl || "",
           TCM_TOKEN_SECRET: c.tcm_token_secret || c.TCM_TOKEN_SECRET || c.tcmTokenSecret || "",
@@ -84,7 +85,7 @@ class TableauService {
         if (mapped.length > 0) {
           const first = mapped[0];
           this.siteName = first.TABLEAU_SITE_NAME || "";
-          this.tokenName = first.TABLEAU_TOKEN_NAME || "TableauToken";
+          this.tokenName = first.TABLEAU_TOKEN_NAME || DEFAULT_TABLEAU_TOKEN_NAME;
         }
         return mapped;
       }
@@ -99,7 +100,7 @@ class TableauService {
     if (creds && creds.length > 0) {
       const first = creds[0];
       this.siteName = first.TABLEAU_SITE_NAME || "";
-      this.tokenName = first.TABLEAU_TOKEN_NAME || "TableauToken";
+      this.tokenName = first.TABLEAU_TOKEN_NAME || DEFAULT_TABLEAU_TOKEN_NAME;
     }
     return creds;
   }
@@ -146,7 +147,7 @@ class TableauService {
     }
     
     if (env === "server") {
-      body.TABLEAU_TOKEN_NAME = creds?.TABLEAU_TOKEN_NAME || "TableauToken";
+      body.TABLEAU_TOKEN_NAME = creds?.TABLEAU_TOKEN_NAME || DEFAULT_TABLEAU_TOKEN_NAME;
       body.TABLEAU_TOKEN_VALUE = creds?.TABLEAU_TOKEN_VALUE || "";
     }
     try {
@@ -202,7 +203,7 @@ class TableauService {
     });
 
     if (!creds?.connection_id) {
-      const tName = creds?.TABLEAU_TOKEN_NAME || "TableauToken";
+      const tName = creds?.TABLEAU_TOKEN_NAME || DEFAULT_TABLEAU_TOKEN_NAME;
       const tValue = creds?.TABLEAU_TOKEN_VALUE;
       if (effectiveEnv === "server") {
         payload.TABLEAU_TOKEN_NAME = tName;
@@ -247,7 +248,7 @@ class TableauService {
     });
 
     if (!creds?.connection_id) {
-      const tName = creds?.TABLEAU_TOKEN_NAME || "TableauToken";
+      const tName = creds?.TABLEAU_TOKEN_NAME || DEFAULT_TABLEAU_TOKEN_NAME;
       const tValue = creds?.TABLEAU_TOKEN_VALUE;
       if (effectiveEnv === "server") {
         payload.TABLEAU_TOKEN_NAME = tName;
@@ -288,7 +289,7 @@ class TableauService {
       connection_name: creds.CONNECTION_NAME || "",
       tableau_server_url: creds.TABLEAU_SERVER_URL,
       tableau_site_name: creds.TABLEAU_SITE_NAME || "",
-      tableau_token_name: creds.TABLEAU_TOKEN_NAME || "TableauToken",
+      tableau_token_name: creds.TABLEAU_TOKEN_NAME || DEFAULT_TABLEAU_TOKEN_NAME,
       tableau_token_value: creds.TABLEAU_TOKEN_VALUE || "",    // → Key Vault
       tcm_base_url: creds.TCM_BASE_URL || "",
       tcm_token_secret: creds.TCM_TOKEN_SECRET || "",          // → Key Vault

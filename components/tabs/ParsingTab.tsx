@@ -3,6 +3,7 @@ import { useAgentStore } from "@/stores/agent.store"
 import { useDashboardStore } from "@/stores/dashboard.store"
 import { useParsingStore } from "@/stores/parsing.store"
 import { matchesAgent } from "@/lib/agentNames"
+import { RUN_STATUS_POLL_INTERVAL_MS } from "@/lib/constants"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -596,7 +597,7 @@ export function ParsingTab({ workbookId, projectId: propProjectId, runId: propRu
     };
 
     pullData();
-    intervalId = setInterval(pullData, 5000);
+    intervalId = setInterval(pullData, RUN_STATUS_POLL_INTERVAL_MS);
 
     return () => {
       isMounted = false;

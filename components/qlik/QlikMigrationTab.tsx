@@ -7,6 +7,7 @@ import { semanticKernelService } from "@/services/semanticKernel.service";
 import { QlikService } from "@/services/qlik.service";
 import { fabricService, FabricWorkspace } from "@/services/fabric.service";
 import { withRetry } from "@/lib/api/retry";
+import { RUN_STATUS_POLL_INTERVAL_MS } from "@/lib/constants";
 import { QlikMigrationDashboard } from "@/components/Qlik-Migration-Dashboard/QlikMigrationDashboard/page";
 import { ConfigurationsAndResults } from "@/components/Qlik-Migration-Dashboard/ConfigurationsAndResults/page";
 import { QlikApp, AssessmentData, ParsedData, MappedData, ReportGenerationData } from "@/types/assessment";
@@ -444,7 +445,7 @@ export function QlikMigrationTab() {
       };
 
       while (!runStatusCompleted && !runFailed && !cancelledRef.current && (Date.now() - startTime) < MAX_POLL_TIME) {
-        await new Promise(r => setTimeout(r, 5000));
+        await new Promise(r => setTimeout(r, RUN_STATUS_POLL_INTERVAL_MS));
         if (cancelledRef.current) break;
         try {
           const statusRes = await fetchWithAuth<any>(`/api/qlik/history?email=${encodeURIComponent(userEmail)}&run_id=${encodeURIComponent(actualRunId)}&project_id=${encodeURIComponent(selectedQlikSpace || "personal")}`);

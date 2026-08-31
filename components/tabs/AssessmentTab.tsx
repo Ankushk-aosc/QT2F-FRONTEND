@@ -2142,9 +2142,15 @@ export function AssessmentTab({ selectedWorkbookId, projectId: propProjectId, ru
   const hasCustomSQL = custom_sql_details.length > 0 || semantics?.has_custom_sql || false
   const customSqlCount = semantics?.custom_sql_count || 0
 
+  // Complexity/risk score bands (0-100, higher = riskier). Independent from
+  // the unrelated 0-100 *confidence* score in MappingTab.tsx, where higher
+  // means better -- the two are not the same scale despite both being
+  // percentages, so they intentionally use their own thresholds.
+  const RISK_SCORE_HIGH = 75
+  const RISK_SCORE_MEDIUM = 50
   const getRiskColor = (score: number) => {
-    if (score >= 75) return "destructive"
-    if (score >= 50) return "warning"
+    if (score >= RISK_SCORE_HIGH) return "destructive"
+    if (score >= RISK_SCORE_MEDIUM) return "warning"
     return "success"
   }
 

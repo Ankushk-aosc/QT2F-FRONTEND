@@ -64,6 +64,8 @@ export default function DashboardPage() {
 
   const loadRuns = React.useCallback(async () => {
     if (!email) return
+    // Smaller than DEFAULT_PAGE_SIZE on purpose: this is the dashboard's
+    // "recent runs" preview widget, not the full paged run-history table.
     await fetchRunHistory(email, { page: 1, pageSize: 5 })
   }, [email, fetchRunHistory])
 

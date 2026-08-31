@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
+import { withRetry } from "@/lib/api/retry";
 
 export const dynamic = "force-dynamic";
+
+// Matches the 60s bound used by every other outbound call in the app
+// (lib/fetchWithAuth.ts, lib/api/httpClient.ts) -- this was previously the
+// only outbound fetch in the app with no timeout at all, so a hung Azure
+// OpenAI endpoint could block this route handler indefinitely.
+const AZURE_OPENAI_TIMEOUT_MS = 60000;
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,21 +47,41 @@ DO NOT wrap the response in markdown code blocks like \`\`\`json. Return only th
     const userPrompt = `Please analyze the following Qlik-to-Fabric migration portfolio data and generate the JSON insights:
 ${JSON.stringify(data, null, 2)}`;
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "api-key": apiKey,
-      },
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 1500,
-        response_format: { type: "json_object" },
-      }),
+    const response = await withRetry(async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), AZURE_OPENAI_TIMEOUT_MS);
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "api-key": apiKey,
+          },
+          body: JSON.stringify({
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            temperature: 0.7,
+            max_tokens: 1500,
+            response_format: { type: "json_object" },
+          }),
+          signal: controller.signal,
+        });
+        // Retry on 429s and 5xx -- a transient rate-limit or upstream hiccup,
+        // not a request we should give up on after one try.
+        if (res.status === 429 || res.status >= 500) {
+          throw new Error(`Azure OpenAI request failed with ${res.status}`);
+        }
+        return res;
+      } catch (err: any) {
+        if (err?.name === "AbortError") {
+          throw new Error(`Azure OpenAI request timed out after ${AZURE_OPENAI_TIMEOUT_MS}ms`);
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeoutId);
+      }
     });
 
     if (!response.ok) {

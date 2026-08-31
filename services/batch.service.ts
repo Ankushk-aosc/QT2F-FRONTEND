@@ -2,6 +2,7 @@
 
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { getErrorMessage } from "@/lib/error-handler";
+import { DEFAULT_TABLEAU_TOKEN_NAME } from "@/lib/constants";
 
 export interface BatchItem {
   project_id: string;
@@ -52,7 +53,7 @@ export interface ProcessSitePayload {
   scope?: string;
 }
 
-const FIXED_TOKEN_NAME = "TableauToken";
+const FIXED_TOKEN_NAME = DEFAULT_TABLEAU_TOKEN_NAME;
 
 export type MigrationPayload = InvokeBatchPayload | ProcessSitePayload;
 

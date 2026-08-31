@@ -77,6 +77,7 @@ import { useConnectorReadiness } from "@/hooks/useConnectorReadiness"
 import { MigrationOverview } from "./MigrationOverview"
 import ConfigurationsContent from "./ConfigurationsContent"
 import { isLiteMode } from "@/lib/config"
+import { DEFAULT_TABLEAU_TOKEN_NAME } from "@/lib/constants"
 import dynamic from "next/dynamic"
 
 // PdfReportRenderer is loaded at MigrationTab level (not MigrationOverview)
@@ -269,7 +270,7 @@ export function MigrationTab() {
   const [configTableauUrl, setConfigTableauUrl] = useState("")
   const [configTcmBaseUrl, setConfigTcmBaseUrl] = useState("")
   const [configTcmTokenSecret, setConfigTcmTokenSecret] = useState("")
-  const [configTableauTokenName, setConfigTableauTokenName] = useState("TableauToken")
+  const [configTableauTokenName, setConfigTableauTokenName] = useState(DEFAULT_TABLEAU_TOKEN_NAME)
   const [configTableauTokenValue, setConfigTableauTokenValue] = useState("")
 
   // Fields for the main page
@@ -333,7 +334,7 @@ export function MigrationTab() {
           CONNECTION_NAME: "Configured Connection",
           TABLEAU_SERVER_URL: "",
           TABLEAU_SITE_NAME: "",
-          TABLEAU_TOKEN_NAME: "TableauToken",
+          TABLEAU_TOKEN_NAME: DEFAULT_TABLEAU_TOKEN_NAME,
         };
       }
 
@@ -348,7 +349,7 @@ export function MigrationTab() {
           setCurrentConnectionName(singleCred.CONNECTION_NAME || url);
           setConfigConnectionName(singleCred.CONNECTION_NAME || "");
           setConfigTableauUrl(url);
-          setConfigTableauTokenName(singleCred.TABLEAU_TOKEN_NAME || "TableauToken");
+          setConfigTableauTokenName(singleCred.TABLEAU_TOKEN_NAME || DEFAULT_TABLEAU_TOKEN_NAME);
         } else {
           if (singleCred.TABLEAU_SERVER_URL) {
             setCurrentConnectionName(singleCred.CONNECTION_NAME || singleCred.TABLEAU_SERVER_URL);
@@ -375,7 +376,7 @@ export function MigrationTab() {
           setCurrentConnectionName("")
           setConfigConnectionName("")
           setConfigTableauUrl("")
-          setConfigTableauTokenName("TableauToken")
+          setConfigTableauTokenName(DEFAULT_TABLEAU_TOKEN_NAME)
         }
         setConfigStatus("error")
       }
@@ -425,7 +426,7 @@ export function MigrationTab() {
     setConfigConnectionName("");
     setConfigTableauUrl("");
     setTableauSiteName("");
-    setConfigTableauTokenName("TableauToken");
+    setConfigTableauTokenName(DEFAULT_TABLEAU_TOKEN_NAME);
     setConfigTableauTokenValue("");
     setConfigTcmBaseUrl("");
     setConfigTcmTokenSecret("");
@@ -599,7 +600,7 @@ export function MigrationTab() {
               setCurrentConnectionName(singleCred.CONNECTION_NAME || url);
               setConfigConnectionName(singleCred.CONNECTION_NAME || "");
               setConfigTableauUrl(url);
-              setConfigTableauTokenName(singleCred.TABLEAU_TOKEN_NAME || "TableauToken");
+              setConfigTableauTokenName(singleCred.TABLEAU_TOKEN_NAME || DEFAULT_TABLEAU_TOKEN_NAME);
             } else {
               if (singleCred.TABLEAU_SERVER_URL) {
                 setCurrentConnectionName(singleCred.CONNECTION_NAME || singleCred.TABLEAU_SERVER_URL);
@@ -624,7 +625,7 @@ export function MigrationTab() {
               setCurrentConnectionName("")
               setConfigConnectionName("")
               setConfigTableauUrl("")
-              setConfigTableauTokenName("TableauToken")
+              setConfigTableauTokenName(DEFAULT_TABLEAU_TOKEN_NAME)
             }
           }
         }
@@ -1176,7 +1177,7 @@ export function MigrationTab() {
                   setCurrentConnectionName("");
                   setConfigConnectionName("");
                   setConfigTableauUrl("");
-                  setConfigTableauTokenName("TableauToken");
+                  setConfigTableauTokenName(DEFAULT_TABLEAU_TOKEN_NAME);
                   setConfigTcmBaseUrl("");
                   setConfigTcmTokenSecret("");
                   setConfigTableauTokenValue("");
