@@ -32,10 +32,8 @@ export function QlikMigrationTab() {
     apps,
     setApps,
     processStates,
-    updateProcessState,
     setIsProcessing,
     isProcessing,
-    fetchAgentActions,
   } = useQlikStore();
 
   // Spaces and Apps Selection
@@ -83,27 +81,16 @@ export function QlikMigrationTab() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dropdownDirection, setDropdownDirection] = useState<"down" | "up">("down");
 
-  // One lookup per Fabric workspace per run, not once per app -- validation
-  // needs a lakehouse to check the migrated data against, and there's no
-  // lakehouse picker in this UI yet, so the first lakehouse found in the
-  // selected target workspace is used (mirrors the same "default" pattern
-  // used for the Qlik connection when none is explicitly selected).
-  const lakehouseCacheRef = useRef<Map<string, string | null>>(new Map());
-  const resolveLakehouseId = async (fabricWorkspaceId: string): Promise<string | null> => {
-    if (!fabricWorkspaceId) return null;
-    const cache = lakehouseCacheRef.current;
-    if (cache.has(fabricWorkspaceId)) return cache.get(fabricWorkspaceId) ?? null;
-    try {
-      const lakehouses = await fabricService.getLakehouses(fabricWorkspaceId);
-      const id = lakehouses?.[0]?.id || null;
-      cache.set(fabricWorkspaceId, id);
-      return id;
-    } catch (e) {
-      console.warn("[QlikMigrationTab] Failed to resolve Lakehouse for validation:", e);
-      cache.set(fabricWorkspaceId, null);
-      return null;
-    }
-  };
+  // The status-polling loop in handleStartProcessing runs for up to 25
+  // minutes; now that this tab lives inside a route-based workspace it can
+  // unmount mid-run (navigating away), and without this guard the loop kept
+  // polling in the background regardless.
+  const cancelledRef = useRef(false);
+  useEffect(() => {
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, []);
 
   // Load the pickers' options. The Qlik connection itself is not loaded here —
   // it is configured in Settings and read from the connector store by the
@@ -456,8 +443,9 @@ export function QlikMigrationTab() {
          }
       };
 
-      while (!runStatusCompleted && !runFailed && (Date.now() - startTime) < MAX_POLL_TIME) {
+      while (!runStatusCompleted && !runFailed && !cancelledRef.current && (Date.now() - startTime) < MAX_POLL_TIME) {
         await new Promise(r => setTimeout(r, 5000));
+        if (cancelledRef.current) break;
         try {
           const statusRes = await fetchWithAuth<any>(`/api/qlik/history?email=${encodeURIComponent(userEmail)}&run_id=${encodeURIComponent(actualRunId)}&project_id=${encodeURIComponent(selectedQlikSpace || "personal")}`);
           const items = Array.isArray(statusRes) ? statusRes : (statusRes?.data || statusRes?.items || statusRes?.records || statusRes?.runs || []);
@@ -508,7 +496,7 @@ export function QlikMigrationTab() {
       if (runCancelled) {
          throw new Error("Migration run was cancelled.");
       }
-      
+
       // Do not throw a fatal error if Assessment or Parsing data was successfully fetched,
       // so that the UI can still display partial results even if Mapping/Overall failed.
       const hasPartialResults = fetchedStages.assessment || fetchedStages.parsing;
@@ -517,217 +505,28 @@ export function QlikMigrationTab() {
       } else if (runFailed && hasPartialResults) {
          console.warn("[QlikMigrationTab] Run failed globally, but displaying partial fetched results. Error:", errorMessage);
       }
-      
-      if (!runStatusCompleted && !hasPartialResults) {
+
+      // The tab was unmounted (route navigation) mid-poll, not a real
+      // timeout -- nothing left mounted to show an error on.
+      if (!runStatusCompleted && !hasPartialResults && !cancelledRef.current) {
          throw new Error("Migration run timed out waiting for completion.");
       }
 
     } catch (err: any) {
+      if (cancelledRef.current) return;
       console.error("[QlikMigrationTab] Migration error:", err);
       // Surface detailed backend errors if provided
       const details = err.details || err.detail;
       const errorMsg = details ? `${err.message || 'Migration failed'}: ${typeof details === 'object' ? JSON.stringify(details) : details}` : formatApiErrorMessage(err.message || err);
       setGlobalError(errorMsg);
     } finally {
+      if (cancelledRef.current) return;
       setIsProcessing(false);
       setIsProcessCompleted(true);
       setHasProcessed(true);
       if (selectedApps.length > 0) {
         setDropdownAppId(selectedApps[0]);
       }
-    }
-  };
-
-  // Single app sequential execution
-  // `qlikSpaceId` is the Qlik space the app belongs to and is what the
-  // Assessment and Parsing APIs mean by `workspace_id`. It is distinct from
-  // `workspaceName`, which names the *Fabric* target workspace and was
-  // previously being sent as the Qlik workspace id.
-  const processAppSequence = async (
-    app: QlikApp,
-    workspaceName: string,
-    qlikSpaceId: string,
-    runId: string,
-    spaceName: string,
-    fabricGroupId: string
-  ) => {
-    const appId = app.id;
-    
-    // Generate folder name
-    const timestamp = new Date().toISOString().replace(/[-:T]/g, "").split(".")[0];
-    const folderName = `${app.name.replace(/\s+/g, "_")}_${timestamp}`;
-
-    // Initialize state
-    updateProcessState(appId, "assessment", { status: "running" });
-    updateProcessState(appId, "parsing", { status: "pending" });
-    updateProcessState(appId, "mapping", { status: "pending" });
-    updateProcessState(appId, "reportGeneration", { status: "pending" });
-    updateProcessState(appId, "validation", { status: "pending" });
-
-    // Add initial results shell
-    setApiResults((prev) => [
-      ...prev.filter((r) => r.appId !== appId),
-      { appId, appName: app.name, folderName },
-    ]);
-
-    // Active log poller ref
-    let isPolling = true;
-
-    // Start logs poller
-    const pollLogs = async (agentName: string) => {
-      while (isPolling) {
-        try {
-          await fetchAgentActions(appId, folderName, agentName);
-        } catch (e) {
-          // Silent log error
-        }
-        await new Promise((r) => setTimeout(r, 2500));
-      }
-    };
-
-    try {
-      // No "unbuild" pre-fetch step: vl-q2f-assessment and vl-q2f-parsing
-      // fetch Qlik app data themselves server-side and their request
-      // schemas have no field to accept caller-supplied data -- the
-      // pre-fetch was silently discarded downstream (and its own endpoint,
-      // /all/:appId on qlik-base-api, doesn't exist, so it never even
-      // returned real data). Removed rather than kept as dead weight.
-
-      // 1. Assessment
-      pollLogs("assessment");
-      const assessmentData = await QlikService.runAssessment(appId, folderName, qlikSpaceId, app.name);
-      isPolling = false;
-      await fetchAgentActions(appId, folderName, "assessment");
-      updateProcessState(appId, "assessment", { status: "completed", result: assessmentData });
-      setApiResults((prev) =>
-        prev.map((r) => (r.appId === appId ? { ...r, assessmentData } : r))
-      );
-
-      const rawAssessment: any = assessmentData;
-      const normalizedAssessment = {
-        run_id: runId,
-        workbook_id: appId,
-        workbook_name: app.name,
-        project_id: qlikSpaceId,
-        project_name: spaceName,
-        status: "completed",
-        payload: rawAssessment?.payload || rawAssessment?.data || rawAssessment,
-        results: rawAssessment?.results || rawAssessment?.payload?.results || rawAssessment?.data?.results || (Array.isArray(rawAssessment) ? rawAssessment : []),
-      };
-      useAgentStore.getState().setAssessmentData(runId, appId, normalizedAssessment);
-      useAgentStore.setState((s) => ({
-        assessmentActivitiesDone: { ...s.assessmentActivitiesDone, [appId]: true },
-      }));
-
-      // 2. Parsing
-      isPolling = true;
-      pollLogs("parsing");
-      updateProcessState(appId, "parsing", { status: "running" });
-      const parsedData = await QlikService.runParsing(appId, folderName, qlikSpaceId, app.name);
-      isPolling = false;
-      await fetchAgentActions(appId, folderName, "parsing");
-      updateProcessState(appId, "parsing", { status: "completed", result: parsedData });
-      setApiResults((prev) =>
-        prev.map((r) => (r.appId === appId ? { ...r, parsedData } : r))
-      );
-
-      const rawParsed: any = (parsedData as any)?.data || (parsedData as any)?.payload || parsedData;
-      const mappedParsed = mapParsingPayload(rawParsed);
-      useParsingStore.setState((s) => ({
-        parsingData: { ...s.parsingData, [appId]: mappedParsed },
-        parsingRaw: { ...s.parsingRaw, [appId]: rawParsed },
-      }));
-      useAgentStore.setState((s) => ({
-        parsingActivitiesDone: { ...s.parsingActivitiesDone, [appId]: true },
-      }));
-
-      // 3. Mapping
-      isPolling = true;
-      pollLogs("mapping");
-      updateProcessState(appId, "mapping", { status: "running" });
-      const mappedData = await QlikService.runMapping(appId, folderName, qlikSpaceId, app.name);
-      isPolling = false;
-      await fetchAgentActions(appId, folderName, "mapping");
-      updateProcessState(appId, "mapping", { status: "completed", result: mappedData });
-      setApiResults((prev) =>
-        prev.map((r) => (r.appId === appId ? { ...r, mappedData } : r))
-      );
-
-      const rawMapping: any = (mappedData as any)?.data || (mappedData as any)?.payload || mappedData;
-      useMappingStore.setState((s) => ({
-        mappingData: { ...s.mappingData, [appId]: rawMapping },
-        mappingRaw: { ...s.mappingRaw, [appId]: rawMapping },
-      }));
-      useAgentStore.setState((s) => ({
-        mappingActivitiesDone: { ...s.mappingActivitiesDone, [appId]: true },
-      }));
-
-      // 4. Report Generation
-      isPolling = true;
-      pollLogs("reportGeneration");
-      updateProcessState(appId, "reportGeneration", { status: "running" });
-      const reportGenData = await QlikService.runReportGeneration(
-        appId,
-        folderName,
-        qlikSpaceId,
-        app.name,
-        undefined,
-        fabricGroupId
-      );
-      isPolling = false;
-      await fetchAgentActions(appId, folderName, "reportGeneration");
-      updateProcessState(appId, "reportGeneration", { status: "completed", result: reportGenData });
-      setApiResults((prev) =>
-        prev.map((r) => (r.appId === appId ? { ...r, reportGenData } : r))
-      );
-
-      const rawGen: any = (reportGenData as any)?.data || (reportGenData as any)?.payload || reportGenData;
-      useGenerationStore.setState((s) => ({
-        generationData: { ...s.generationData, [appId]: rawGen },
-        generationRaw: { ...s.generationRaw, [appId]: rawGen },
-      }));
-      useAgentStore.setState((s) => ({
-        generationActivitiesDone: { ...s.generationActivitiesDone, [appId]: true },
-      }));
-
-      // 5. Validation (best-effort — does not fail the run: the migration
-      // already succeeded by this point, validation only checks it).
-      isPolling = true;
-      pollLogs("validation");
-      updateProcessState(appId, "validation", { status: "running" });
-      try {
-        const lakehouseId = await resolveLakehouseId(fabricGroupId);
-        if (lakehouseId) {
-          const validationData = await QlikService.runValidation(appId, folderName, qlikSpaceId, lakehouseId);
-          isPolling = false;
-          await fetchAgentActions(appId, folderName, "validation");
-          updateProcessState(appId, "validation", { status: "completed", result: validationData });
-        } else {
-          isPolling = false;
-          updateProcessState(appId, "validation", {
-            status: "skipped",
-            error: "No Fabric Lakehouse found in the target workspace to validate against.",
-          });
-        }
-      } catch (valErr: any) {
-        isPolling = false;
-        await fetchAgentActions(appId, folderName, "validation");
-        updateProcessState(appId, "validation", { status: "failed", error: formatApiErrorMessage(valErr.message) });
-      }
-
-    } catch (err: any) {
-      isPolling = false;
-      console.error(`Execution failed for ${app.name}:`, err);
-      
-      // Fail remaining stages with clean error
-      const stages = ["assessment", "parsing", "mapping", "reportGeneration", "validation"] as const;
-      const cleanError = formatApiErrorMessage(err.message);
-      stages.forEach((stage) => {
-        if (processStates[appId]?.[stage]?.status !== "completed") {
-          updateProcessState(appId, stage, { status: "failed", error: cleanError });
-        }
-      });
-      throw err;
     }
   };
 

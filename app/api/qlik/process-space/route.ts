@@ -28,12 +28,12 @@ export interface ProcessQlikSpaceRequest {
  * Resolves the server_url for a given connection_id by looking it up from the
  * records API (/qlik endpoint). The process-space backend requires this field.
  */
-async function resolveServerUrl(connectionId: string): Promise<string | null> {
+async function resolveServerUrl(connectionId: string, authHeader: string): Promise<string | null> {
   try {
     const base = getRecordsApiBaseUrl();
     const res = await fetch(`${base}/qlik`, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: authHeader },
     });
     if (!res.ok) return null;
     const connections: any[] = await res.json();
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
   // payload — the backend requires this field even when connection_id is present.
   let serverUrl: string | null = null;
   if (body.connection_id) {
-    serverUrl = await resolveServerUrl(body.connection_id);
+    serverUrl = await resolveServerUrl(body.connection_id, authHeader!);
   }
 
   // Seed the server-held refresh token so long runs can renew Fabric/OneLake
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
     const base = getRecordsApiBaseUrl();
     const res = await fetch(`${base}/qlik/process-space`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: authHeader! },
       body: JSON.stringify(payload),
     });
 

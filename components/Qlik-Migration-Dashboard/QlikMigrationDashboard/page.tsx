@@ -11,6 +11,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { MigrationScope } from "@/lib/api/runContract";
 import { isLiteMode, isPartialProcessing } from "@/lib/config";
+import { isFailedStage } from "@/lib/agentStatus";
 import { QlikUrlConfigContent } from "@/components/Qlik-Migration-Dashboard/QlikUrlConfig/page";
 import { QlikConnectionConfigContent } from "@/components/Qlik-Migration-Dashboard/QlikConnectionConfig/page";
 import { QlikSpaceSelectorContent } from "@/components/Qlik-Migration-Dashboard/QlikSpaceSelector/page";
@@ -211,22 +212,26 @@ export function QlikMigrationDashboard(props: QlikMigrationDashboardProps) {
   const hasSpentRun = !!props.currentRunId && !isRunInFlight && !props.isStarting;
   const isRestart = props.isProcessCompleted || hasSpentRun;
 
+  // Uses the shared isFailedStage helper (lib/agentStatus.ts) rather than a
+  // raw `status === "failed"` check, so a Lite Mode skip (stored as a
+  // "failed" stage with a "Skipped — ..." error) isn't reported as a real
+  // failure here while the Monitoring tab correctly excludes it.
   const isFailed = React.useMemo(() => {
     if (props.globalError) return true;
     if (!props.processStates) return false;
     return Object.values(props.processStates).some((appState: any) =>
-      Object.values(appState || {}).some((stage: any) => stage?.status === "failed")
+      Object.values(appState || {}).some((stage: any) => isFailedStage(stage))
     );
   }, [props.globalError, props.processStates]);
 
   const failedStageName = React.useMemo(() => {
     if (!props.processStates) return "Migration Failed";
     for (const appState of Object.values(props.processStates) as any[]) {
-      if (appState?.mapping?.status === "failed") return "Mapping Failed";
-      if (appState?.parsing?.status === "failed") return "Parsing Failed";
-      if (appState?.assessment?.status === "failed") return "Assessment Failed";
-      if (appState?.reportGeneration?.status === "failed") return "Report Generation Failed";
-      if (appState?.validation?.status === "failed") return "Validation Failed";
+      if (isFailedStage(appState?.mapping)) return "Mapping Failed";
+      if (isFailedStage(appState?.parsing)) return "Parsing Failed";
+      if (isFailedStage(appState?.assessment)) return "Assessment Failed";
+      if (isFailedStage(appState?.reportGeneration)) return "Report Generation Failed";
+      if (isFailedStage(appState?.validation)) return "Validation Failed";
     }
     return "Migration Failed";
   }, [props.processStates]);

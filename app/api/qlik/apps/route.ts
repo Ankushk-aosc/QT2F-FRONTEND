@@ -24,32 +24,26 @@ export async function GET(req: NextRequest) {
     // 1. If connectionId is passed, try to fetch connection details from records DB
     if (connectionId) {
       try {
-        const connRes = await fetch(`https://mongo-db-k15s.onrender.com/qlik/${connectionId}`, {
-          headers: { Authorization: authHeader, "Content-Type": "application/json" },
-          cache: "no-store",
+        const connData = await httpClient.get<any>(`/qlik/${connectionId}`, {
+          apiType: "records",
+          headers: { Authorization: authHeader },
         });
-        if (connRes.ok) {
-          const connData = await connRes.json();
-          qlikApiKey = connData.api_key || connData.QLIK_API_KEY || "";
-        }
-      } catch (e) {
-        console.warn("[API /api/qlik/apps] Failed to fetch connection details for ID:", connectionId, e);
+        qlikApiKey = connData?.api_key || connData?.QLIK_API_KEY || "";
+      } catch (e: any) {
+        console.warn("[API /api/qlik/apps] Failed to fetch connection details for ID:", connectionId, e.message);
       }
     }
 
     // 2. Fallback to default secret if specific connection key wasn't found
     if (!qlikApiKey) {
       try {
-        const secretRes = await fetch("https://mongo-db-k15s.onrender.com/secrets/default_qlik_tenant-api-key", {
-          headers: { "Content-Type": "application/json" },
-          cache: "no-store",
+        const secretData = await httpClient.get<any>("/secrets/default_qlik_tenant-api-key", {
+          apiType: "records",
+          forwardHeaders: false,
         });
-        if (secretRes.ok) {
-          const secretData = await secretRes.json();
-          qlikApiKey = secretData.value || "";
-        }
-      } catch (e) {
-        console.warn("[API /api/qlik/apps] Failed to fetch Qlik API key from secrets:", e);
+        qlikApiKey = secretData?.value || "";
+      } catch (e: any) {
+        console.warn("[API /api/qlik/apps] Failed to fetch Qlik API key from secrets:", e.message);
       }
     }
 

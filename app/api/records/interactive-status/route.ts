@@ -18,11 +18,19 @@ export async function GET(request: Request) {
       cache: "no-store",
     });
 
+    const data = await response.json().catch(() => null);
+
     if (!response.ok) {
-      throw new Error(`Backend responded with ${response.status}`);
+      // Passing the backend's real status through (rather than collapsing
+      // everything to 500) lets callers tell "not configured yet" (404) apart
+      // from an actual failure — see RecordsService.getInteractiveStatus.
+      console.error(`[API Records] GET backend responded with ${response.status}`);
+      return NextResponse.json(
+        data ?? { error: `Backend responded with ${response.status}` },
+        { status: response.status }
+      );
     }
 
-    const data = await response.json();
     return NextResponse.json(data);
   } catch (error: any) {
     console.error("[API Records] GET Error:", error);
@@ -46,13 +54,17 @@ export async function PATCH(request: Request) {
     });
 
     if (!response.ok) {
-        let errorText = "";
+        let errorBody: any = null;
         try {
-            errorText = await response.text();
+            errorBody = await response.json();
         } catch {
             // ignore
         }
-      throw new Error(`Backend responded with ${response.status}: ${errorText}`);
+      console.error(`[API Records] PATCH backend responded with ${response.status}`);
+      return NextResponse.json(
+        errorBody ?? { error: `Backend responded with ${response.status}` },
+        { status: response.status }
+      );
     }
 
     const data = await response.json();
