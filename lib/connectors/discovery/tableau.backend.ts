@@ -70,12 +70,13 @@ function credentialFields(context: DiscoveryContext): Record<string, string> {
     email: context.userEmail,
     TABLEAU_SERVER_URL: String(values.serverUrl ?? ""),
     TABLEAU_SITE_NAME: String(values.site ?? ""),
-    TABLEAU_TOKEN_NAME: String(values.patName ?? "TableauToken"),
+    TABLEAU_TOKEN_NAME: String(values.patName || "token"),
     server_url: String(values.serverUrl ?? ""),
     site_name: String(values.site ?? ""),
-    token_name: String(values.patName ?? "TableauToken"),
+    token_name: String(values.patName || "token"),
     tableau_server_url: String(values.serverUrl ?? ""),
     tableau_site_name: String(values.site ?? ""),
+    tableau_token_name: String(values.patName || "token"),
   };
 
   const secret = context.secrets.patSecret;
@@ -159,7 +160,7 @@ async function registerConnection(context: DiscoveryContext): Promise<string> {
     connection_name: context.connection.connectionName || "Tableau",
     tableau_server_url: String(values.serverUrl ?? ""),
     tableau_site_name: String(values.site ?? ""),
-    tableau_token_name: String(values.patName ?? "TableauToken"),
+    tableau_token_name: String(values.patName || "token"),
     tcm_base_url: env === "cloud" ? String(values.tcmBaseUrl ?? "") : "",
   };
 
