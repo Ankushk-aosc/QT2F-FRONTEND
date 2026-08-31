@@ -75,7 +75,10 @@ class TableauService {
           TABLEAU_SERVER_URL: c.tableau_server_url || c.TABLEAU_SERVER_URL || "",
           TABLEAU_SITE_NAME: c.tableau_site_name || c.TABLEAU_SITE_NAME || "",
           TABLEAU_TOKEN_NAME: c.tableau_token_name || c.TABLEAU_TOKEN_NAME || "TableauToken",
-          TCM_BASE_URL: c.tcm_base_url || c.TCM_BASE_URL || "",
+          TCM_BASE_URL: c.tcm_base_url || c.TCM_BASE_URL || c.tcmBaseUrl || "",
+          tcm_base_url: c.tcm_base_url || c.TCM_BASE_URL || c.tcmBaseUrl || "",
+          TCM_TOKEN_SECRET: c.tcm_token_secret || c.TCM_TOKEN_SECRET || c.tcmTokenSecret || "",
+          tcm_token_secret: c.tcm_token_secret || c.TCM_TOKEN_SECRET || c.tcmTokenSecret || "",
           connection_id: c.id || c.connection_id || "",
         }));
         if (mapped.length > 0) {
@@ -102,45 +105,79 @@ class TableauService {
   }
 
   async getSites(tcmBaseUrl: string, env: "cloud" | "server" | "cloud_trial" = "cloud", creds?: TableauCredentials): Promise<Site[]> {
-    // Cloud Trial: no TCM, no site listing — user provides site name directly
-    if (env === "cloud_trial") {
-      return []; // No sites to list; user enters site name manually
+    const credsAny = creds as any;
+    const effectiveTcmBaseUrl = tcmBaseUrl || credsAny?.TCM_BASE_URL || credsAny?.tcm_base_url || credsAny?.tcmBaseUrl || "";
+    const effectiveTcmSecret = credsAny?.TCM_TOKEN_SECRET || credsAny?.tcm_token_secret || credsAny?.tcmTokenSecret || "";
+    const siteName = creds?.TABLEAU_SITE_NAME || credsAny?.tableau_site_name || "";
+
+    // If env is cloud_trial or if TCM base URL / secret are not provided, return connection site directly
+    if (env === "cloud_trial" || (env === "cloud" && (!effectiveTcmBaseUrl || !effectiveTcmSecret))) {
+      console.log("[Tableau Service] TCM credentials omitted. Returning site from connection credentials:", siteName || "Default");
+      const fallbackSite = siteName || "Default";
+      return [{ id: fallbackSite, name: fallbackSite }];
     }
 
     const endpoint = env === "server" ? "/api/tableau/server-sites" : "/api/tableau/get-all-tenant-sites";
     const method = "POST";
-    
     const isCloudURL = creds?.TABLEAU_SERVER_URL?.includes("online.tableau.com") || creds?.TABLEAU_SERVER_URL?.includes("tableau.com");
-    
+
     const body: any = env === "server" ? {
       TABLEAU_SERVER_URL: (!isCloudURL && creds?.TABLEAU_SERVER_URL) ? creds.TABLEAU_SERVER_URL : "",
       TABLEAU_SITE_NAME: creds?.TABLEAU_SITE_NAME || "",
       action: "get_sites"
     } : { 
-      tcm_base_url: tcmBaseUrl
+      tcm_base_url: effectiveTcmBaseUrl,
+      TCM_BASE_URL: effectiveTcmBaseUrl,
+      tcm_token_secret: effectiveTcmSecret,
+      TCM_TOKEN_SECRET: effectiveTcmSecret,
     };
 
+    console.log("[Tableau Service] getSites body prepared:", {
+      endpoint,
+      env,
+      tcm_base_url: env === "cloud" ? effectiveTcmBaseUrl.substring(0, 50) : "N/A",
+      has_connection_id: !!creds?.connection_id,
+      has_tcm_token_secret: !!effectiveTcmSecret,
+    });
+
+    // Always pass connection_id if available — backend will retrieve credentials from Key Vault
     if (creds?.connection_id) {
       body.connection_id = creds.connection_id;
-    } else {
-      if (env === "server") {
-        body.TABLEAU_TOKEN_NAME = creds?.TABLEAU_TOKEN_NAME || "TableauToken";
-        body.TABLEAU_TOKEN_VALUE = creds?.TABLEAU_TOKEN_VALUE || "";
-      } else {
-        body.tcm_token_secret = creds?.TCM_TOKEN_SECRET || "";
-      }
     }
-    const data = await fetchWithAuth<any>(endpoint, {
-      method,
-      headers: { "x-tableau-environment": env },
-      body: JSON.stringify(body)
-    });
     
-    const sitesArr = data.sites || (Array.isArray(data) ? data : []);
-    return sitesArr.map((s: any) => ({
-      id: s.id || s.site_id || s.siteId || "",
-      name: s.name || s.site_name || s.contentUrl || ""
-    }));
+    if (env === "server") {
+      body.TABLEAU_TOKEN_NAME = creds?.TABLEAU_TOKEN_NAME || "TableauToken";
+      body.TABLEAU_TOKEN_VALUE = creds?.TABLEAU_TOKEN_VALUE || "";
+    }
+    try {
+      const data = await fetchWithAuth<any>(endpoint, {
+        method,
+        headers: { "x-tableau-environment": env },
+        body: JSON.stringify(body)
+      });
+      
+      const sitesArr = data.sites || (Array.isArray(data) ? data : []);
+      if (sitesArr.length > 0) {
+        return sitesArr.map((s: any) => ({
+          id: s.id || s.site_id || s.siteId || "",
+          name: s.name || s.site_name || s.contentUrl || ""
+        }));
+      }
+      if (creds?.TABLEAU_SITE_NAME) {
+        return [{ id: creds.TABLEAU_SITE_NAME, name: creds.TABLEAU_SITE_NAME }];
+      }
+      return [];
+    } catch (err: any) {
+      const errMsg = err?.message || "";
+      if (errMsg.includes("No TCM token secret") || errMsg.includes("base URL found") || errMsg.includes("400")) {
+        console.warn("[TableauService] TCM credentials missing or incomplete for tenant site listing. Returning fallback site from connection.");
+        if (creds?.TABLEAU_SITE_NAME) {
+          return [{ id: creds.TABLEAU_SITE_NAME, name: creds.TABLEAU_SITE_NAME }];
+        }
+        return [];
+      }
+      throw err;
+    }
   }
 
   async getProjects(serverUrl: string, email: string, siteName: string, env: "cloud" | "server" | "cloud_trial" = "cloud", creds?: TableauCredentials, siteId?: string, folderName?: string, groupId?: string): Promise<Project[]> {
@@ -148,7 +185,9 @@ class TableauService {
     const endpoint = effectiveEnv === "server" ? "/api/tableau/server-projects" : "/api/tableau/propagate-tableau-details";
     const isCloudURL = creds?.TABLEAU_SERVER_URL?.includes("online.tableau.com") || creds?.TABLEAU_SERVER_URL?.includes("tableau.com");
 
-    const payload: any = effectiveEnv === "server" ? {
+    const payload: any = creds?.connection_id ? {
+      connection_id: creds.connection_id
+    } : (effectiveEnv === "server" ? {
       TABLEAU_SERVER_URL: isCloudURL ? "" : serverUrl,
       site_id: siteId || ""
     } : {
@@ -160,11 +199,9 @@ class TableauService {
       project_id: creds?.PROJECT_ID || "",
       folder_name: folderName || "",
       group_id: groupId || ""
-    };
+    });
 
-    if (creds?.connection_id) {
-      payload.connection_id = creds.connection_id;
-    } else {
+    if (!creds?.connection_id) {
       const tName = creds?.TABLEAU_TOKEN_NAME || "TableauToken";
       const tValue = creds?.TABLEAU_TOKEN_VALUE;
       if (effectiveEnv === "server") {
@@ -194,7 +231,10 @@ class TableauService {
     const endpoint = effectiveEnv === "server" ? "/api/tableau/server-workbooks" : "/api/tableau/workbooks";
     const isCloudURL = creds?.TABLEAU_SERVER_URL?.includes("online.tableau.com") || creds?.TABLEAU_SERVER_URL?.includes("tableau.com");
 
-    const payload: any = effectiveEnv === "server" ? {
+    const payload: any = creds?.connection_id ? {
+      connection_id: creds.connection_id,
+      PROJECT_ID: [projectId]
+    } : (effectiveEnv === "server" ? {
       TABLEAU_SERVER_URL: isCloudURL ? "" : serverUrl,
       site_id: siteId || "",
       project_id: projectId
@@ -202,12 +242,11 @@ class TableauService {
       tableau_server_url: serverUrl,
       tableau_site_name: siteName,
       project_id: projectId,
+      PROJECT_ID: [projectId],
       email: email
-    };
+    });
 
-    if (creds?.connection_id) {
-      payload.connection_id = creds.connection_id;
-    } else {
+    if (!creds?.connection_id) {
       const tName = creds?.TABLEAU_TOKEN_NAME || "TableauToken";
       const tValue = creds?.TABLEAU_TOKEN_VALUE;
       if (effectiveEnv === "server") {

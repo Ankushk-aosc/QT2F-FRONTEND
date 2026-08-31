@@ -67,18 +67,22 @@ function credentialFields(context: DiscoveryContext): Record<string, string> {
   const values = context.connection.values;
 
   const fields: Record<string, string> = {
+    email: context.userEmail,
     TABLEAU_SERVER_URL: String(values.serverUrl ?? ""),
     TABLEAU_SITE_NAME: String(values.site ?? ""),
     TABLEAU_TOKEN_NAME: String(values.patName ?? "TableauToken"),
     server_url: String(values.serverUrl ?? ""),
     site_name: String(values.site ?? ""),
     token_name: String(values.patName ?? "TableauToken"),
+    tableau_server_url: String(values.serverUrl ?? ""),
+    tableau_site_name: String(values.site ?? ""),
   };
 
   const secret = context.secrets.patSecret;
   if (secret) {
     fields.TABLEAU_TOKEN_VALUE = secret;
     fields.token_value = secret;
+    fields.tableau_token_value = secret;
   }
 
   const connectionId = String(values.connectionId ?? "");
@@ -159,14 +163,29 @@ async function registerConnection(context: DiscoveryContext): Promise<string> {
     tcm_base_url: env === "cloud" ? String(values.tcmBaseUrl ?? "") : "",
   };
 
+  console.log("[Tableau registerConnection] Preparing payload:", {
+    env_type: payload.env_type,
+    connection_name: payload.connection_name,
+    tableau_server_url: payload.tableau_server_url.substring(0, 50),
+    tableau_site_name: payload.tableau_site_name,
+    tableau_token_name: payload.tableau_token_name,
+    hasTokenSecret: !!context.secrets.patSecret,
+    existingId: existingId || "new",
+  });
+
   // Secrets are only sent when the administrator supplied a new one. Omitting
   // them on an edit leaves the stored credential untouched rather than
   // overwriting it with a blank.
   if (context.secrets.patSecret) {
     payload.tableau_token_value = context.secrets.patSecret;
+    console.log("[Tableau registerConnection] ✓ Token secret included in payload");
+  } else {
+    console.warn("[Tableau registerConnection] ⚠ WARNING: No token secret found! This will fail authentication.");
   }
+  
   if (env === "cloud" && context.secrets.tcmTokenSecret) {
     payload.tcm_token_secret = context.secrets.tcmTokenSecret;
+    console.log("[Tableau registerConnection] ✓ TCM token secret included in payload");
   }
 
   // `skipPayloadIntercept` is essential here, not an optimisation. The default
@@ -181,10 +200,12 @@ async function registerConnection(context: DiscoveryContext): Promise<string> {
   };
 
   if (existingId) {
+    console.log("[Tableau registerConnection] Updating existing connection:", existingId);
     await httpClient.patch(`/connections/${encodeURIComponent(existingId)}`, payload, options);
     return existingId;
   }
 
+  console.log("[Tableau registerConnection] Creating new connection...");
   await httpClient.post("/connections", payload, options);
 
   // The create response shape is not guaranteed to carry the id, so it is read
@@ -203,6 +224,7 @@ async function registerConnection(context: DiscoveryContext): Promise<string> {
       "The connection was created but the backend did not return an id for it, so it cannot be used for a migration.",
     );
   }
+  console.log("[Tableau registerConnection] ✓ Connection registered with id:", resolved);
   return resolved;
 }
 
@@ -225,9 +247,22 @@ function asArray<T>(payload: unknown, ...keys: string[]): T[] {
 }
 
 async function fetchProjects(context: DiscoveryContext): Promise<TableauProject[]> {
+  const credFields = credentialFields(context);
+  const payload = { ...credFields, source_type: isCloud(context) ? "cloud" : "server" };
+  
+  console.log("[Tableau fetchProjects] Payload being sent:", {
+    email: credFields.email,
+    tableau_server_url: credFields.tableau_server_url?.substring(0, 50),
+    tableau_site_name: credFields.tableau_site_name,
+    tableau_token_name: credFields.tableau_token_name,
+    hasTableauTokenValue: !!credFields.tableau_token_value,
+    hasConnectionId: !!credFields.connection_id,
+    source_type: payload.source_type,
+  });
+
   const data = await httpClient.post<unknown>(
     "/propagate-tableau-details",
-    { ...credentialFields(context), source_type: isCloud(context) ? "cloud" : "server" },
+    payload,
     { apiType: "tableau", headers: requestHeaders(context), skipPayloadIntercept: true },
   );
   return asArray<TableauProject>(data, "projects");
@@ -271,12 +306,25 @@ export const tableauBackendAdapter: DiscoveryAdapter = {
   async test(context: DiscoveryContext): Promise<ConnectionTestResult> {
     let connectionId: string;
 
+    // Log what we're trying to register
+    const values = context.connection.values;
+    console.log("[Tableau Discovery] Testing connection with:", {
+      serverUrl: String(values.serverUrl ?? "").substring(0, 50),
+      site: String(values.site ?? ""),
+      patName: String(values.patName ?? "TableauToken"),
+      hasPatSecret: !!context.secrets.patSecret,
+      envType: envType(context),
+      userEmail: context.userEmail,
+    });
+
     // Registration is a precondition, not a best-effort step, so its failure is
     // reported on its own terms rather than as a Tableau authentication
     // problem. Without an id there is nothing a migration could run against.
     try {
       connectionId = await registerConnection(context);
+      console.log("[Tableau Discovery] Connection registered with id:", connectionId);
     } catch (error) {
+      console.error("[Tableau Discovery] Registration failed:", error);
       return {
         ok: false,
         message: toErrorMessage(
@@ -300,10 +348,14 @@ export const tableauBackendAdapter: DiscoveryAdapter = {
         },
       };
 
+      console.log("[Tableau Discovery] Verifying credentials by listing projects...");
+
       // Listing projects is the cheapest call that proves the token, the site
       // and the server URL are all correct together.
       const projects = await fetchProjects(verifyContext);
       const site = String(verifyContext.connection.values.site ?? "");
+
+      console.log("[Tableau Discovery] ✓ Authentication successful, found projects:", projects.length);
 
       return {
         ok: true,
@@ -314,12 +366,24 @@ export const tableauBackendAdapter: DiscoveryAdapter = {
         values: { connectionId },
       };
     } catch (error) {
+      console.error("[Tableau Discovery] Authentication verification failed:", error);
+      
+      // Provide specific guidance based on error
+      let message = "Could not reach Tableau. Check the server URL, site and personal access token.";
+      if (error instanceof Error) {
+        const errorMsg = error.message.toLowerCase();
+        if (errorMsg.includes("401") || errorMsg.includes("unauthorized")) {
+          message = "Authentication failed: Check your Personal Access Token name and secret. Ensure they match exactly what you created in Tableau.";
+        } else if (errorMsg.includes("site")) {
+          message = "Site verification failed: Check that the Site name (content URL) is correct.";
+        } else if (errorMsg.includes("url") || errorMsg.includes("server")) {
+          message = "Server connection failed: Check that the Server URL is correct and accessible from this network.";
+        }
+      }
+      
       return {
         ok: false,
-        message: toErrorMessage(
-          error,
-          "Could not reach Tableau. Check the server URL, site and personal access token.",
-        ),
+        message: toErrorMessage(error, message),
       };
     }
   },

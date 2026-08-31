@@ -3,7 +3,7 @@
 // ðŸš¨ MUST accept: email, tableau_server_url, tableau_site_name, project_id
 
 import { NextRequest, NextResponse } from "next/server";
-import { httpPost, errorResponse } from "@/lib/api/httpClient";
+import { httpPost, httpClient, errorResponse } from "@/lib/api/httpClient";
 
 export const dynamic = 'force-dynamic';
 
@@ -55,15 +55,16 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // Validate required fields per MANDATORY contract
+    // Validate required fields: project_id is mandatory, server URL & site name only if no connection_id
     const missing: string[] = [];
-    if (!body.email?.trim()) missing.push("email");
-    if (!body.tableau_server_url?.trim()) missing.push("tableau_server_url");
-    if (!body.tableau_site_name?.trim()) missing.push("tableau_site_name");
     if (!body.project_id) missing.push("project_id");
+    if (!body.connection_id) {
+      if (!body.tableau_server_url?.trim()) missing.push("tableau_server_url");
+      if (!body.tableau_site_name?.trim()) missing.push("tableau_site_name");
+    }
 
     if (missing.length > 0) {
-      console.error(`[API /api/tableau/workbooks] âŒ Missing fields: ${missing.join(", ")}`);
+      console.error(`[API /api/tableau/workbooks] ❌ Missing fields: ${missing.join(", ")}`);
       return NextResponse.json(
         {
           error: `Missing required fields: ${missing.join(", ")}`,
@@ -90,26 +91,62 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log(`[API /api/tableau/workbooks] Request for ${projectIds.length} project(s) from ${body.email}`);
+    console.log(`[API /api/tableau/workbooks] Request for ${projectIds.length} project(s)`);
 
     // Forward Authorization header
     const forwardHeaders: Record<string, string> = {
       Authorization: authHeader,
     };
 
-    // Build backend request body
+    let serverUrl = body.tableau_server_url?.trim() || "";
+    let siteName = body.tableau_site_name?.trim() || "";
+    let tokenName = body.tableau_token_name?.trim() || "";
+
+    // Fallback: If connection_id is passed, auto-resolve connection metadata from MongoDB
+    if (body.connection_id && (!serverUrl || !siteName || !tokenName)) {
+        try {
+            const connRes = await httpClient.get<any>("/tableau/connections", {
+                apiType: "semantic",
+                headers: authHeader ? { Authorization: authHeader } : undefined,
+            });
+            const connections = Array.isArray(connRes) ? connRes : (connRes?.connections || []);
+            const match = connections.find((c: any) => (c.id === body.connection_id || c.connection_id === body.connection_id));
+            if (match) {
+                serverUrl = serverUrl || match.tableau_server_url || match.TABLEAU_SERVER_URL || "";
+                siteName = siteName || match.tableau_site_name || match.TABLEAU_SITE_NAME || "";
+                tokenName = tokenName || match.tableau_token_name || match.TABLEAU_TOKEN_NAME || "token";
+                console.log("[API /api/tableau/workbooks] Auto-resolved connection metadata from MongoDB connection_id:", { serverUrl, siteName, tokenName });
+            }
+        } catch (lookupErr: any) {
+            console.warn("[API /api/tableau/workbooks] Could not resolve connection_id lookup:", lookupErr?.message);
+        }
+    }
+
+    if (!tokenName) tokenName = "token";
+
+    // Build backend request body forwarding all property alias variants
     const requestBody: any = {
-      TABLEAU_SERVER_URL: body.tableau_server_url.trim(),
-      TABLEAU_SITE_NAME: body.tableau_site_name.trim(),
-      TABLEAU_TOKEN_NAME: body.tableau_token_name?.trim() || "TableauToken",
+      tableau_server_url: serverUrl,
+      tableau_site_name: siteName,
+      tableau_token_name: tokenName,
+      server_url: serverUrl,
+      site_name: siteName,
+      token_name: tokenName,
+      TABLEAU_SERVER_URL: serverUrl,
+      TABLEAU_SITE_NAME: siteName,
+      TABLEAU_TOKEN_NAME: tokenName,
       PROJECT_ID: projectIds,
+      project_id: projectIds,
+      email: body.email || ""
     };
+
+    if (body.connection_id) {
+       requestBody.connection_id = body.connection_id;
+    }
 
     if (body.tableau_token_value?.trim()) {
        requestBody.TABLEAU_TOKEN_VALUE = body.tableau_token_value.trim();
-    }
-    if (body.connection_id) {
-       requestBody.connection_id = body.connection_id;
+       requestBody.tableau_token_value = body.tableau_token_value.trim();
     }
 
     console.log("[API /api/tableau/workbooks] Forwarding to backend:", {

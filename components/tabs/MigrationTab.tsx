@@ -305,6 +305,12 @@ export function MigrationTab() {
       const credsArray = Array.isArray(creds) ? creds : (creds ? [creds] : [])
       setSavedCredentials(credsArray)
 
+      console.log("[MigrationTab] Loaded credentials:", {
+        count: credsArray.length,
+        configuredConnectionId,
+        selectedConnectionId,
+      });
+
       // Preserve the current selection; otherwise prefer the connection
       // configured in Settings, so someone who set Tableau up there lands on it
       // rather than on whichever connection happens to be first.
@@ -316,6 +322,19 @@ export function MigrationTab() {
           (configuredConnectionId
             ? credsArray.find(c => c.connection_id === configuredConnectionId)
             : null) ?? credsArray[0] ?? null;
+      }
+
+      // If no credentials found but we have a configuredConnectionId from Settings,
+      // create a stub credential with just the connection_id so sites can be loaded
+      if (!singleCred && configuredConnectionId) {
+        console.log("[MigrationTab] No saved credentials found, but connection configured in Settings");
+        singleCred = {
+          connection_id: configuredConnectionId,
+          CONNECTION_NAME: "Configured Connection",
+          TABLEAU_SERVER_URL: "",
+          TABLEAU_SITE_NAME: "",
+          TABLEAU_TOKEN_NAME: "TableauToken",
+        };
       }
 
       setTableauCredentials(singleCred)
@@ -342,8 +361,13 @@ export function MigrationTab() {
         // The saved value may be stale (e.g. "vectorlab") and would cause 401 errors.
         // Leave empty so user picks from the freshly fetched sites dropdown.
         if (singleCred.TABLEAU_TOKEN_VALUE) setConfigTableauTokenValue(singleCred.TABLEAU_TOKEN_VALUE);
-        setConfigTcmBaseUrl(singleCred.TCM_BASE_URL || "");
-        setConfigTcmTokenSecret(singleCred.TCM_TOKEN_SECRET || "");
+        // Load TCM config from multiple possible field name variants
+        const singleCredAny = singleCred as any;
+        const tcmBaseUrl = singleCredAny.TCM_BASE_URL || singleCredAny.tcm_base_url || singleCredAny.tcmBaseUrl || "";
+        const tcmTokenSecret = singleCredAny.TCM_TOKEN_SECRET || singleCredAny.tcm_token_secret || singleCredAny.tcmTokenSecret || "";
+        setConfigTcmBaseUrl(tcmBaseUrl);
+        setConfigTcmTokenSecret(tcmTokenSecret);
+        console.log("[MigrationTab] Loaded TCM config from connection:", { hasTcmBaseUrl: !!tcmBaseUrl, hasTcmTokenSecret: !!tcmTokenSecret });
 
         setConfigStatus("success")
       } else {
@@ -381,8 +405,9 @@ export function MigrationTab() {
       setTableauSiteId("");
       setConfigTableauTokenName(cred.TABLEAU_TOKEN_NAME || "");
       // Note: TABLEAU_TOKEN_VALUE usually not returned for security if already saved
-      setConfigTcmBaseUrl(cred.TCM_BASE_URL || "");
-      setConfigTcmTokenSecret(cred.TCM_TOKEN_SECRET || "");
+      const credAny = cred as any;
+      setConfigTcmBaseUrl(credAny.TCM_BASE_URL || credAny.tcm_base_url || credAny.tcmBaseUrl || "");
+      setConfigTcmTokenSecret(credAny.TCM_TOKEN_SECRET || credAny.tcm_token_secret || credAny.tcmTokenSecret || "");
 
       // Reset dependent data
       setProjects([]);
@@ -589,8 +614,11 @@ export function MigrationTab() {
             // forces the user to pick from the freshly fetched sites dropdown,
             // which prevents the 401 "Tableau sign-in failed" error.
             if (singleCred.TABLEAU_TOKEN_VALUE) setConfigTableauTokenValue(singleCred.TABLEAU_TOKEN_VALUE)
-            if (singleCred.TCM_BASE_URL) setConfigTcmBaseUrl(singleCred.TCM_BASE_URL)
-            if (singleCred.TCM_TOKEN_SECRET) setConfigTcmTokenSecret(singleCred.TCM_TOKEN_SECRET)
+            const singleCredAny = singleCred as any;
+            const loadedTcmBaseUrl = singleCredAny.TCM_BASE_URL || singleCredAny.tcm_base_url || singleCredAny.tcmBaseUrl || "";
+            const loadedTcmSecret = singleCredAny.TCM_TOKEN_SECRET || singleCredAny.tcm_token_secret || singleCredAny.tcmTokenSecret || "";
+            if (loadedTcmBaseUrl) setConfigTcmBaseUrl(loadedTcmBaseUrl);
+            if (loadedTcmSecret) setConfigTcmTokenSecret(loadedTcmSecret);
           } else {
             if (tableauEnv === "server") {
               setCurrentConnectionName("")
@@ -618,31 +646,62 @@ export function MigrationTab() {
       if (!mounted || !url) return
       setLoadingSites(true)
       try {
-        const list = await tableauService.getSites(configTcmBaseUrl, tableauEnv, {
+        const credsAny = tableauCredentials as any;
+        const effectiveTcmBaseUrl = configTcmBaseUrl || credsAny?.TCM_BASE_URL || credsAny?.tcm_base_url || credsAny?.tcmBaseUrl || "";
+        const effectiveTcmSecret = configTcmTokenSecret || credsAny?.TCM_TOKEN_SECRET || credsAny?.tcm_token_secret || credsAny?.tcmTokenSecret || "";
+
+        const credsForSites = {
           TABLEAU_SERVER_URL: url,
-          // For server-mode site listing we need the credential's own TABLEAU_SITE_NAME
-          // for authentication — NOT the currently displayed tableauSiteName (which is
-          // the user's selection and may be empty while the dropdown is being populated).
           TABLEAU_SITE_NAME: tableauCredentials?.TABLEAU_SITE_NAME || "",
           TABLEAU_TOKEN_NAME: (configTableauTokenName || tableauCredentials?.TABLEAU_TOKEN_NAME) ?? "",
           TABLEAU_TOKEN_VALUE: (configTableauTokenValue || tableauCredentials?.TABLEAU_TOKEN_VALUE) ?? "",
-          TCM_TOKEN_SECRET: configTcmTokenSecret,
+          TCM_TOKEN_SECRET: effectiveTcmSecret,
+          tcm_token_secret: effectiveTcmSecret,
+          TCM_BASE_URL: effectiveTcmBaseUrl,
+          tcm_base_url: effectiveTcmBaseUrl,
           connection_id: tableauCredentials?.connection_id
-        })
+        };
+        
+        console.log("[MigrationTab] Loading sites with credentials:", {
+          hasConnectionId: !!credsForSites.connection_id,
+          hasTokenValue: !!credsForSites.TABLEAU_TOKEN_VALUE,
+          hasTcmBaseUrl: !!credsForSites.TCM_BASE_URL,
+          hasTcmTokenSecret: !!credsForSites.TCM_TOKEN_SECRET,
+          env: tableauEnv,
+          url: url
+        });
+        
+        const list = await tableauService.getSites(effectiveTcmBaseUrl, tableauEnv, credsForSites as any);
         if (mounted) {
-          setSites(list)
+          setSites(list);
+          setError(null);
+          if (list.length > 0) {
+            const currentValid = list.some(s => s.name === tableauSiteName || s.id === tableauSiteName);
+            if (!tableauSiteName || !currentValid) {
+              setTableauSiteName(list[0].name);
+              setTableauSiteId(list[0].id);
+              console.log(`[MigrationTab] Auto-selected site: ${list[0].name}`);
+            }
+          }
         }
       } catch (err) {
-        if (mounted) setError("Failed to load sites")
+        console.error("[MigrationTab] Failed to load sites:", err);
+        if (mounted) {
+          const errorMsg = err instanceof Error ? err.message : "Failed to load sites";
+          if (errorMsg.includes("No TCM token secret") || errorMsg.includes("base URL found")) {
+            setError(null);
+          } else if (errorMsg.includes("connection_id") || errorMsg.includes("credentials")) {
+            setError("Tableau connection is not fully configured. Please check Settings.");
+          } else {
+            setError("Failed to load sites: " + errorMsg);
+          }
+        }
       } finally {
         if (mounted) setLoadingSites(false)
       }
     }
     loadSites()
     return () => { mounted = false }
-    // tableauSiteName intentionally excluded: the user's site selection should NOT
-    // trigger a re-fetch of the site list. Sites are driven by the connection, not by
-    // which site is currently selected in the dropdown.
   }, [tableauCredentials, tableauEnv, currentConnectionName, configTableauUrl, configTableauTokenName, configTableauTokenValue, configTcmBaseUrl, configTcmTokenSecret])
 
   // Sync site ID if name is set but ID is missing (e.g. on load from saved credentials)

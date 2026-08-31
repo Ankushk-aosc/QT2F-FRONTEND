@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
-import { httpPost, errorResponse } from "@/lib/api/httpClient";
+import { httpPost, httpClient, errorResponse } from "@/lib/api/httpClient";
 
 export const dynamic = 'force-dynamic';
 
@@ -16,20 +16,48 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
+        const connectionId = body.connection_id || body.connectionId;
+
+        let tcmBaseUrl = body.tcm_base_url || body.TCM_BASE_URL || body.tcmBaseUrl || "";
+        const tcmTokenSecret = body.tcm_token_secret || body.TCM_TOKEN_SECRET || body.tcmTokenSecret || "";
+
+        // Fallback: If connection_id is provided but tcm_base_url is missing, resolve connection from storage
+        if (connectionId && !tcmBaseUrl) {
+            try {
+                const connRes = await httpClient.get<any>("/tableau/connections", {
+                    apiType: "semantic",
+                    headers: { Authorization: authHeader },
+                });
+                const connections = Array.isArray(connRes) ? connRes : (connRes?.connections || []);
+                const match = connections.find((c: any) => (c.id === connectionId || c.connection_id === connectionId));
+                if (match) {
+                    tcmBaseUrl = match.tcm_base_url || match.TCM_BASE_URL || match.tcmBaseUrl || "";
+                    console.log("[POST /api/tableau/get-all-tenant-sites] Auto-resolved TCM_BASE_URL from connection_id:", tcmBaseUrl);
+                }
+            } catch (lookupErr: any) {
+                console.warn("[POST /api/tableau/get-all-tenant-sites] Could not resolve connection_id lookup:", lookupErr?.message);
+            }
+        }
+
+        let requestBody: any = {
+            tcm_base_url: tcmBaseUrl,
+            TCM_BASE_URL: tcmBaseUrl,
+            tcm_token_secret: tcmTokenSecret,
+            TCM_TOKEN_SECRET: tcmTokenSecret,
+        };
+
+        if (connectionId) {
+            requestBody.connection_id = connectionId;
+        }
 
         const forwardHeaders: Record<string, string> = {
             "Authorization": authHeader
         };
 
-        // Forward full body so backend can use tcm_token_secret as fallback
         const result = await httpPost<any>(
             "tableau",
             "/get-all-tenant-sites",
-            { 
-                TCM_BASE_URL: body.tcm_base_url || body.TCM_BASE_URL,
-                tcm_token_secret: body.tcm_token_secret || "",
-                connection_id: body.connection_id,
-            },
+            requestBody,
             { headers: forwardHeaders }
         );
 
@@ -40,3 +68,4 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(body, { status });
     }
 }
+
