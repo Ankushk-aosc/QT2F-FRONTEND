@@ -34,7 +34,7 @@ export function useAuth() {
 
   const getAccessToken = async (scopes?: string[]) => {
     if (!account) {
-      return "dummy-access-token-for-dev";
+      throw new Error("[useAuth] getAccessToken called with no signed-in account");
     }
 
     // Default to the API scope if no specific scopes provided
@@ -46,17 +46,16 @@ export function useAuth() {
     } catch (error) {
       if (error instanceof InteractionRequiredAuthError) {
         if (inProgress !== InteractionStatus.None) {
-          console.warn(
-            "[useAuth] Silent token failed but MSAL interaction is in progress — cannot open popup now."
+          throw new Error(
+            "[useAuth] Silent token acquisition failed and an MSAL interaction is already in progress"
           );
-          return "dummy-access-token-for-dev";
         }
 
         console.warn("[useAuth] Silent token failed, using popup fallback");
         const response = await instance.acquireTokenPopup({ scopes: requestScopes, account });
         return response.accessToken;
       }
-      return "dummy-access-token-for-dev";
+      throw error;
     }
   };
 
@@ -78,7 +77,7 @@ export function useAuth() {
       initials: (account.name || "").slice(0, 1).toUpperCase() || "U",
     } : storeUser ? {
       name: storeUser.name || storeUser.email || "Admin",
-      email: storeUser.email || "subscriptions@aoscaustralia.com",
+      email: storeUser.email || "",
       initials: storeUser.initials || "A",
     } : null,
   };

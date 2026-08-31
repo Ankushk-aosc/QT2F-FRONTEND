@@ -106,18 +106,23 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     if (body.api_key) {
-      try {
-        await fetch("https://mongo-db-k15s.onrender.com/secrets", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: "default_qlik_tenant-api-key",
-            value: body.api_key,
-            description: "Qlik API Key"
-          })
-        });
-      } catch (e) {
-        console.warn("[POST /api/qlik/connections] Failed to push api_key to secrets DB:", e);
+      const base = qlikBase();
+      if (base) {
+        try {
+          await fetch(`${base}/secrets`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: "default_qlik_tenant-api-key",
+              value: body.api_key,
+              description: "Qlik API Key"
+            })
+          });
+        } catch (e) {
+          console.warn("[POST /api/qlik/connections] Failed to push api_key to secrets DB:", e);
+        }
+      } else {
+        console.warn("[POST /api/qlik/connections] Records API base URL not configured; skipping secrets push");
       }
     }
 
