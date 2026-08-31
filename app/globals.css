@@ -21,7 +21,6 @@
    (`@theme default { ... }`) with still no Preflight, so it's safe to add
    alongside the existing utilities-only setup.
 ═══════════════════════════════════════════════════════════════════════ */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss/theme" layer(theme);
 @import "tailwindcss/utilities";
 
@@ -129,7 +128,7 @@
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
 
   /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --text-xs: 12px;
   --text-sm: 13px;
   --text-base: 14px;
