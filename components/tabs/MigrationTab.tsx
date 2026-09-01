@@ -51,7 +51,7 @@ function Text({
     />
   )
 }
-import { debounce } from "lodash"
+import debounce from "lodash/debounce"
 import { useMsal } from "@azure/msal-react"
 import Image from "next/image"
 

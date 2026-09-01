@@ -1,13 +1,21 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ConfigurationsContent from "@/components/tabs/ConfigurationsContent";
 import { MigrationOverview } from "@/components/tabs/MigrationOverview";
 import { ResultTab } from "@/components/tabs/ResultTab";
 import { useDashboardStore } from "@/stores/dashboard.store";
-import { QlikPdfReportRenderer } from "@/components/QlikPdfReportRenderer";
 import { AssessmentData, MappedData, ParsedData, ReportGenerationData, AppProcessState } from "@/types/assessment";
+
+// Same pattern as the Tableau side's PdfReportRenderer (components/tabs/MigrationTab.tsx):
+// jspdf/html2canvas/jszip only load when the user actually generates a PDF,
+// not whenever this page mounts.
+const QlikPdfReportRenderer = dynamic(
+  () => import("@/components/QlikPdfReportRenderer").then(mod => mod.QlikPdfReportRenderer),
+  { ssr: false }
+);
 
 function cx(...parts: Array<string | false | undefined>) {
   return parts.filter(Boolean).join(" ");

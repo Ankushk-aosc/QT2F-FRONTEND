@@ -59,9 +59,15 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   const settling = !authResolved || inProgress !== InteractionStatus.None
   if (settling && !isStoreAuthed) {
+    // Same background/size/label as MsalProviderWrapper's own loading
+    // spinner (the state immediately before this one renders), so this
+    // settle-timer wait reads as a continuation of that screen rather than
+    // a second, visually distinct loading gate. The settle logic itself --
+    // the authResolved timer and inProgress check above -- is unchanged;
+    // only the visual presentation of this branch was unified.
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", width: "100%", backgroundColor: "var(--background)" }}>
-        <Spinner size="large" label="Securing your session..." />
+      <div style={{ height: "100vh", width: "100vw", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "var(--background)" }}>
+        <Spinner size="extra-large" label="Loading Application Context..." />
       </div>
     )
   }

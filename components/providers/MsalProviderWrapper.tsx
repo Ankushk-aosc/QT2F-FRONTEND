@@ -770,8 +770,13 @@ export default function MsalProviderWrapper({
   }
 
   if (!msalInstance) {
+    // Background matches AuthGuard's settling-state spinner (both
+    // var(--background), same size/label) so the two sequential loading
+    // states -- MSAL init here, then AuthGuard's brief settle wait for
+    // @azure/msal-react to catch up -- render as one continuous screen
+    // instead of two visually distinct ones back to back.
     return (
-      <div style={{ height: "100vh", width: "100vw", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#ffffff" }}>
+      <div style={{ height: "100vh", width: "100vw", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "var(--background)" }}>
         <Spinner size="extra-large" label="Loading Application Context..." />
       </div>
     );

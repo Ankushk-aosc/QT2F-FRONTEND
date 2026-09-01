@@ -3,12 +3,27 @@
 import type React from "react"
 import { usePathname } from "next/navigation"
 import { useEffect } from "react"
+import dynamic from "next/dynamic"
 
 import { AuthGuard } from "@/components/auth/AuthGuard"
 import { TopNavigation } from "@/components/layout/TopNavigation"
 import { AppSidebar } from "@/components/layout/AppSidebar"
-import { LeftSidebar } from "@/components/layout/LeftSidebar"
 import { useUIStore } from "@/stores/ui.store"
+
+// LeftSidebar pulls in qlikStore plus every migration-pipeline store
+// (dashboard/agent/parsing/mapping/generation/validation/datalayer/monitoring).
+// It's only ever rendered on /migrations/qlik and /migrations/tableau
+// (see needsWorkspaceSidebar below), but a static import here would still
+// bundle its whole dependency tree into every protected route's shared
+// chunk -- the render is conditional, the import wasn't. Same dynamic()
+// pattern already used for MigrationTab/QlikMigrationTab in
+// components/migration/MigrationWorkspace.tsx. The sidebar's own container
+// (.app-shell-sidebar-container) has a fixed width in globals.css, so there
+// is no layout shift while this chunk loads.
+const LeftSidebar = dynamic(
+  () => import("@/components/layout/LeftSidebar").then((mod) => ({ default: mod.LeftSidebar })),
+  { ssr: false }
+)
 
 /**
  * Routes where the source/workbook tree is meaningful context, not clutter.

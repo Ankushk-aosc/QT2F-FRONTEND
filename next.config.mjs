@@ -11,6 +11,11 @@ const nextConfig = {
     optimizePackageImports: [
       "recharts",
       "date-fns",
+      "@azure/msal-browser",
+      "@azure/msal-react",
+      "lodash",
+      "react-circular-progressbar",
+      "lucide-react",
     ],
   },
   typescript: {
