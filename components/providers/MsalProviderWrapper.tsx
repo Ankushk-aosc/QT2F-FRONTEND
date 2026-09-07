@@ -217,8 +217,11 @@ export async function getActiveToken(
       sessionStorage.setItem("access_token", res.accessToken);
       return res.accessToken;
     } catch (error: unknown) {
-      if (error instanceof InteractionRequiredAuthError) {
-        // Only open a popup when MSAL is not already busy with another interaction.
+      const isInteractionRequired = error instanceof InteractionRequiredAuthError;
+      const isTimeout = (error as any)?.errorCode === 'monitor_window_timeout';
+      const isCorsError = (error as any)?.errorCode === 'post_request_failed';
+
+      if (isInteractionRequired || isTimeout || isCorsError) {
         if (isMsalInteracting()) {
           console.warn(
             "[getActiveToken] Silent acquisition failed but MSAL interaction is in progress — cannot open popup now. Will retry silently later."
@@ -243,8 +246,21 @@ export async function getActiveToken(
             console.log("[getActiveToken] New token acquired via popup");
           }
           return res.accessToken;
-        } catch (popupError) {
+        } catch (popupError: any) {
           console.error("[getActiveToken] Popup acquisition failed", popupError);
+          
+          if (popupError?.errorCode === "popup_window_error") {
+            console.warn("[getActiveToken] Popup blocked, falling back to redirect");
+            try {
+              await globalMsalInstance!.acquireTokenRedirect({
+                scopes: [globalApiScope],
+                account,
+              });
+            } catch (redirectErr) {
+              console.error("[getActiveToken] Redirect failed", redirectErr);
+            }
+          }
+          
           throw new Error("Unable to acquire access token (popup failed)");
         }
       }
@@ -299,7 +315,11 @@ export async function getFabricToken(
       }
       return res.accessToken;
     } catch (error: unknown) {
-      if (error instanceof InteractionRequiredAuthError) {
+      const isInteractionRequired = error instanceof InteractionRequiredAuthError;
+      const isTimeout = (error as any)?.errorCode === 'monitor_window_timeout';
+      const isCorsError = (error as any)?.errorCode === 'post_request_failed';
+
+      if (isInteractionRequired || isTimeout || isCorsError) {
         if (isMsalInteracting()) {
           console.warn(
             "[getFabricToken] Silent acquisition failed but MSAL interaction is in progress — cannot open popup now."
@@ -324,8 +344,21 @@ export async function getFabricToken(
             console.log("[getFabricToken] New Fabric token acquired via popup");
           }
           return res.accessToken;
-        } catch (popupError) {
+        } catch (popupError: any) {
           console.error("[getFabricToken] Popup acquisition failed", popupError);
+          
+          if (popupError?.errorCode === "popup_window_error") {
+            console.warn("[getFabricToken] Popup blocked, falling back to redirect");
+            try {
+              await globalMsalInstance!.acquireTokenRedirect({
+                scopes: [fabricScope],
+                account,
+              });
+            } catch (redirectErr) {
+              console.error("[getFabricToken] Redirect failed", redirectErr);
+            }
+          }
+          
           throw new Error("Unable to acquire Fabric access token (popup failed)");
         }
       }

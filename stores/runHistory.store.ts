@@ -11,6 +11,7 @@ export interface RunHistoryItem {
   workbook_id: string
   workbook_name: string
   created_at: string
+  updated_at?: string
   overall_status: string
   assessment_status: string
   parsing_status: string
@@ -281,12 +282,15 @@ export const useRunHistoryStore = create<RunHistoryState>((set, get) => ({
 
       if (needsAuthoritativeTotal) {
         try {
-          const summaryQuery = new URLSearchParams({ email_id: email })
-          const timeZone = useUIStore.getState().timezone || "UTC"
-          applyRunHistoryFilters(summaryQuery, filters, timeZone)
+          // const summaryQuery = new URLSearchParams({ email_id: email })
+          // const timeZone = useUIStore.getState().timezone || "UTC"
+          // applyRunHistoryFilters(summaryQuery, filters, timeZone)
 
-          const summaryResponse = await fetchWithAuth<any>(`/api/monitoring-summary?${summaryQuery.toString()}`)
-          const summaryTotal = Number(summaryResponse?.total_runs ?? summaryResponse?.totalRuns ?? 0)
+          // const summaryResponse = await fetchWithAuth<any>(`/api/monitoring-summary?${summaryQuery.toString()}`)
+          // const summaryTotal = Number(summaryResponse?.total_runs ?? summaryResponse?.totalRuns ?? 0)
+          
+          // Monitoring summary disabled temporarily as per client requirements
+          const summaryTotal = 0
 
           if (summaryTotal > 0 || hasActiveFilters) {
             pagination.total = summaryTotal
@@ -517,6 +521,7 @@ export function mapRunHistoryItem(item: any, isPartial: boolean): RunHistoryItem
     workbook_id: displayWorkbookId,
     workbook_name: displayWorkbookName,
     created_at: createdAt,
+    updated_at: item.updated_at,
     overall_status: isPartial
       ? "SUCCESS"
       : isParentTerminalState

@@ -870,6 +870,7 @@ function mapStory(s: any, idx: number): Story {
 interface ParsingStore {
     parsingRaw: Record<string, any>;
     parsingData: Record<string, ParsingPayload>;
+    parsingCache: Record<string, ParsingPayload>;
     isLoading: Record<string, boolean>;
     error: Record<string, string | null>;
 
@@ -881,10 +882,20 @@ interface ParsingStore {
 export const useParsingStore = create<ParsingStore>((set, get) => ({
     parsingRaw: {},
     parsingData: {},
+    parsingCache: {},
     isLoading: {},
     error: {},
 
     fetchParsingResult: async (projectId, workbookId, runId) => {
+        const cacheKey = `${runId}_${workbookId}`;
+        const cached = get().parsingCache[cacheKey];
+        if (cached) {
+            set((state) => ({
+                parsingData: { ...state.parsingData, [workbookId]: cached }
+            }));
+            return;
+        }
+
         if (!get().parsingData[workbookId]) {
             set((state) => ({
                 isLoading: { ...state.isLoading, [workbookId]: true },
@@ -894,10 +905,6 @@ export const useParsingStore = create<ParsingStore>((set, get) => ({
 
         try {
             const result = await parsingService.getWorkbookResult(projectId, workbookId, runId);
-
-            if (JSON.stringify(get().parsingRaw[workbookId]) === JSON.stringify(result)) {
-                return;
-            }
 
             if (result && result.detail && result.detail.toLowerCase().includes("not found")) {
                 set((state) => ({ error: { ...state.error, [workbookId]: null } }));
@@ -909,6 +916,7 @@ export const useParsingStore = create<ParsingStore>((set, get) => ({
             if (result) {
                 const mapped = mapParsingPayload(result);
                 set((state) => ({
+                    parsingCache: { ...state.parsingCache, [cacheKey]: mapped },
                     parsingData: { ...state.parsingData, [workbookId]: mapped },
                     error: { ...state.error, [workbookId]: null }
                 }));

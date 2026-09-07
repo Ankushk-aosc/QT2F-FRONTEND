@@ -23,6 +23,7 @@
  * spellings here and both callers pick them up.
  */
 export const AGENT_NAME_VARIANTS: Record<string, string[]> = {
+  orchestrator: ["Orchestrator", "Semantic Kernel", "SemanticKernel"],
   assessment: ["Assessment Agent", "AssessmentAgent", "Assessment"],
   parsing: ["Parsing Agent", "Parser Agent", "ParsingAgent", "ParserAgent", "Parsing"],
   mapping: ["Mapping Agent", "MappingAgent", "Mapper Agent", "Mapping"],
@@ -58,6 +59,7 @@ export function agentNameVariants(stage: string): string[] {
 
 export function matchesAgent(agentName: string, canonicalKey: string): boolean {
   const variants = AGENT_NAME_VARIANTS[canonicalAgentKey(canonicalKey)];
-  if (!variants) return false;
-  return variants.includes(agentName);
+  if (!variants || !agentName) return false;
+  const normalized = agentName.trim().toLowerCase();
+  return variants.some(v => v.toLowerCase() === normalized);
 }

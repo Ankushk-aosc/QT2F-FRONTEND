@@ -158,7 +158,8 @@ const getDisplayedStatus = (
     checkMappingExists(app, runId, activities) ||
     (showDataLayer && checkDataLayerExists(app, runId, activities)) ||
     checkParsingExists(app, runId, activities) ||
-    app.final_status?.toLowerCase() === "running" || app.status?.toLowerCase() === "running"
+    app.final_status?.toLowerCase() === "running" || app.status?.toLowerCase() === "running" ||
+    (app.status === "Selected" && (migrationPhase === "starting" || migrationPhase === "processing" || (window.location.pathname.includes("qlik") && useQlikStore.getState().isProcessing)))
   ) {
     return "Processing..."
   }
@@ -229,30 +230,13 @@ function AgentActionsBlock({
 
   const [isOpen, setIsOpen] = useState(true)
 
+  const globalActivities = useAgentStore(s => s.activities)
+
   const activities = useMemo(() => {
-    if (workspace === "qlik") {
-      let logs: any[] = [];
-      if (qlikActivities) {
-        if (agentName.toLowerCase() === "generation" || agentName.toLowerCase() === "reportgeneration") {
-          logs = qlikActivities["generation"] || qlikActivities["reportGeneration"] || qlikActivities["reportgeneration"] || [];
-        } else {
-          logs = qlikActivities[agentName] || qlikActivities[agentName.toLowerCase()] || [];
-        }
-      }
-
-      if (Array.isArray(logs)) {
-        return logs.map((log: any, idx: number) => ({
-          id: log.id || `${app.workbookId}-${agentName}-${idx}`,
-          activity_summary: typeof log === "string" ? log : log.activity_summary || log.action || log.message || log.text || JSON.stringify(log),
-          created_at: log.timestamp || log.created_at || new Date().toISOString(),
-          agent_name: agentName,
-        }))
-      }
-      return []
-    }
-
-    const allActivities = getActivitiesForWorkbook(app.workbookId)
+    const targetRunId = runId || useAgentStore.getState().currentRunId
+    const allActivities = targetRunId ? (globalActivities[targetRunId]?.[app.workbookId] || []) : []
     const raw = allActivities.filter(a => matchesAgent(a.agent_name, agentName))
+    
     const seen = new Set<string>()
     return raw.filter(act => {
       const key = `${act.agent_name}-${act.created_at}-${act.activity_summary}`
@@ -260,7 +244,7 @@ function AgentActionsBlock({
       seen.add(key)
       return true
     })
-  }, [workspace, qlikActivities, app.workbookId, agentName, getActivitiesForWorkbook])
+  }, [app.workbookId, agentName, runId, globalActivities])
 
   const stageCompletionMap: Record<string, Record<string, boolean>> = {
     assessment: assessmentActivitiesDone,
@@ -379,6 +363,7 @@ function WorkbookLevel({
   // Safe Zustand selectors returning stable references
   const qlikProcessStates = useQlikStore(s => s.processStates[app.workbookId])
   const isQlikProcessing = useQlikStore(s => s.isProcessing)
+  const isQlikProcessCompleted = useQlikStore(s => s.isProcessCompleted)
   const { migrationPhase } = useDashboardStore()
   const { mode, hasContinued } = useUIStore()
   const [open, setOpen] = useState(true)
@@ -392,73 +377,60 @@ function WorkbookLevel({
   const hasTableauValidation = useValidationStore(s => !!s.validationData[app.workbookId])
 
   // Unconditional useMemo hooks
+  const completionTest = (a: any) => {
+    const action = ((a as any).action || '').toLowerCase();
+    const summary = ((a as any).activity_summary || '').toLowerCase();
+    return /\b(completed|finished|complete|done)\b/.test(action) || /\b(completed|finished|complete|done)\b/.test(summary);
+  };
+
   const isTableauAssessmentComplete = useMemo(() => {
     if (!runId || !activities || !activities[runId]) return false
     const acts = activities[runId][app.workbookId] || []
     const assessmentActs = acts.filter((a: any) => matchesAgent(a.agent_name, 'assessment'))
-    return assessmentActs.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()))
+    return assessmentActs.some(completionTest)
   }, [activities, runId, app.workbookId])
 
   const isTableauParsingComplete = useMemo(() => {
     if (!runId || !activities || !activities[runId]) return false
     const acts = activities[runId][app.workbookId] || []
     const parsingActs = acts.filter((a: any) => matchesAgent(a.agent_name, 'parsing'))
-    return parsingActs.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()))
+    return parsingActs.some(completionTest)
   }, [activities, runId, app.workbookId])
 
   const isTableauMappingComplete = useMemo(() => {
     if (!runId || !activities || !activities[runId]) return false
     const acts = activities[runId][app.workbookId] || []
     const mappingActs = acts.filter((a: any) => matchesAgent(a.agent_name, 'mapping'))
-    return mappingActs.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()))
+    return mappingActs.some(completionTest)
   }, [activities, runId, app.workbookId])
 
   const isTableauGenerationComplete = useMemo(() => {
     if (!runId || !activities || !activities[runId]) return false
     const acts = activities[runId][app.workbookId] || []
     const generationActs = acts.filter((a: any) => matchesAgent(a.agent_name, 'generation'))
-    return generationActs.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()))
+    return generationActs.some(completionTest)
   }, [activities, runId, app.workbookId])
 
   const isTableauValidationComplete = useMemo(() => {
     if (!runId || !activities || !activities[runId]) return false
     const acts = activities[runId][app.workbookId] || []
     const validationActs = acts.filter((a: any) => matchesAgent(a.agent_name, 'validation'))
-    return validationActs.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()))
+    return validationActs.some(completionTest)
   }, [activities, runId, app.workbookId])
 
   // Determine stage completion for Qlik vs Tableau
-  const hasAssessment = workspace === "qlik"
-    ? ["completed", "success"].includes(qlikProcessStates?.assessment?.status?.toLowerCase() || "")
-    : !!(runId && assessmentData[runId]?.[app.workbookId])
-
-  const hasParsing = workspace === "qlik"
-    ? ["completed", "success"].includes(qlikProcessStates?.parsing?.status?.toLowerCase() || "")
-    : hasTableauParsing
-
-  const hasDataLayer = workspace === "qlik"
-    ? false
-    : hasTableauDataLayer
-
-  const hasMapping = workspace === "qlik"
-    ? ["completed", "success"].includes(qlikProcessStates?.mapping?.status?.toLowerCase() || "")
-    : hasTableauMapping
-
-  const hasGeneration = workspace === "qlik"
-    ? ["completed", "success"].includes(qlikProcessStates?.reportGeneration?.status?.toLowerCase() || "")
-    : !!generationEntry
-
-  const hasValidation = workspace === "qlik"
-    ? false
-    : hasTableauValidation
+  const hasAssessment = !!(runId && assessmentData[runId]?.[app.workbookId])
+  const hasParsing = hasTableauParsing
+  const hasDataLayer = hasTableauDataLayer
+  const hasMapping = hasTableauMapping
+  const hasGeneration = !!generationEntry
+  const hasValidation = hasTableauValidation
 
   const hasAllResults = workspace === "qlik"
     ? (hasAssessment && hasParsing && hasMapping && hasGeneration)
     : (hasParsing && hasMapping && hasGeneration && hasValidation)
 
-  const hasGenerationFailed = workspace === "qlik"
-    ? qlikProcessStates?.reportGeneration?.status?.toLowerCase() === "failed" || qlikProcessStates?.reportGeneration?.status?.toLowerCase() === "error"
-    : hasGeneration && (() => {
+  const hasGenerationFailed = hasGeneration && (() => {
         const mappedStatus = (generationEntry?.status || "").toLowerCase()
         const rawOuterStatus = (generationRawEntry?.status || "").toLowerCase()
         const rawFinalStatus = (generationRawEntry?.payload?.final_response?.status ||
@@ -472,12 +444,17 @@ function WorkbookLevel({
 
   const isSinglePreContinue = mode === 'single' && !hasContinued
 
-  const isAssessmentComplete = workspace === "qlik"
-    ? hasAssessment
-    : isTableauAssessmentComplete
+  const isAssessmentComplete = isTableauAssessmentComplete
 
   let displayedStatus = workspace === "qlik"
-    ? (app.status === "completed" ? "Migration Completed" : app.status === "running" ? "Processing..." : app.status === "failed" ? "Failed" : "Pending")
+    ? (
+        hasAllResults ? "Migration Completed" :
+        isQlikProcessing ? "Processing..." :
+        hasGenerationFailed ? "Failed" :
+        (app.status === "Selected" && !isQlikProcessCompleted && runId) ? "Failed" :
+        (app.status === "Selected" && !isQlikProcessCompleted) ? "Selected" :
+        "Pending"
+      )
     : getDisplayedStatus(app, runId, activities, migrationPhase, !shouldSkipDataLayer(app.workbookId), hasAllResults, hasGenerationFailed)
 
   if (isSinglePreContinue && hasParsing && displayedStatus === "Processing...") {
@@ -495,21 +472,10 @@ function WorkbookLevel({
 
   const toggleOpen = () => setOpen((prev) => !prev)
 
-  const isParsingComplete = workspace === "qlik"
-    ? hasParsing
-    : isTableauParsingComplete
-
-  const isMappingComplete = workspace === "qlik"
-    ? hasMapping
-    : isTableauMappingComplete
-
-  const isGenerationComplete = workspace === "qlik"
-    ? hasGeneration
-    : isTableauGenerationComplete
-
-  const isValidationComplete = workspace === "qlik"
-    ? false
-    : isTableauValidationComplete
+  const isParsingComplete = isTableauParsingComplete
+  const isMappingComplete = isTableauMappingComplete
+  const isGenerationComplete = isTableauGenerationComplete
+  const isValidationComplete = isTableauValidationComplete
 
   const statusColor = getStatusColor(displayedStatus)
   const isMultilineBadge = displayedStatus === "Migration Completed" || displayedStatus === "Extraction Completed"
@@ -533,14 +499,15 @@ function WorkbookLevel({
         {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
       </div>
 
-      <div className={open ? "block" : "hidden"}>
-        <AgentActionsBlock
-          app={app}
-          runId={runId}
-          agentName="assessment"
-          title="Assessment Agent"
-          isCompleted={hasAssessment}
-        />
+      {(displayedStatus !== "Selected" || (runId && activities[runId]?.[app.workbookId]?.length > 0) || (workspace === "qlik" && runId)) && (
+        <div className={open ? "block" : "hidden"}>
+          <AgentActionsBlock
+            app={app}
+            runId={runId}
+            agentName="assessment"
+            title="Assessment Agent"
+            isCompleted={hasAssessment}
+          />
 
         {(isAssessmentComplete || (workspace === "qlik" && (hasParsing || qlikProcessStates?.parsing?.status === "running"))) && (
           <AgentActionsBlock
@@ -597,7 +564,8 @@ function WorkbookLevel({
             isCompleted={hasValidation}
           />
         )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -687,7 +655,11 @@ export function LeftSidebar({ onClose }: LeftSidebarProps) {
     runId: dashboardRunId,
     migrationPhase,
     tableauSiteName,
-    activeRunStats
+    activeRunStats,
+    selectedWorkbooks,
+    selectedWorkbookNames,
+    selectedProject,
+    selectedProjectName
   } = useDashboardStore()
   const { currentRunId: agentRunId, activities, assessmentData, generationActivitiesDone } = useAgentStore()
   const isSinglePreContinue = mode === 'single' && !hasContinued
@@ -729,7 +701,7 @@ export function LeftSidebar({ onClose }: LeftSidebarProps) {
   const generationRaw = useGenerationStore(s => s.generationRaw)
   const validationData = useValidationStore(s => s.validationData)
 
-  // Map Qlik apps to Application interface if workspace is qlik
+  // Map apps to Application interface
   const applications: Application[] = useMemo(() => {
     if (workspace === "qlik") {
       let targetQlikApps = qlikApps || []
@@ -746,15 +718,11 @@ export function LeftSidebar({ onClose }: LeftSidebarProps) {
       }
 
       return targetQlikApps.map((qa) => {
-        const states = qlikProcessStates[qa.id] || {}
-        const statuses = Object.values(states).map((s: any) => s?.status?.toLowerCase())
-        let status = "pending"
-        if (statuses.includes("failed") || statuses.includes("error")) {
-          status = "failed"
-        } else if (statuses.includes("running") || statuses.includes("in_progress")) {
-          status = "running"
-        } else if (statuses.length >= 4 && statuses.every((s) => s === "completed" || s === "success" || s === "done")) {
+        let status = "Selected"
+        if (isQlikProcessCompleted) {
           status = "completed"
+        } else if (isQlikProcessing) {
+          status = "running"
         }
         return {
           id: qa.id,
@@ -765,11 +733,32 @@ export function LeftSidebar({ onClose }: LeftSidebarProps) {
           workbookName: qa.name,
           status,
           startTime: new Date(),
-        }
+        } as Application
       })
     }
+    
+    // For Tableau
+    if (tableauApps.length === 0 && selectedWorkbooks && selectedWorkbooks.length > 0) {
+      return selectedWorkbooks.map(wbId => {
+        const name = selectedWorkbookNames?.[wbId] || wbId;
+        return {
+          id: wbId,
+          workbookId: wbId,
+          siteName: tableauSiteName || "Selected Site",
+          projectName: selectedProjectName || selectedProject || "Selected Project",
+          projectId: selectedProject || "",
+          workbookName: name,
+          status: "Selected" as any,
+          startTime: new Date(),
+        };
+      }) as Application[];
+    }
+    
     return tableauApps
-  }, [workspace, qlikApps, selectedQlikApps, qlikProcessStates, isQlikProcessing, isQlikProcessCompleted, tableauApps])
+  }, [
+    workspace, qlikApps, selectedQlikApps, qlikProcessStates, isQlikProcessing, isQlikProcessCompleted, 
+    tableauApps, selectedWorkbooks, tableauSiteName, selectedProjectName, selectedProject
+  ])
 
   const dynamicCounters = useMemo(() => {
     let running = 0

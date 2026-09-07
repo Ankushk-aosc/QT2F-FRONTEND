@@ -238,11 +238,12 @@ export function Combobox({
                 No matching applications found
               </div>
             ) : (
-              filteredOptions.map((o) => {
+              <>
+                {filteredOptions.map((o, idx) => {
                 const isSelected = !!selectedOptions?.includes(o.value);
                 return (
                   <div
-                    key={o.value ?? o.text}
+                    key={`${o.value ?? o.text}-${idx}`}
                     onClick={() => {
                       if (o.disabled) return;
                       const current = selectedOptions || [];
@@ -278,7 +279,8 @@ export function Combobox({
                     <span className="truncate">{o.text}</span>
                   </div>
                 );
-              })
+              })}
+              </>
             )}
           </div>
         </div>

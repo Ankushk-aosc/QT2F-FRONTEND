@@ -76,8 +76,7 @@ interface QlikMigrationDashboardProps {
   setIsSaving?: (saving: boolean) => void;
   onSaveSuccess?: () => void;
   onQlikSpaceChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  onAppSelection: (appId: string) => void;
-  onRemoveApp: (appId: string) => void;
+  setSelectedApps: (apps: string[]) => void;
   onWorkspaceChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   onStartProcessing: () => void;
   /** Clears a finished run and returns the page to a clean slate. */
@@ -412,8 +411,7 @@ export function QlikMigrationDashboard(props: QlikMigrationDashboardProps) {
                     setDropdownOpen={props.setDropdownOpen}
                     dropdownDirection={props.dropdownDirection}
                     setDropdownDirection={props.setDropdownDirection as any}
-                    onAppSelection={props.onAppSelection}
-                    onRemoveApp={props.onRemoveApp}
+                    setSelectedApps={props.setSelectedApps}
                     dropdownRef={props.dropdownRef}
                   />
                 </div>

@@ -124,7 +124,11 @@ export function ValidationTab({ workbookId, workbookName, projectId: propProject
     }
     if (!runId || !activities[runId]?.[workbookId]) return false
     const acts = activities[runId][workbookId].filter((a: any) => a.agent_name === "Validation Agent")
-    return acts.some((a: any) => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()))
+    return acts.some((a: any) => {
+      const action = ((a as any).action || '').toLowerCase();
+      const summary = ((a as any).activity_summary || '').toLowerCase();
+      return /\b(completed|finished|complete|done)\b/.test(action) || /\b(completed|finished|complete|done)\b/.test(summary);
+    })
   }, [activities, runId, workbookId, isHistoricalRun, historicRunData])
 
   // ★ Validation data is fetched by the central poller in agent.store.ts (Step 3.75)

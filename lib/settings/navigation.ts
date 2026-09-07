@@ -126,7 +126,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     label: "AI Providers",
     description: "Credentials and connection settings for each supported model provider.",
     group: "ai",
-    status: "planned",
+    status: "available",
     keywords: ["openai", "azure", "anthropic", "claude", "gemini", "ollama", "groq", "mistral"],
   },
   {
@@ -134,7 +134,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     label: "AI Models",
     description: "Discovered models and per-workflow model assignment.",
     group: "ai",
-    status: "planned",
+    status: "available",
     keywords: ["model", "deployment", "temperature", "tokens", "assignment"],
   },
   {
@@ -142,7 +142,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     label: "AI Agents",
     description: "Semantic Kernel agent configuration for the migration pipeline.",
     group: "ai",
-    status: "planned",
+    status: "available",
     keywords: ["agent", "semantic kernel", "pipeline", "orchestration"],
   },
 

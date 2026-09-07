@@ -47,7 +47,7 @@ class GenerationService {
 
         try {
             const response = await fetchWithAuth<any>(`/api/generation?${params.toString()}`);
-            const data = response.data || response;
+            const data = response?.data || response;
 
             if (!data || (Array.isArray(data) && data.length === 0)) {
                 return null;

@@ -233,7 +233,18 @@ const OverviewPanel = ({ data, appName }: { data: QlikAssessment; appName: strin
       <div className="vl-grid-3">
         <InfoTile label="Total Sheets" value={data.totalPages} />
         <InfoTile label="Tables" value={data.datasetCount} />
+        <InfoTile label="Total Fields" value={data.totalFields} />
         <InfoTile label="Total Visualizations" value={data.visualCount} />
+        {data.kpiCount !== undefined && <InfoTile label="KPIs" value={data.kpiCount} />}
+        {data.chartCount !== undefined && <InfoTile label="Charts" value={data.chartCount} />}
+        {data.filterPaneCount !== undefined && <InfoTile label="Filter Panes" value={data.filterPaneCount} />}
+        {data.masterMeasureCount !== undefined && <InfoTile label="Measures" value={data.masterMeasureCount} />}
+        {data.masterDimensionCount !== undefined && <InfoTile label="Dimensions" value={data.masterDimensionCount} />}
+        {data.variableCount !== undefined && <InfoTile label="Variables" value={data.variableCount} />}
+        {data.relationshipCount !== undefined && <InfoTile label="Relationships" value={data.relationshipCount} />}
+        {data.bookmarkCount !== undefined && <InfoTile label="Bookmarks" value={data.bookmarkCount} />}
+        {data.extensionCount !== undefined && <InfoTile label="Extensions" value={data.extensionCount} />}
+        {data.storyCount !== undefined && <InfoTile label="Stories" value={data.storyCount} />}
       </div>
     </SectionCard>
   </>
@@ -590,6 +601,12 @@ const AppPrivilegesPanel = ({ data }: { data: QlikAssessment }) => (
 const SecurityPanel = ({ data }: { data: QlikAssessment }) => (
   <>
   <SectionCard title="Security (Section Access)" icon={<Key size={20} />} collapsible defaultOpen={false}>
+    <div style={{ marginBottom: "16px" }}>
+      <strong>RLS Enabled: </strong>
+      <Badge variant={data.hasSectionAccess ? "success" : "secondary"}>
+        {data.hasSectionAccess ? "Yes" : "No"}
+      </Badge>
+    </div>
     {!data.hasSectionAccess || data.sectionAccess.length === 0 ? (
       <EmptyState message="No row-level security rules defined for this app." />
     ) : (

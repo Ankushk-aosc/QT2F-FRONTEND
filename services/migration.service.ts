@@ -41,7 +41,8 @@ class MigrationService {
 
   async invokeBatch(
     items: MigrationItem[],
-    userEmail: string
+    userEmail: string,
+    model?: string
   ): Promise<InvokeBatchResponse> {
     try {
       if (!userEmail || !userEmail.trim()) {
@@ -53,7 +54,7 @@ class MigrationService {
 
       return await fetchWithAuth<InvokeBatchResponse>("/api/migration/invoke-batch", {
         method: "POST",
-        body: JSON.stringify({ email: userEmail, items })
+        body: JSON.stringify({ email: userEmail, items, model: model || "auto" })
       });
 
     } catch (error: any) {

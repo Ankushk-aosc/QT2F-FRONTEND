@@ -1,0 +1,37 @@
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Center large orange cross -->
+  <rect x="50" y="34" width="20" height="52" fill="#E97627"/>
+  <rect x="34" y="50" width="52" height="20" fill="#E97627"/>
+
+  <!-- Top center small steel-gray cross -->
+  <rect x="55.5" y="8" width="9" height="20" fill="#A0AEC0"/>
+  <rect x="50" y="13.5" width="20" height="9" fill="#A0AEC0"/>
+
+  <!-- Top-left medium gold cross -->
+  <rect x="22" y="17" width="14" height="34" fill="#F5A623"/>
+  <rect x="12" y="24" width="34" height="14" fill="#F5A623"/>
+
+  <!-- Top-right large dark slate-gray cross -->
+  <rect x="78" y="15" width="16" height="38" fill="#5A6A7A"/>
+  <rect x="66" y="23" width="40" height="16" fill="#5A6A7A"/>
+
+  <!-- Left small light-gray cross -->
+  <rect x="6" y="49" width="9" height="22" fill="#A0AEC0"/>
+  <rect x="1" y="54.5" width="20" height="9" fill="#A0AEC0"/>
+
+  <!-- Right small indigo cross -->
+  <rect x="105" y="49" width="9" height="22" fill="#5B5EA6"/>
+  <rect x="100" y="54.5" width="20" height="9" fill="#5B5EA6"/>
+
+  <!-- Bottom-left medium crimson-red cross -->
+  <rect x="22" y="71" width="14" height="34" fill="#C0392B"/>
+  <rect x="12" y="80" width="34" height="14" fill="#C0392B"/>
+
+  <!-- Bottom-right large dark navy-blue cross -->
+  <rect x="78" y="69" width="16" height="38" fill="#1A3A6B"/>
+  <rect x="66" y="79" width="40" height="16" fill="#1A3A6B"/>
+
+  <!-- Bottom center small purple cross -->
+  <rect x="55.5" y="94" width="9" height="20" fill="#5B5EA6"/>
+  <rect x="50" y="99.5" width="20" height="9" fill="#5B5EA6"/>
+</svg>

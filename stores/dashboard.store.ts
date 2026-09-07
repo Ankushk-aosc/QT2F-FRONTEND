@@ -6,7 +6,9 @@ import type { Application, LogEntry, AgentResult, RunHistoryItem, AgentType, App
 import { migrationService } from "@/services/migration.service"
 import { useAuthStore } from "@/stores/auth.store"
 import { useRunHistoryStore } from "@/stores/runHistory.store"
+import { useSettingsStore } from "@/stores/settings.store"
 import { DEFAULT_PAGE_SIZE } from "@/lib/constants"
+import { fetchWithAuth } from "@/lib/fetchWithAuth"
 
 interface DashboardStore {
   selectedSite: string
@@ -15,13 +17,14 @@ interface DashboardStore {
   selectedProjects: string[]
   selectedProjectNames: Record<string, string>
   selectedWorkbooks: string[]
+  selectedWorkbookNames: Record<string, string>
   selectedWorkspaceId: string
   selectedWorkspaceName: string
   tableauSiteName: string
   setSelectedSite: (site: string) => void
   setSelectedProject: (projectId: string, projectName: string) => void
   setSelectedProjects: (projects: { id: string; name: string }[]) => void
-  setSelectedWorkbooks: (workbooks: string[]) => void
+  setSelectedWorkbooks: (workbooks: string[], names?: Record<string, string>) => void
   setSelectedWorkspace: (id: string, name: string) => void
   setTableauSiteName: (name: string) => void
   isProcessing: boolean
@@ -60,6 +63,7 @@ interface DashboardStore {
   pollRunStatus: () => void
   checkSystemHealth: () => Promise<void>
   setHasShownResultSection: (shown: boolean) => void
+  resetDashboard: () => void
 }
 
 let pollAttempt = 0
@@ -80,6 +84,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   selectedProjects: [],
   selectedProjectNames: {},
   selectedWorkbooks: [],
+  selectedWorkbookNames: {},
   selectedWorkspaceId: "",
   selectedWorkspaceName: "",
   tableauSiteName: "",
@@ -96,6 +101,18 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   // ─── NEW ────────────────────────────────────────
   migrationPhase: 'idle',
   setMigrationPhase: (phase) => set({ migrationPhase: phase }),
+  resetDashboard: () => set({
+    isProcessing: false,
+    applications: [],
+    logs: [],
+    agentResults: {},
+    runId: null,
+    runNo: null,
+    errorPopup: { message: "", show: false },
+    hasShownResultSection: false,
+    migrationPhase: 'idle',
+    activeRunStats: null,
+  }),
   activeRunStats: null,
   fetchActiveRunStats: async (runId: string, emailId: string) => {
     try {
@@ -153,7 +170,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ selectedProjects: ids, selectedProjectNames: names })
   },
 
-  setSelectedWorkbooks: (workbooks) => set({ selectedWorkbooks: workbooks }),
+  setSelectedWorkbooks: (workbooks, names) => set({ selectedWorkbooks: workbooks, selectedWorkbookNames: names || {} }),
 
   setHasShownResultSection: (shown) => set({ hasShownResultSection: shown }),
 
@@ -352,7 +369,8 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         workbook_id: wbId,
       }))
 
-      const result = await migrationService.invokeBatch(items, userEmail)
+      const selectedModel = useSettingsStore.getState().settings.ai?.selectedModel || "auto";
+      const result = await migrationService.invokeBatch(items, userEmail, selectedModel)
 
       console.log("[Store] ✅ Migration started:", result)
 

@@ -577,33 +577,19 @@ export function ParsingTab({ workbookId, projectId: propProjectId, runId: propRu
     if (isHistoricalRun || hasData) return true;
     if (!runId || !activities[runId]?.[workbookId]) return false;
     const parsingActs = activities[runId][workbookId].filter(a => matchesAgent(a.agent_name, 'parsing'));
-    return parsingActs.some(a => ["completed", "success", "failed", "error"].includes(a.status?.toLowerCase()));
+    return parsingActs.some(a => {
+      const action = ((a as any).action || '').toLowerCase();
+      const summary = ((a as any).activity_summary || '').toLowerCase();
+      return /\b(completed|finished|complete|done)\b/.test(action) || /\b(completed|finished|complete|done)\b/.test(summary);
+    });
   }, [activities, runId, workbookId, isHistoricalRun, hasData]);
 
   useEffect(() => {
-    if (!workbookId || !projectId || !runId) return;
-    if (!isParsingComplete) return;
-    if (hasData) return;
-
-    let isMounted = true;
-    let intervalId: NodeJS.Timeout;
-
-    const pullData = async () => {
-      if (!isMounted || useParsingStore.getState().parsingData[workbookId]) {
-        clearInterval(intervalId);
-        return;
-      }
-      await fetchParsingResult(projectId, workbookId, runId);
-    };
-
-    pullData();
-    intervalId = setInterval(pullData, RUN_STATUS_POLL_INTERVAL_MS);
-
-    return () => {
-      isMounted = false;
-      clearInterval(intervalId);
-    };
-  }, [workbookId, projectId, runId, isParsingComplete, hasData, fetchParsingResult]);
+    if (isHistoricalRun && !hasData && projectId && workbookId && runId) {
+      console.log(`[ParsingTab] Fetching historical data for ${workbookId}`);
+      fetchParsingResult(projectId, workbookId, runId);
+    }
+  }, [isHistoricalRun, hasData, projectId, workbookId, runId, fetchParsingResult]);
 
   useEffect(() => { setTab("sources") }, [workbookId])
 
@@ -641,13 +627,15 @@ export function ParsingTab({ workbookId, projectId: propProjectId, runId: propRu
 
   const uniqueDsTypes = useMemo(() => {
     if (!d) return "N/A";
-    const types = Array.from(new Set(d.sources.map(s => s.type))).filter(Boolean);
+    const sourceList = (d as any).datasources || d.sources || [];
+    const types = Array.from(new Set(sourceList.map((s: any) => s.connector_type || s.type))).filter(Boolean);
     return types.length > 0 ? types.join(", ") : d.file_type || "snowflake";
   }, [d]);
 
   const tableCount = useMemo(() => {
     if (!d) return 0;
-    return d.tables?.length || d.sources.reduce((acc, s) => acc + (s.tables?.length || 0), 0) || 0;
+    const sourceList = (d as any).datasources || d.sources || [];
+    return d.tables?.length || sourceList.reduce((acc: number, s: any) => acc + (s.tables?.length || s.used_by_tables?.length || 0), 0) || 0;
   }, [d]);
 
   const dimCount = useMemo(() => d?.fields?.dimensions?.length || 0, [d]);
@@ -696,66 +684,36 @@ export function ParsingTab({ workbookId, projectId: propProjectId, runId: propRu
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "14px", marginBottom: "24px", width: "100%", boxSizing: "border-box" }}>
-            <Card style={{ padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "#ffffff", display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
-              <div style={{ padding: "10px", borderRadius: "10px", backgroundColor: "#eff6ff", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Shapes size={22} />
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>APPLICATION</div>
-                <div title={resolvedWorkbookName} style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{resolvedWorkbookName}</div>
-              </div>
-            </Card>
+          <div className="vl-metrics-grid" style={{ marginBottom: "24px" }}>
+            <div className="vl-metric-card" style={isPdfMode ? { backgroundColor: "#ffffff" } : undefined}>
+              <div className="vl-metric-value" title={resolvedWorkbookName} style={{ fontSize: "20px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{resolvedWorkbookName}</div>
+              <div className="vl-metric-label">APPLICATION</div>
+            </div>
 
-            <Card style={{ padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "#ffffff", display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
-              <div style={{ padding: "10px", borderRadius: "10px", backgroundColor: "#eff6ff", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Database size={22} />
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>DATA SOURCE TYPE</div>
-                <div title={uniqueDsTypes} style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{uniqueDsTypes}</div>
-              </div>
-            </Card>
+            <div className="vl-metric-card" style={isPdfMode ? { backgroundColor: "#ffffff" } : undefined}>
+              <div className="vl-metric-value" title={uniqueDsTypes} style={{ fontSize: "20px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{uniqueDsTypes}</div>
+              <div className="vl-metric-label">DATA SOURCE TYPE</div>
+            </div>
 
-            <Card style={{ padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "#ffffff", display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
-              <div style={{ padding: "10px", borderRadius: "10px", backgroundColor: "#eff6ff", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Database size={22} />
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>TABLES</div>
-                <div style={{ fontSize: "20px", fontWeight: 700, color: "#0f172a" }}>{tableCount}</div>
-              </div>
-            </Card>
+            <div className="vl-metric-card" style={isPdfMode ? { backgroundColor: "#ffffff" } : undefined}>
+              <div className="vl-metric-value">{tableCount}</div>
+              <div className="vl-metric-label">TABLES</div>
+            </div>
 
-            <Card style={{ padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "#ffffff", display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
-              <div style={{ padding: "10px", borderRadius: "10px", backgroundColor: "#eff6ff", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Key size={22} />
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>DIMENSIONS</div>
-                <div style={{ fontSize: "20px", fontWeight: 700, color: "#0f172a" }}>{dimCount}</div>
-              </div>
-            </Card>
+            <div className="vl-metric-card" style={isPdfMode ? { backgroundColor: "#ffffff" } : undefined}>
+              <div className="vl-metric-value">{dimCount}</div>
+              <div className="vl-metric-label">DIMENSIONS</div>
+            </div>
 
-            <Card style={{ padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "#ffffff", display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
-              <div style={{ padding: "10px", borderRadius: "10px", backgroundColor: "#eff6ff", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <FileText size={22} />
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>MEASURES</div>
-                <div style={{ fontSize: "20px", fontWeight: 700, color: "#0f172a" }}>{measCount}</div>
-              </div>
-            </Card>
+            <div className="vl-metric-card" style={isPdfMode ? { backgroundColor: "#ffffff" } : undefined}>
+              <div className="vl-metric-value">{measCount}</div>
+              <div className="vl-metric-label">MEASURES</div>
+            </div>
 
-            <Card style={{ padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "#ffffff", display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
-              <div style={{ padding: "10px", borderRadius: "10px", backgroundColor: "#eff6ff", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Filter size={22} />
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>FILTERS</div>
-                <div style={{ fontSize: "20px", fontWeight: 700, color: "#0f172a" }}>{filterCount}</div>
-              </div>
-            </Card>
+            <div className="vl-metric-card" style={isPdfMode ? { backgroundColor: "#ffffff" } : undefined}>
+              <div className="vl-metric-value">{filterCount}</div>
+              <div className="vl-metric-label">FILTERS</div>
+            </div>
           </div>
 
           <Card className={styles.tabsCard} style={isPdfMode ? { backgroundColor: "#ffffff", border: "none" } : { padding: 0, overflow: "hidden" }}>
@@ -869,9 +827,10 @@ function P_Sources({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: bo
             <tbody>
               {(() => {
                 const rows: any[] = [];
-                (d.sources || []).forEach(r => {
+                const dataList = (d as any).datasources || d.sources || [];
+                dataList.forEach((r: any) => {
                   if (r.connections && r.connections.length > 0) {
-                    r.connections.forEach(conn => {
+                    r.connections.forEach((conn: any) => {
                       rows.push({ ...r, ...conn, originalSource: r });
                     });
                   } else {
@@ -886,9 +845,9 @@ function P_Sources({ d, isPdfMode = false }: { d: ParsingPayload, isPdfMode?: bo
                         {r.database && <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 400 }}>{r.database}</span>}
                       </div>
                     </td>
-                    <td style={{ padding: "16px", color: "#475569" }}>{r.type}</td>
+                    <td style={{ padding: "16px", color: "#475569" }}>{r.connector_type || r.type}</td>
                     <td style={{ padding: "16px" }}>
-                      <Badge variant={r.originalSource.mode === "Live" ? "secondary" : "default"} style={{ textTransform: "lowercase" }}>{r.originalSource.mode === "Live" ? "live" : "extract"}</Badge>
+                      <Badge variant={r.originalSource.mode === "Live" || r.originalSource.auth_type === "Standard" ? "secondary" : "default"} style={{ textTransform: "lowercase" }}>{r.originalSource.mode === "Live" ? "live" : "extract"}</Badge>
                     </td>
 
                     <td style={{ padding: "16px", color: "#666666", fontSize: "13px", wordBreak: "break-word" }}>{r.server || "—"}</td>

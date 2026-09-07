@@ -67,13 +67,18 @@ export async function GET(req: NextRequest) {
         `/agent-actions?${query.toString()}`,
         { apiType: "semantic" }
       );
-    } catch {
+      console.log(`[API /api/activities] Semantic Kernel response type: ${Array.isArray(data) ? 'array' : typeof data}, has .data: ${!!(data && (data as any).data)}, raw count: ${Array.isArray(data) ? data.length : Array.isArray((data as any)?.data) ? (data as any).data.length : 'N/A'}`);
+    } catch (err: any) {
+      console.warn(`[API /api/activities] Semantic (semantic) failed: ${err?.message}`);
       try {
         data = await httpClient.get<unknown>(
           `/agent-actions?${query.toString()}`,
           { apiType: "logs" }
         );
-      } catch {}
+        console.log(`[API /api/activities] Logs fallback response type: ${Array.isArray(data) ? 'array' : typeof data}`);
+      } catch (err2: any) {
+        console.warn(`[API /api/activities] Logs fallback also failed: ${err2?.message}`);
+      }
     }
 
     // 2. Tableau Agent Actions API: {{SEMANTIC_KERNEL_URL}}/api/records/activities?run_id=...
@@ -103,7 +108,9 @@ export async function GET(req: NextRequest) {
       } catch {}
     }
 
-    return NextResponse.json(normalizeAgentActions(data || []), { status: 200 });
+    const normalized = normalizeAgentActions(data || []);
+    console.log(`[API /api/activities] run_id=${runId} → normalized ${normalized.length} activities. Agents: ${[...new Set(normalized.map(a => a.agent_name))].join(', ') || 'none'}`);
+    return NextResponse.json(normalized, { status: 200 });
   } catch (err: any) {
     console.error("[API /api/activities] Error:", err?.message);
     return NextResponse.json(

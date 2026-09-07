@@ -70,7 +70,6 @@ export async function POST(req: NextRequest) {
 
         if (!tokenName) tokenName = "token";
 
-        // Build backend request body with all property alias variants
         const requestBody: any = {
             tableau_server_url: serverUrl,
             tableau_site_name: siteName,

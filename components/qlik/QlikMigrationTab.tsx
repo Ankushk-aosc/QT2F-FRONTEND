@@ -25,13 +25,17 @@ import { useMappingStore } from "@/stores/mapping.store";
 import { useGenerationStore } from "@/stores/generation.store";
 import { useAuthStore } from "@/stores/auth.store";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import { useSettingsStore } from "@/stores/settings.store";
 
 export function QlikMigrationTab() {
   const { accounts } = useMsal();
   const { toast } = useToast();
+  const selectedModel = useSettingsStore((state) => state.settings.ai?.selectedModel) || "auto";
   const {
     apps,
     setApps,
+    selectedApps,
+    setSelectedApps,
     processStates,
     setIsProcessing,
     isProcessing,
@@ -41,7 +45,6 @@ export function QlikMigrationTab() {
   const [qlikSpaces, setQlikSpaces] = useState<{ id: string; name: string }[]>([]);
   const [selectedQlikSpace, setSelectedQlikSpace] = useState("");
   const [isFetchingApps, setIsFetchingApps] = useState(false);
-  const [selectedApps, setSelectedApps] = useState<string[]>([]);
   const [showNoAppsPopup, setShowNoAppsPopup] = useState(false);
 
   // Target Fabric configurations
@@ -62,9 +65,9 @@ export function QlikMigrationTab() {
 
   // Process States
   const [globalError, setGlobalError] = useState<string | null>(null);
-  const [isProcessCompleted, setIsProcessCompleted] = useState(false);
-  const [hasProcessed, setHasProcessed] = useState(false);
-  const [isAssessmentTriggered, setIsAssessmentTriggered] = useState(false);
+  const [isProcessCompleted, setIsProcessCompleted] = useState(() => useDashboardStore.getState().migrationPhase === 'completed');
+  const [hasProcessed, setHasProcessed] = useState(() => !!useAgentStore.getState().currentRunId);
+  const [isAssessmentTriggered, setIsAssessmentTriggered] = useState(() => !!useAgentStore.getState().currentRunId);
   const [dropdownAppId, setDropdownAppId] = useState("");
 
   // API Results storage
@@ -88,6 +91,7 @@ export function QlikMigrationTab() {
   // polling in the background regardless.
   const cancelledRef = useRef(false);
   useEffect(() => {
+    cancelledRef.current = false;
     return () => {
       cancelledRef.current = true;
     };
@@ -164,13 +168,15 @@ export function QlikMigrationTab() {
   }, [selectedQlikSpace, qlikConnectionId, setApps]);
 
   const handleAppSelection = (appId: string) => {
-    setSelectedApps((prev) =>
-      prev.includes(appId) ? prev.filter((id) => id !== appId) : [...prev, appId]
-    );
+    if (selectedApps.includes(appId)) {
+      setSelectedApps(selectedApps.filter((id) => id !== appId));
+    } else {
+      setSelectedApps([...selectedApps, appId]);
+    }
   };
 
   const handleRemoveApp = (appId: string) => {
-    setSelectedApps((prev) => prev.filter((id) => id !== appId));
+    setSelectedApps(selectedApps.filter((id) => id !== appId));
   };
 
   const handleQlikSpaceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -211,7 +217,7 @@ export function QlikMigrationTab() {
 
     // Initialize unified stores so ResultTab & LeftSidebar immediately know about the running project/apps
     useAgentStore.setState((state) => ({
-      currentRunId: runId,
+      currentRunId: runId, // Will be replaced with backend runId soon
       currentProjectId: selectedQlikSpace || "personal",
       currentWorkbookIds: selectedApps,
       workbookProjectMap: {
@@ -220,6 +226,7 @@ export function QlikMigrationTab() {
       },
       migrationStarted: true,
     }));
+
 
     useDashboardStore.setState(() => ({
       selectedProject: selectedQlikSpace || "personal",
@@ -276,7 +283,7 @@ export function QlikMigrationTab() {
             fabric_access_token: fabricToken,
             connection_id: qlikConnectionId || undefined,
             run_validation: false,
-            model: "auto",
+            model: selectedModel,
             items: selectedAppObjects.map((app) => ({
               workspace_id: selectedQlikSpace || "personal",
               workspace_name: spaceName || "Personal",
@@ -293,6 +300,7 @@ export function QlikMigrationTab() {
            deployment_type: "DIRECT_FABRIC",
            fabric_group_id: selectedWorkspace,
            connection_id: qlikConnectionId || undefined,
+           model: selectedModel,
          });
       }
       
@@ -317,7 +325,19 @@ export function QlikMigrationTab() {
         console.warn("[QlikMigrationTab] Failed to extract run_id from backend response, falling back to frontend ID:", started);
       }
       
-      useAgentStore.setState({ currentRunId: actualRunId });
+      const newWorkbookProjectMap = {
+        ...useAgentStore.getState().workbookProjectMap,
+        ...selectedApps.reduce((acc, id) => ({ ...acc, [id]: selectedQlikSpace || "personal" }), {}),
+      };
+      
+      // Now that we have the real backend run ID, initialize the run info to start polling correctly
+      useAgentStore.getState().setCurrentRunInfo(
+        actualRunId,
+        selectedQlikSpace || "personal",
+        selectedApps,
+        newWorkbookProjectMap
+      );
+
       setApiResults(selectedAppObjects.map((app) => ({
         appId: app.id,
         appName: app.name,
@@ -585,8 +605,7 @@ export function QlikMigrationTab() {
           setSelectedSpaces={setSelectedSpaces}
           onRetryConfig={() => setConfigReloadKey((key) => key + 1)}
           onQlikSpaceChange={handleQlikSpaceChange}
-          onAppSelection={handleAppSelection}
-          onRemoveApp={handleRemoveApp}
+          setSelectedApps={setSelectedApps}
           onWorkspaceChange={handleWorkspaceChange}
           processStates={processStates}
           onReload={() => window.location.reload()}

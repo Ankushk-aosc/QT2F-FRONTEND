@@ -1,0 +1,37 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Center orange cross -->
+  <rect x="42" y="32" width="16" height="36" fill="#e97627" />
+  <rect x="32" y="42" width="36" height="16" fill="#e97627" />
+
+  <!-- Top teal cross -->
+  <rect x="47" y="10" width="6" height="16" fill="#69b3a2" />
+  <rect x="42" y="15" width="16" height="6" fill="#69b3a2" />
+
+  <!-- Bottom purple cross -->
+  <rect x="47" y="74" width="6" height="16" fill="#5c6ac4" />
+  <rect x="42" y="79" width="16" height="6" fill="#5c6ac4" />
+
+  <!-- Left yellow cross -->
+  <rect x="23" y="27" width="6" height="16" fill="#f6ad55" />
+  <rect x="18" y="32" width="16" height="6" fill="#f6ad55" />
+
+  <!-- Right light blue cross -->
+  <rect x="71" y="27" width="6" height="16" fill="#63b3ed" />
+  <rect x="66" y="32" width="16" height="6" fill="#63b3ed" />
+
+  <!-- Bottom-left red cross -->
+  <rect x="30" y="58" width="6" height="16" fill="#e53e3e" />
+  <rect x="25" y="63" width="16" height="6" fill="#e53e3e" />
+
+  <!-- Bottom-right dark blue cross -->
+  <rect x="64" y="58" width="6" height="16" fill="#2b6cb0" />
+  <rect x="59" y="63" width="16" height="6" fill="#2b6cb0" />
+
+  <!-- Far left small teal cross -->
+  <rect x="12" y="45" width="4" height="10" fill="#4fd1c5" />
+  <rect x="9" y="48" width="10" height="4" fill="#4fd1c5" />
+
+  <!-- Far right small purple cross -->
+  <rect x="84" y="45" width="4" height="10" fill="#667eea" />
+  <rect x="81" y="48" width="10" height="4" fill="#667eea" />
+</svg>

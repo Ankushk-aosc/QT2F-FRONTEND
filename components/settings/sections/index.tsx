@@ -11,6 +11,9 @@ import { IntegrationsSection } from "./IntegrationsSection"
 import { MigrationSection } from "./MigrationSection"
 import { PlannedSection } from "./PlannedSection"
 import { WorkspaceSection } from "./WorkspaceSection"
+import { AiProvidersSection } from "./AiProvidersSection"
+import { AiModelsSection } from "./AiModelsSection"
+import { AiAgentsSection } from "./AiAgentsSection"
 
 /**
  * Maps a section id to its implementation.
@@ -25,6 +28,9 @@ const IMPLEMENTED_SECTIONS: Partial<Record<SettingsSectionId, React.ComponentTyp
   workspace: WorkspaceSection,
   migration: MigrationSection,
   integrations: IntegrationsSection,
+  "ai-providers": AiProvidersSection,
+  "ai-models": AiModelsSection,
+  "ai-agents": AiAgentsSection,
   about: AboutSection,
 }
 

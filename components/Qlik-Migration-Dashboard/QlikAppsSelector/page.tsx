@@ -18,8 +18,7 @@ interface QlikAppsSelectorProps {
   setDropdownOpen: (open: boolean) => void;
   dropdownDirection: "down" | "up";
   setDropdownDirection: (direction: "right" | "up") => void;
-  onAppSelection: (appId: string) => void;
-  onRemoveApp: (appId: string) => void;
+  setSelectedApps: (apps: string[]) => void;
   dropdownRef: React.RefObject<HTMLDivElement>;
 }
 
@@ -57,8 +56,7 @@ export function QlikAppsSelectorContent({
   isFetchingApps = false,
   isSpaceSelected,
   hasProcessed,
-  onAppSelection,
-  onRemoveApp,
+  setSelectedApps,
 }: QlikAppsSelectorProps) {
   const [showConfirmPopup, setShowConfirmPopup] = useState(false);
 
@@ -71,11 +69,7 @@ export function QlikAppsSelectorContent({
       setShowConfirmPopup(true);
       return;
     }
-    if (selected.includes(optionValue)) {
-      onAppSelection(optionValue);
-    } else {
-      onRemoveApp(optionValue);
-    }
+    setSelectedApps(selected);
   };
 
   const handleConfirm = () => {

@@ -90,6 +90,7 @@ interface AgentStore {
     agentName: string
   ) => Promise<Activity[]>
   fetchActivitiesForAllWorkbooks: () => Promise<void>
+  fetchAllAgentActionsForRun: (runId: string) => Promise<void>
 
   fetchAssessmentData: (projectId: string, workbookId: string, runId: string) => Promise<void>
 
@@ -129,6 +130,7 @@ export function mapAssessmentResponseToStore(raw: any): AssessmentData {
 const TERMINAL = ['completed', 'success', 'failed', 'error', 'cancelled']
 
 const _fullyDone = new Set<string>()
+const _failedWorkbooks = new Set<string>()
 const _lastCount = new Map<string, number>()
 
 // ★ Data-fetched trackers (result data is available)
@@ -176,12 +178,37 @@ function wbKey(runId: string, wbId: string) {
   return `${runId}:${wbId}`
 }
 
-// ★ Helper: check if activities list contains a terminal status
-function hasTerminalActivity(activities: Activity[]): boolean {
-  return activities.some(a => TERMINAL.includes((a.status || '').toLowerCase()))
+const SUCCESS_PATTERNS = /\b(completed|finished|complete|done)\b/i;
+const FAILURE_PATTERNS = /\b(failed|cancelled)\b/i;
+
+function getTerminalState(activities: Activity[]): 'success' | 'failed' | 'none' {
+  // Check from newest to oldest to find the final terminal state
+  for (let i = activities.length - 1; i >= 0; i--) {
+    const a = activities[i];
+    const action = ((a as any).action || '').toLowerCase();
+    const summary = ((a as any).activity_summary || '').toLowerCase();
+    const details = ((a as any).details || '').toLowerCase();
+    const status = ((a as any).status || '').toLowerCase();
+    
+    if (status === 'failed' || status === 'error' || status === 'cancelled') return 'failed';
+    if (status === 'completed' && !/(failed|error)/i.test(action + summary)) return 'success';
+    
+    const combinedText = `${action} ${summary} ${details}`;
+    
+    // Ignore recovery/retry messages for failure matching
+    if (FAILURE_PATTERNS.test(combinedText) && !/\b(recovered|retrying|retried)\b/i.test(combinedText)) {
+      return 'failed';
+    }
+    
+    if (SUCCESS_PATTERNS.test(combinedText)) {
+      return 'success';
+    }
+  }
+  return 'none';
 }
 
 function resetTrackers() {
+  _failedWorkbooks.clear()
   _fullyDone.clear()
   _lastCount.clear()
   _assessmentFetched.clear()
@@ -287,7 +314,57 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
     setTimeout(() => get().startPolling(), RUN_STATUS_POLL_INTERVAL_MS)
   },
 
-  setCurrentRunId: (runId) => set({ currentRunId: runId }),
+  setCurrentRunId: (runId) => {
+    set({ currentRunId: runId })
+    if (runId) {
+      const activities = get().activities[runId]
+      if (!activities || Object.keys(activities).length === 0) {
+        get().fetchAllAgentActionsForRun(runId)
+      }
+    }
+  },
+
+  fetchAllAgentActionsForRun: async (runId: string) => {
+    if (!runId) return
+    try {
+      console.log(`[AgentStore] Fetching ALL activities for run: ${runId}`)
+      const res = await fetchWithAuth<any>(`/api/activities?run_id=${runId}`)
+
+      // /api/activities returns a flat normalized array after the route's
+      // normalizeAgentActions call.  Support both that and the older
+      // { status, data } wrapper shape for resilience.
+      const activities: Activity[] = Array.isArray(res)
+        ? res
+        : (res && Array.isArray(res.data))
+          ? res.data
+          : []
+
+      if (activities.length === 0) {
+        console.log(`[AgentStore] No activities returned for run: ${runId}`)
+        return
+      }
+
+      console.log(`[AgentStore] Received ${activities.length} activities. Agents: ${[...new Set(activities.map((a: any) => a.agent_name))].join(', ')}`)
+      
+      const grouped: Record<string, Activity[]> = {}
+      for (const act of activities) {
+        const wbId = act.workbook_id || (act as any).app_id
+        if (!wbId) continue
+        if (!grouped[wbId]) grouped[wbId] = []
+        grouped[wbId].push(act)
+      }
+      
+      set((state) => ({
+        activities: {
+          ...state.activities,
+          [runId]: grouped
+        }
+      }))
+      console.log(`[AgentStore] Bulk fetch complete for run: ${runId}. Stored ${activities.length} activities across ${Object.keys(grouped).length} workbooks.`)
+    } catch (err) {
+      console.error("[AgentStore] Error in fetchAllAgentActionsForRun:", err)
+    }
+  },
 
   startValidationForWorkbook: async (workbookId: string, overrides?: { runId: string, projectId: string }) => {
     const { currentRunId, getProjectIdForWorkbook } = get()
@@ -611,6 +688,8 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
   // ──────────────────────────────────────────
   fetchAssessmentData: async (projectId, workbookId, runId) => {
     try {
+      if (get().assessmentData[runId]?.[workbookId]) return;
+
       console.log(`[Assessment GET] Fetching historical assessment for ${workbookId} (run: ${runId})`)
       const query = `project_id=${projectId}&workbook_id=${workbookId}&run_id=${runId}`
       const data = await fetchWithAuth<any>(`/api/assessment?${query}`)
@@ -749,17 +828,28 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         set((state) => {
           const runMap = state.activities[runId] || {}
           const currentList = runMap[workbookId] || []
-          // Only remove existing activities for ALL canonical variants and replace
-          // them with this fresh fetch when we actually have fresh results.
           const canonicalVariants = canonicalKey ? new Set(AGENT_NAME_VARIANTS[canonicalKey]) : new Set([agentName])
+          
+          // Separate acts belonging to other agent stages
           const otherAgentActs = currentList.filter(a => !canonicalVariants.has(a.agent_name))
-          // ★ Deduplicate sorted results by activity ID
+          
+          // Get the previously fetched acts for THIS agent stage
+          const sameAgentOldActs = currentList.filter(a => canonicalVariants.has(a.agent_name))
+          
+          // Merge old and newly fetched activities
+          const mergedActs = [...sameAgentOldActs, ...sorted]
+          
+          // ★ Deduplicate sorted results by activity ID, keeping the latest occurrences
           const seenIds = new Set<string>()
-          const dedupedSorted = sorted.filter(a => {
-            if (a.id && seenIds.has(a.id)) return false
-            if (a.id) seenIds.add(a.id)
-            return true
-          })
+          // Iterate backwards to keep the newest copy of a duplicate ID if it exists
+          const dedupedSorted = []
+          for (let i = mergedActs.length - 1; i >= 0; i--) {
+             const a = mergedActs[i]
+             if (a.id && seenIds.has(a.id)) continue
+             if (a.id) seenIds.add(a.id)
+             dedupedSorted.unshift(a)
+          }
+
           const combined = [...otherAgentActs, ...dedupedSorted]
 
           return {
@@ -774,8 +864,8 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         })
       }
 
-      const isTerminal = (status: string) => TERMINAL.includes(status?.toLowerCase())
-      const hasTerminal = sorted.some(a => isTerminal(a.status))
+      // Wait for genuine terminal action pattern rather than relying on HTTP status code or status: success
+      const hasTerminal = getTerminalState(sorted) !== 'none'
       const prevCount = _lastCount.get(key) ?? -1
       const currentCount = sorted.length
       _lastCount.set(key, currentCount)
@@ -817,7 +907,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
   //    then marked done so data-fetching can begin.
   // ──────────────────────────────────────────
   fetchActivitiesForAllWorkbooks: async () => {
-    const { currentRunId, currentWorkbookIds, fetchWorkbookActivities, getProjectIdForWorkbook } = get()
+    const { currentRunId, currentWorkbookIds, fetchAllAgentActionsForRun, getActivitiesForWorkbook, getProjectIdForWorkbook } = get()
     if (!currentRunId || currentWorkbookIds.length === 0) return
 
     const uiState = useUIStore.getState()
@@ -830,6 +920,13 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       return 0
     })
 
+    if (currentRunId && sortedWbIds.length > 0) {
+      const activities = get().activities[currentRunId]
+      if (!activities || Object.keys(activities).length === 0) {
+        await fetchAllAgentActionsForRun(currentRunId)
+      }
+    }
+
     for (const wbId of sortedWbIds) {
       const projectId = getProjectIdForWorkbook(wbId)
       const key = wbKey(currentRunId, wbId)
@@ -838,49 +935,56 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
 
       // ── STAGE 1: Assessment Agent ──
       if (isSelected || !_assessmentFetched.has(key)) {
-        const variants = AGENT_NAME_VARIANTS.assessment
-        let allActs: Activity[] = []
-        for (const v of variants) {
-          const acts = await fetchWorkbookActivities(projectId, wbId, currentRunId, v)
-          allActs = [...allActs, ...acts]
+        if (!_assessmentActivitiesDone.has(key) && !_failedWorkbooks.has(key)) {
+           await get().fetchWorkbookActivities(projectId, wbId, currentRunId, "assessment")
         }
-        if (allActs.length > 0 && hasTerminalActivity(allActs)) {
+        
+        const allWorkbookActs = getActivitiesForWorkbook(wbId, currentRunId)
+        const allActs = allWorkbookActs.filter((a: any) => matchesAgent(a.agent_name, "assessment"))
+        
+        const terminalState = getTerminalState(allActs)
+        if (terminalState === 'failed') {
+          _failedWorkbooks.add(key)
+          _assessmentActivitiesDone.add(key)
+          console.log(`[Assessment] ❌ Failed for ${wbId}. Halting downstream stages.`)
+        } else if (terminalState === 'success' || get().assessmentData[currentRunId]?.[wbId]) {
           _assessmentActivitiesDone.add(key)
           set((state) => ({ assessmentActivitiesDone: { ...state.assessmentActivitiesDone, [wbId]: true } }))
-        } else if (get().assessmentData[currentRunId]?.[wbId]) {
-          // ★ Fallback: if data exists, auto-resolve activities so we don't poll forever
-          _assessmentActivitiesDone.add(key)
-          set((state) => ({ assessmentActivitiesDone: { ...state.assessmentActivitiesDone, [wbId]: true } }))
-          console.log(`[Assessment] ✅ Activities auto-resolved for ${wbId} (data available)`)
+          if (get().assessmentData[currentRunId]?.[wbId]) {
+            console.log(`[Assessment] ✅ Activities auto-resolved for ${wbId} (data available)`)
+          }
         }
       }
+
+      if (_failedWorkbooks.has(key)) continue;
 
       // ── STAGE 2: Parsing Agent ──
       if (_assessmentFetched.has(key) && (isSelected || !_parsingFetched.has(key))) {
         _parsingTriggered.add(key)
         set((state) => ({ parsingTriggered: { ...state.parsingTriggered, [wbId]: true } }))
         
-        const variants = AGENT_NAME_VARIANTS.parsing
-        let allActs: Activity[] = []
-        const seenIds = new Set<string>()
-        for (const v of variants) {
-          const acts = await fetchWorkbookActivities(projectId, wbId, currentRunId, v)
-          for (const a of acts) {
-            if (a.id && seenIds.has(a.id)) continue
-            if (a.id) seenIds.add(a.id)
-            allActs.push(a)
+        if (!_parsingActivitiesDone.has(key) && !_failedWorkbooks.has(key)) {
+           await get().fetchWorkbookActivities(projectId, wbId, currentRunId, "parsing")
+        }
+
+        const allWorkbookActs = getActivitiesForWorkbook(wbId, currentRunId)
+        const allActs = allWorkbookActs.filter((a: any) => matchesAgent(a.agent_name, "parsing"))
+        
+        const terminalState = getTerminalState(allActs)
+        if (terminalState === 'failed') {
+          _failedWorkbooks.add(key)
+          _parsingActivitiesDone.add(key)
+          console.log(`[Parsing] ❌ Failed for ${wbId}. Halting downstream stages.`)
+        } else if (terminalState === 'success' || useParsingStore.getState().parsingData[wbId]) {
+          _parsingActivitiesDone.add(key)
+          set((state) => ({ parsingActivitiesDone: { ...state.parsingActivitiesDone, [wbId]: true } }))
+          if (useParsingStore.getState().parsingData[wbId]) {
+            console.log(`[Parsing] ✅ Activities auto-resolved for ${wbId} (data available)`)
           }
         }
-        if (allActs.length > 0 && hasTerminalActivity(allActs)) {
-          _parsingActivitiesDone.add(key)
-          set((state) => ({ parsingActivitiesDone: { ...state.parsingActivitiesDone, [wbId]: true } }))
-        } else if (useParsingStore.getState().parsingData[wbId]) {
-          // ★ Fallback: if data exists, auto-resolve activities so we don't poll forever
-          _parsingActivitiesDone.add(key)
-          set((state) => ({ parsingActivitiesDone: { ...state.parsingActivitiesDone, [wbId]: true } }))
-          console.log(`[Parsing] ✅ Activities auto-resolved for ${wbId} (data available)`)
-        }
       }
+
+      if (_failedWorkbooks.has(key)) continue;
 
       // If we are in Lite Mode, stop activity polling right after Parsing is done
       if (isLiteMode()) {
@@ -893,166 +997,74 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       const skipDataLayer = get().shouldSkipDataLayer(wbId)
       if (!isPausedInSingleMode && _parsingFetched.has(key) && (isSelected || !_mappingFetched.has(key))) {
         _mappingTriggered.add(key)
-        if (!get().mappingTriggered[wbId]) {
-          set((state) => ({ mappingTriggered: { ...state.mappingTriggered, [wbId]: true } }))
-        }
+        set((state) => ({ mappingTriggered: { ...state.mappingTriggered, [wbId]: true } }))
         
-        const variants = AGENT_NAME_VARIANTS.mapping
-        let allActs: Activity[] = []
-        const seenIds = new Set<string>()
-        for (const v of variants) {
-          const acts = await fetchWorkbookActivities(projectId, wbId, currentRunId, v)
-          for (const a of acts) {
-            if (a.id && seenIds.has(a.id)) continue
-            if (a.id) seenIds.add(a.id)
-            allActs.push(a)
-          }
+        if (!_mappingActivitiesDone.has(key) && !_failedWorkbooks.has(key)) {
+           await get().fetchWorkbookActivities(projectId, wbId, currentRunId, "mapping")
         }
-        if (allActs.length > 0 && hasTerminalActivity(allActs)) {
-          _mappingEmptyActsCount.delete(key)
+
+        const allWorkbookActs = getActivitiesForWorkbook(wbId, currentRunId)
+        const allActs = allWorkbookActs.filter((a: any) => matchesAgent(a.agent_name, "mapping"))
+        
+        const terminalState = getTerminalState(allActs)
+        if (terminalState === 'failed') {
+          _failedWorkbooks.add(key)
+          _mappingActivitiesDone.add(key)
+          console.log(`[Mapping] ❌ Failed for ${wbId}. Halting downstream stages.`)
+        } else if (terminalState === 'success' || useMappingStore.getState().mappingData[wbId]) {
           _mappingActivitiesDone.add(key)
           set((state) => ({ mappingActivitiesDone: { ...state.mappingActivitiesDone, [wbId]: true } }))
-        } else if (useMappingStore.getState().mappingData[wbId]) {
-          // ★ Fallback: if data exists, auto-resolve activities so we don't poll forever
-          _mappingEmptyActsCount.delete(key)
-          _mappingActivitiesDone.add(key)
-          set((state) => ({ mappingActivitiesDone: { ...state.mappingActivitiesDone, [wbId]: true } }))
-          console.log(`[Mapping] ✅ Activities auto-resolved for ${wbId} (data available)`)
+          if (useMappingStore.getState().mappingData[wbId]) {
+            console.log(`[Mapping] ✅ Activities auto-resolved for ${wbId} (data available)`)
+          }
         } else {
           const count = (_mappingEmptyActsCount.get(key) || 0) + 1
           _mappingEmptyActsCount.set(key, count)
         }
       }
 
-      // ── STAGE 3.5: Data Layer Agent ──
-      // ★ REORDERED: Data Layer now runs AFTER Mapping and BEFORE Generation
+      if (_failedWorkbooks.has(key)) continue;
+
+      // ── STAGE 4: Data Layer Agent ──
       // Gate: mapping data must be fetched
-      const isDLDone = _datalayerActivitiesDone.has(key)
-      const isDLTriggered = _datalayerTriggered.has(key)
-      
-      // ★ FIX: Added _assessmentFetched gate to prevent race condition
-      // Stop polling once Generation is triggered
-      // CRITICAL: Assessment must be loaded before checking skipDataLayer() to avoid intermittent triggering
-      if (!isPausedInSingleMode && _assessmentFetched.has(key) && !skipDataLayer && _mappingFetched.has(key) && (isSelected || !_datalayerFetched.has(key))) {
+      if (!skipDataLayer && !isPausedInSingleMode && _mappingFetched.has(key) && (isSelected || !_datalayerFetched.has(key))) {
         _datalayerTriggered.add(key)
-        if (!isDLTriggered) {
-          set((state) => ({ datalayerTriggered: { ...state.datalayerTriggered, [wbId]: true } }))
-        }
+        set((state) => ({ datalayerTriggered: { ...state.datalayerTriggered, [wbId]: true } }))
         
-        const variants = AGENT_NAME_VARIANTS.datalayer
-        let allActs: Activity[] = []
-        const seenIds = new Set<string>()
-        for (const v of variants) {
-          const acts = await fetchWorkbookActivities(projectId, wbId, currentRunId, v)
-          for (const a of acts) {
-            if (a.id && seenIds.has(a.id)) continue
-            if (a.id) seenIds.add(a.id)
-            allActs.push(a)
-          }
+        if (!_datalayerActivitiesDone.has(key) && !_failedWorkbooks.has(key)) {
+           await get().fetchWorkbookActivities(projectId, wbId, currentRunId, "datalayer")
         }
 
-        // ★ [SYNTHETIC LOGIC] If no real activities but data exists, create a sequence of detailed ones
-        const dlData = useDatalayerStore.getState().datalayerData[wbId]
-        if (allActs.length === 0 && dlData) {
-          const isErr = !!dlData.error || dlData.status === 'failed'
-          const syntheticActs: Activity[] = []
-          
-          if (isErr) {
-            syntheticActs.push({
-              id: `synth-dl-error-${wbId}`,
-              project_name: "", run_id: currentRunId, status: 'failed', created_at: new Date().toISOString(),
-              payload: dlData, agent_name: "DataLayerAgent",
-              activity_summary: `Data Layer processing encountered an issue: ${dlData.error || 'Connection error'}`,
-              project_id: projectId, workbook_id: wbId, type: "synthetic"
-            })
-          } else {
-            // Success sequence
-            if (dlData.pipeline_summary?.hyper_files_found > 0) {
-              syntheticActs.push({
-                id: `synth-dl-hyper-${wbId}`,
-                project_name: "", run_id: currentRunId, status: 'completed', created_at: new Date(Date.now() - 5000).toISOString(),
-                payload: dlData, agent_name: "DataLayerAgent",
-                activity_summary: `Source Analysis: Found ${dlData.pipeline_summary.hyper_files_found} Hyper files in the workbook metadata.`,
-                project_id: projectId, workbook_id: wbId, type: "synthetic"
-              })
-            }
-            if (dlData.pipeline_summary?.parquet_files_created > 0) {
-              syntheticActs.push({
-                id: `synth-dl-parquet-${wbId}`,
-                project_name: "", run_id: currentRunId, status: 'completed', created_at: new Date(Date.now() - 3000).toISOString(),
-                payload: dlData, agent_name: "DataLayerAgent",
-                activity_summary: `Extraction: Successfully created ${dlData.pipeline_summary.parquet_files_created} Parquet files for medallion processing.`,
-                project_id: projectId, workbook_id: wbId, type: "synthetic"
-              })
-            }
-            if (dlData.lakehouse?.name) {
-              syntheticActs.push({
-                id: `synth-dl-lh-${wbId}`,
-                project_name: "", run_id: currentRunId, status: 'completed', created_at: new Date(Date.now() - 1000).toISOString(),
-                payload: dlData, agent_name: "DataLayerAgent",
-                activity_summary: `Environment: Verified target Fabric Lakehouse "${dlData.lakehouse.name}".`,
-                project_id: projectId, workbook_id: wbId, type: "synthetic"
-              })
-            }
-            syntheticActs.push({
-              id: `synth-dl-final-${wbId}`,
-              project_name: "", run_id: currentRunId, status: 'completed', created_at: new Date().toISOString(),
-              payload: dlData, agent_name: "DataLayerAgent",
-              activity_summary: "Data Layer processing complete. OneLake assets are ready for Generation.",
-              project_id: projectId, workbook_id: wbId, type: "synthetic"
-            })
-          }
-          
-          allActs = syntheticActs
-          
-          // Inject into state
-          set((state) => {
-            const runMap = state.activities[currentRunId] || {}
-            const currentList = runMap[wbId] || []
-            return {
-              activities: {
-                ...state.activities,
-                [currentRunId]: { 
-                  ...runMap, 
-                  [wbId]: [...currentList.filter(a => !matchesAgent(a.agent_name, 'datalayer')), ...syntheticActs] 
-                }
-              }
-            }
-          })
-        }
-
-        if (allActs.length > 0 && hasTerminalActivity(allActs)) {
+        const allWorkbookActs = getActivitiesForWorkbook(wbId, currentRunId)
+        const allActs = allWorkbookActs.filter((a: any) => matchesAgent(a.agent_name, "datalayer"))
+        
+        const terminalState = getTerminalState(allActs)
+        if (terminalState === 'failed') {
+          _failedWorkbooks.add(key)
+          _datalayerActivitiesDone.add(key)
+          console.log(`[DataLayer] ❌ Failed for ${wbId}. Halting downstream stages.`)
+        } else if (terminalState === 'success') {
           _datalayerActivitiesDone.add(key)
           set((state) => ({ datalayerActivitiesDone: { ...state.datalayerActivitiesDone, [wbId]: true } }))
-        } else if (useDatalayerStore.getState().datalayerData[wbId]) {
-          // Data arrived but no terminal activities — mark activities as done
-          _datalayerActivitiesDone.add(key)
-          set((state) => ({ datalayerActivitiesDone: { ...state.datalayerActivitiesDone, [wbId]: true } }))
-          console.log(`[DataLayer] ✅ Activities auto-resolved for ${wbId} (data available)`)
         }
       }
 
-      // ── STAGE 4: Generation Agent ──
+      if (_failedWorkbooks.has(key)) continue;
+
+      // ── STAGE 5: Generation Agent ──
       // ★ Gate: when DL enabled, gate on datalayer data; when DL disabled, gate on mapping data
       const generationGateReady = skipDataLayer ? _mappingFetched.has(key) : _datalayerFetched.has(key)
       // Stop polling once Validation is triggered
       if (!isPausedInSingleMode && generationGateReady && (isSelected || !_generationFetched.has(key))) {
         _generationTriggered.add(key)
-        if (!get().generationTriggered[wbId]) {
-          set((state) => ({ generationTriggered: { ...state.generationTriggered, [wbId]: true } }))
-        }
+        set((state) => ({ generationTriggered: { ...state.generationTriggered, [wbId]: true } }))
         
-        const variants = AGENT_NAME_VARIANTS.generation
-        let allActs: Activity[] = []
-        const seenIds = new Set<string>()
-        for (const v of variants) {
-          const acts = await fetchWorkbookActivities(projectId, wbId, currentRunId, v)
-          for (const a of acts) {
-            if (a.id && seenIds.has(a.id)) continue
-            if (a.id) seenIds.add(a.id)
-            allActs.push(a)
-          }
+        if (!_generationActivitiesDone.has(key) && !_failedWorkbooks.has(key)) {
+           await get().fetchWorkbookActivities(projectId, wbId, currentRunId, "generation")
         }
+
+        const allWorkbookActs = getActivitiesForWorkbook(wbId, currentRunId)
+        let allActs = allWorkbookActs.filter((a: any) => matchesAgent(a.agent_name, "generation"))
 
         // ★ [SYNTHETIC LOGIC] If no real activities but data exists, create a sequence of detailed ones
         const genData = useGenerationStore.getState().generationData[wbId]
@@ -1092,35 +1104,32 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
               id: `synth-gen-final-${wbId}`,
               project_name: "", run_id: currentRunId, status: 'completed', created_at: new Date().toISOString(),
               payload: genData, agent_name: "GenerationAgent",
-              activity_summary: "Report Generation complete. Fabric Power BI report is now available for Validation.",
+              activity_summary: `Generation Completed successfully. Workspace is ready for deployment.`,
               project_id: projectId, workbook_id: wbId, type: "synthetic"
             })
           }
           
-          allActs = syntheticActs
-          
-          // Inject into state
-          set((state) => {
+          set(state => {
             const runMap = state.activities[currentRunId] || {}
-            const currentList = runMap[wbId] || []
             return {
               activities: {
                 ...state.activities,
-                [currentRunId]: { 
-                  ...runMap, 
-                  [wbId]: [...currentList.filter(a => !matchesAgent(a.agent_name, 'generation')), ...syntheticActs] 
+                [currentRunId]: {
+                  ...runMap,
+                  [wbId]: [...(runMap[wbId] || []), ...syntheticActs]
                 }
               }
             }
           })
+          allActs = syntheticActs
         }
 
-        if (allActs.length > 0 && hasTerminalActivity(allActs)) {
-          const isFail = allActs.some(a => ['failed', 'error'].includes(a.status?.toLowerCase()))
-          if (isFail) {
-            console.log(`[Generation] ❌ Failed response detected for ${wbId}`)
-            console.log(`[Generation] 🛑 Migration halted due to generation failure for ${wbId}`)
-          }
+        const terminalState = getTerminalState(allActs)
+        if (terminalState === 'failed') {
+          _failedWorkbooks.add(key)
+          _generationActivitiesDone.add(key)
+          console.log(`[Generation] ❌ Failed for ${wbId}. Halting downstream stages.`)
+        } else if (terminalState === 'success') {
           _generationActivitiesDone.add(key)
           set((state) => ({ generationActivitiesDone: { ...state.generationActivitiesDone, [wbId]: true } }))
         } else if (useGenerationStore.getState().generationData[wbId]) {
@@ -1141,18 +1150,19 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
           set((state) => ({ validationTriggered: { ...state.validationTriggered, [wbId]: true } }))
         }
         
-        const variants = AGENT_NAME_VARIANTS.validation
-        let allActs: Activity[] = []
-        const seenIds = new Set<string>()
-        for (const v of variants) {
-          const acts = await fetchWorkbookActivities(projectId, wbId, currentRunId, v)
-          for (const a of acts) {
-            if (a.id && seenIds.has(a.id)) continue
-            if (a.id) seenIds.add(a.id)
-            allActs.push(a)
-          }
+        if (!_validationActivitiesDone.has(key)) {
+           await get().fetchWorkbookActivities(projectId, wbId, currentRunId, "validation")
         }
-        if (allActs.length > 0 && hasTerminalActivity(allActs)) {
+
+        const allWorkbookActs = getActivitiesForWorkbook(wbId, currentRunId)
+        const allActs = allWorkbookActs.filter((a: any) => matchesAgent(a.agent_name, "validation"))
+        
+        const terminalState = getTerminalState(allActs)
+        if (terminalState === 'failed') {
+          _failedWorkbooks.add(key)
+          _validationActivitiesDone.add(key)
+          console.log(`[Validation] ❌ Failed for ${wbId}.`)
+        } else if (terminalState === 'success') {
           _validationActivitiesDone.add(key)
           set((state) => ({ validationActivitiesDone: { ...state.validationActivitiesDone, [wbId]: true } }))
         }
@@ -1172,8 +1182,13 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
 
     for (const wb of currentWorkbookIds) {
       const key = wbKey(currentRunId, wb)
+      if (_failedWorkbooks.has(key)) continue
       if (_assessmentFetched.has(key)) continue
-      // Do not block assessment polling based on activities
+      
+      if (!_assessmentActivitiesDone.has(key)) {
+        console.log(`[Assessment GET] ⏳ Skipping ${wb} — assessment agent not yet finished`)
+        continue
+      }
 
       const projectId = getProjectIdForWorkbook(wb)
 
@@ -1285,13 +1300,14 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         // ★ STRICT GATE: assessment DATA must be fetched AND parsing activities must be done
         for (const wbId of currentWorkbookIds) {
           const key = wbKey(currentRunId, wbId)
+          if (_failedWorkbooks.has(key)) continue
           if (useParsingStore.getState().parsingData[wbId]) {
             _parsingFetched.add(key)
           }
           if (_parsingFetched.has(key)) continue
           if (!_assessmentFetched.has(key)) continue
-          if (!_parsingTriggered.has(key)) {
-            console.log(`[Parsing GET] ⏳ Skipping ${wbId} — parsing agent not yet triggered`)
+          if (!_parsingActivitiesDone.has(key)) {
+            console.log(`[Parsing GET] ⏳ Skipping ${wbId} — parsing agent not yet finished`)
             continue
           }
 
@@ -1444,6 +1460,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         // ★ Gate: parsing DATA must be fetched AND mapping activities must be done
         for (const wbId of currentWorkbookIds) {
           const key = wbKey(currentRunId, wbId)
+          if (_failedWorkbooks.has(key)) continue
           if (useMappingStore.getState().mappingData[wbId]) {
             _mappingFetched.add(key)
           }
@@ -1452,8 +1469,8 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
             console.log(`[Mapping GET] ⏳ Skipping ${wbId} — parsing data not yet available`)
             continue
           }
-          if (!_mappingTriggered.has(key)) {
-            console.log(`[Mapping GET] ⏳ Skipping ${wbId} — mapping agent not yet triggered`)
+          if (!_mappingActivitiesDone.has(key)) {
+            console.log(`[Mapping GET] ⏳ Skipping ${wbId} — mapping agent not yet finished`)
             continue
           }
 
@@ -1494,6 +1511,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         // ★ FIX: Added _assessmentFetched validation to prevent premature triggering
         for (const wbId of currentWorkbookIds) {
           const key = wbKey(currentRunId, wbId)
+          if (_failedWorkbooks.has(key)) continue
           
           if (useDatalayerStore.getState().datalayerData[wbId]) {
             _datalayerFetched.add(key)
@@ -1513,8 +1531,8 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
             console.log(`[DataLayer GET] ⏳ Skipping ${wbId} — mapping data not yet available`)
             continue
           }
-          if (!_datalayerTriggered.has(key)) {
-            console.log(`[DataLayer GET] ⏳ Skipping ${wbId} — datalayer agent not yet triggered`)
+          if (!_datalayerActivitiesDone.has(key)) {
+            console.log(`[DataLayer GET] ⏳ Skipping ${wbId} — datalayer agent not yet finished`)
             continue
           }
 
@@ -1553,6 +1571,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         // ★ Gate: when DL enabled, gate on datalayer DATA; when DL disabled, gate on mapping DATA
         for (const wbId of currentWorkbookIds) {
           const key = wbKey(currentRunId, wbId)
+          if (_failedWorkbooks.has(key)) continue
           if (useGenerationStore.getState().generationData[wbId]) {
             _generationFetched.add(key)
           }
@@ -1565,8 +1584,8 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
             console.log(`[Generation GET] ⏳ Skipping ${wbId} — ${skipDL ? 'mapping' : 'datalayer'} data not yet available`)
             continue
           }
-          if (!_generationTriggered.has(key)) {
-            console.log(`[Generation GET] ⏳ Skipping ${wbId} — generation agent not yet triggered`)
+          if (!_generationActivitiesDone.has(key)) {
+            console.log(`[Generation GET] ⏳ Skipping ${wbId} — generation agent not yet finished`)
             continue
           }
 
@@ -1617,6 +1636,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         // ★ STRICT GATE: generation DATA must be fetched AND validation activities must be done
         for (const wbId of currentWorkbookIds) {
           const key = wbKey(currentRunId, wbId)
+          if (_failedWorkbooks.has(key)) continue
           if (useValidationStore.getState().validationData[wbId]) {
             const data = useValidationStore.getState().validationData[wbId]
             const status = (data?.status || "").toLowerCase()
@@ -1669,6 +1689,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         // ★ When data layer is disabled, skip _datalayerFetched from the check
         const allDataFetchedUpToGeneration = currentWorkbookIds.every(id => {
           const key = wbKey(currentRunId, id)
+          if (_failedWorkbooks.has(key)) return true
           const skipDL = get().shouldSkipDataLayer(id)
           return _assessmentFetched.has(key) &&
             _parsingFetched.has(key) &&
