@@ -33,6 +33,7 @@ export interface GenerationPayload {
 interface GenerationState {
     generationRaw: Record<string, any> // Keyed by workbookId
     generationData: Record<string, GenerationPayload> // Keyed by workbookId
+    generationCache: Record<string, GenerationPayload> // Keyed by runId_workbookId
     isLoading: Record<string, boolean>
     error: Record<string, string | null>
 
@@ -45,10 +46,20 @@ interface GenerationState {
 export const useGenerationStore = create<GenerationState>((set, get) => ({
     generationRaw: {},
     generationData: {},
+    generationCache: {},
     isLoading: {},
     error: {},
 
     fetchGenerationResult: async (projectId: string, workbookId: string, runId: string) => {
+        const cacheKey = `${runId}_${workbookId}`;
+        const cached = get().generationCache[cacheKey];
+        if (cached) {
+            set((state) => ({
+                generationData: { ...state.generationData, [workbookId]: cached }
+            }));
+            return;
+        }
+
         // Skip if already loading or if we already have data (unless we want to force refresh)
         if (get().isLoading[workbookId]) return;
 
@@ -67,18 +78,16 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
                 return;
             }
 
-            // Check for duplicate data to avoid unnecessary re-renders
-            if (JSON.stringify(get().generationRaw[workbookId]) === JSON.stringify(result)) {
-                set((state) => ({ isLoading: { ...state.isLoading, [workbookId]: false } }));
-                return;
-            }
-
             set((state) => ({ generationRaw: { ...state.generationRaw, [workbookId]: result } }));
 
             // TRANSFORM: result is already unwrapped by the service, but we use the mapper for the final interface
             const transformedPayload = mapGenerationPayload(result);
 
             set((state) => ({
+                generationCache: {
+                    ...state.generationCache,
+                    [cacheKey]: transformedPayload,
+                },
                 generationData: {
                     ...state.generationData,
                     [workbookId]: transformedPayload,

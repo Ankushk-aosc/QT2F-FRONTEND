@@ -124,24 +124,27 @@ export async function POST(req: NextRequest) {
 
     if (!tokenName) tokenName = "token";
 
-    // Build backend request body forwarding all property alias variants
-    const requestBody: any = {
-      tableau_server_url: serverUrl,
-      tableau_site_name: siteName,
-      tableau_token_name: tokenName,
-      server_url: serverUrl,
-      site_name: siteName,
-      token_name: tokenName,
-      TABLEAU_SERVER_URL: serverUrl,
-      TABLEAU_SITE_NAME: siteName,
-      TABLEAU_TOKEN_NAME: tokenName,
-      PROJECT_ID: projectIds,
-      project_id: projectIds,
-      email: body.email || ""
-    };
-
+    let requestBody: any;
     if (body.connection_id) {
-       requestBody.connection_id = body.connection_id;
+       requestBody = {
+         connection_id: body.connection_id,
+         PROJECT_ID: projectIds
+       };
+    } else {
+      requestBody = {
+        tableau_server_url: serverUrl,
+        tableau_site_name: siteName,
+        tableau_token_name: tokenName,
+        server_url: serverUrl,
+        site_name: siteName,
+        token_name: tokenName,
+        TABLEAU_SERVER_URL: serverUrl,
+        TABLEAU_SITE_NAME: siteName,
+        TABLEAU_TOKEN_NAME: tokenName,
+        PROJECT_ID: projectIds,
+        project_id: Array.isArray(body.project_id) ? body.project_id[0] : body.project_id,
+        email: body.email || ""
+      };
     }
 
     if (body.tableau_token_value?.trim()) {

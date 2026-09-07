@@ -1,0 +1,135 @@
+<USER_REQUEST>
+I need you to fix the Assessment Results frontend data mapping. Do NOT modify the backend, assessment API, MongoDB schema, API response structure, or any existing agent logic.
+
+The assessment API is successfully returning real data, but the frontend is currently displaying 0, null, Unknown, or NA for many fields. This is a frontend mapping issue.
+
+First, inspect the actual assessment API response and the current frontend components/types/services that consume it. Identify exactly where the response structure differs from the frontend's expected structure.
+
+1. Use the actual response structure
+
+The assessment response contains data like:
+
+payload.app
+payload.tables
+assessment.complexity
+assessment.dimensional_model
+summary
+data_quality
+assessment_metadata
+_meta
+
+The actual summary structure is:
+
+summary:
+  tables: 23
+  fields: 211
+  relationships: 40
+  datasources: 4
+  sheets: 3
+  visualizations: 49
+  charts: 22
+  filter_panes: 10
+  kpis: 17
+  measures: 30
+  dimensions: 10
+  variables: 4
+  stories: 1
+  bookmarks: 3
+  extensions: 3
+  rls_enabled: true
+
+The frontend must map these fields directly instead of looking for incorrect names such as totalSheets, totalFields, etc.
+
+2. Fix the top Assessment cards
+
+Map the existing frontend cards as follows:
+
+Frontend Card	Actual JSON Field
+Total Sheets	summary.sheets
+KPIs	summary.kpis
+Tables	summary.tables
+Total Fields	summary.fields
+Custom SQL	Calculate from payload.tables[].custom_sql
+Complexity	assessment.complexity.score + assessment.complexity.level
+
+For example:
+
+Total Sheets → 3
+KPIs → 17
+Tables → 23
+Total Fields → 211
+Custom SQL → number of tables where custom_sql is non-null/non-empty
+Complexity → 78 / 100
+Level → High
+
+Do NOT hardcode these values. They must be dynamically calculated from the API response.
+
+3. Complexity mapping
+
+The actual response contains:
+
+assessment.complexity.score
+assessment.complexity.level
+assessment.complexity.risk_level
+assessment.complexity.estimated_migration_hours
+assessment.complexity.reasoning
+assessmen
+<truncated 4871 bytes>
+opriate.
+
+14. Validation
+
+After making the changes:
+
+Run TypeScript/build checks.
+Open the Qlik migration page.
+Run migration for FleetVision KSA.
+Open Results → Assessment.
+Verify that the UI shows actual values from the API.
+
+Expected values for the current response should approximately be:
+
+Application: FleetVision KSA
+Total Sheets: 3
+KPIs: 17
+Tables: 23
+Total Fields: 211
+Visualizations: 49
+Charts: 22
+Filter Panes: 10
+Measures: 30
+Dimensions: 10
+Variables: 4
+Relationships: 40
+Bookmarks: 3
+Extensions: 3
+Complexity: 78 / 100
+Complexity Level: High
+Dimensional Model: Complex
+
+These numbers are ONLY for validation against the current API response. Do not hardcode them into the application.
+
+Finally, give me a concise summary of:
+
+what the incorrect frontend mapping was,
+which files you changed,
+which JSON paths are now mapped,
+and confirmation that no backend/API/agent logic was modified.
+
+Main objective: Fix the existing frontend to correctly consume the actual Assessment JSON response. Do not redesign the application and do not touch working migration functionality.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-01T14:29:54+05:30.
+
+The user's current state is as follows:
+Active Document: f:\frontend qlik and tableau\stores\dashboard.store.ts (LANGUAGE_TYPESCRIPT)
+Cursor is on line: 1
+Other open documents:
+- f:\frontend qlik and tableau\stores\dashboard.store.ts (LANGUAGE_TYPESCRIPT)
+- f:\frontend qlik and tableau\app\api\tableau\get-tableau-url\route.ts (LANGUAGE_TYPESCRIPT)
+- f:\frontend qlik and tableau\app\api\tableau\propagate-tableau-details\route.ts (LANGUAGE_TYPESCRIPT)
+- f:\frontend qlik and tableau\app\api\tableau\get-all-tenant-sites\route.ts (LANGUAGE_TYPESCRIPT)
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from None to Claude Opus 4.6 (Thinking). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>

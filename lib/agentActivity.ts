@@ -158,6 +158,15 @@ export function normalizeAgentAction(raw: unknown): NormalizedAgentAction | null
   const workspaceId = str(raw.workspace_id ?? raw.project_id);
   const agentName = str(raw.agent_name ?? raw.agent);
 
+  // Prefer the backend's activity_summary for display when it is more
+  // descriptive than the resolved action (e.g. action="Assessment Completed"
+  // while activity_summary="Calculated complexity score: Medium (45/100)...").
+  const backendSummary = str(raw.activity_summary);
+  const displaySummary =
+    backendSummary && backendSummary !== action && !BARE_LOG_LEVELS.has(backendSummary.toLowerCase())
+      ? backendSummary
+      : action;
+
   return {
     // A stable id matters: AgentActionsBlock keys its "already typed" set on it,
     // so a synthesised-per-render id would re-type every line on every poll.
@@ -172,7 +181,7 @@ export function normalizeAgentAction(raw: unknown): NormalizedAgentAction | null
     timestamp,
 
     created_at: timestamp,
-    activity_summary: action,
+    activity_summary: displaySummary,
     workbook_id: appId,
     project_id: workspaceId,
     status: str(raw.status),
@@ -191,13 +200,23 @@ export function normalizeAgentAction(raw: unknown): NormalizedAgentAction | null
  * order to every reader.
  */
 export function normalizeAgentActions(data: unknown): NormalizedAgentAction[] {
-  const list = Array.isArray(data)
-    ? data
-    : isRecord(data)
-      ? // A stage that ran but wrote no individual records answers with a bare
-        // { message } object; treat it as a single step.
-        [data]
-      : [];
+  // The Semantic Kernel /agent-actions endpoint returns a wrapper object:
+  //   { status: "success", count: N, data: [ ...records... ] }
+  // Unwrap it before normalizing individual records.  A plain array (the
+  // shape older endpoints and tests use) is also accepted.
+  let list: unknown[];
+  if (Array.isArray(data)) {
+    list = data;
+  } else if (isRecord(data) && Array.isArray((data as Record<string, unknown>).data)) {
+    // Unwrap { status, count, data: [...] } wrapper
+    list = (data as Record<string, unknown>).data as unknown[];
+  } else if (isRecord(data)) {
+    // A stage that ran but wrote no individual records answers with a bare
+    // { message } object; treat it as a single step.
+    list = [data];
+  } else {
+    list = [];
+  }
 
   return list
     .map(normalizeAgentAction)

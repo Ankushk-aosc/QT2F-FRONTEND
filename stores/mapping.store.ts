@@ -22,6 +22,7 @@ export interface MappingPayload {
 interface MappingStore {
     mappingRaw: Record<string, any>;
     mappingData: Record<string, MappingPayload>;
+    mappingCache: Record<string, MappingPayload>;
     isLoading: Record<string, boolean>;
     error: Record<string, string | null>;
 
@@ -40,6 +41,7 @@ interface MappingStore {
 export const useMappingStore = create<MappingStore>((set, get) => ({
     mappingRaw: {},
     mappingData: {},
+    mappingCache: {},
     isLoading: {},
     error: {},
     activeTab: "Tables/Fields",
@@ -53,6 +55,15 @@ export const useMappingStore = create<MappingStore>((set, get) => ({
         })),
 
     fetchMappingResult: async (projectId, workbookId, runId) => {
+        const cacheKey = `${runId}_${workbookId}`;
+        const cached = get().mappingCache[cacheKey];
+        if (cached) {
+            set((state) => ({
+                mappingData: { ...state.mappingData, [workbookId]: cached }
+            }));
+            return;
+        }
+
         if (!get().mappingData[workbookId]) {
             set((state) => ({
                 isLoading: { ...state.isLoading, [workbookId]: true },
@@ -69,10 +80,6 @@ export const useMappingStore = create<MappingStore>((set, get) => ({
                 throw new Error("404 Mapping data not generated yet");
             }
 
-            if (JSON.stringify(get().mappingRaw[workbookId]) === JSON.stringify(result)) {
-                return;
-            }
-
             if (result && result.detail && result.detail.toLowerCase().includes("not found")) {
                 set((state) => ({ error: { ...state.error, [workbookId]: null } }));
                 return;
@@ -83,6 +90,7 @@ export const useMappingStore = create<MappingStore>((set, get) => ({
             if (result) {
                 const mapped = mapMappingPayload(result);
                 set((state) => ({
+                    mappingCache: { ...state.mappingCache, [cacheKey]: mapped },
                     mappingData: { ...state.mappingData, [workbookId]: mapped },
                     error: { ...state.error, [workbookId]: null }
                 }));

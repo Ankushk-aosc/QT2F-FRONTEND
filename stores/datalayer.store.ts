@@ -16,6 +16,7 @@ export interface DataLayerData {
 
 interface DataLayerStore {
   datalayerData: Record<string, DataLayerData>
+  datalayerCache: Record<string, DataLayerData>
   isLoading: boolean
   error: string | null
   fetchDataLayerResult: (projectId: string, workbookId: string, runId: string) => Promise<void>
@@ -24,16 +25,30 @@ interface DataLayerStore {
 
 export const useDatalayerStore = create<DataLayerStore>((set, get) => ({
   datalayerData: {},
+  datalayerCache: {},
   isLoading: false,
   error: null,
 
   fetchDataLayerResult: async (projectId, workbookId, runId) => {
+    const cacheKey = `${runId}_${workbookId}`;
+    const cached = get().datalayerCache[cacheKey];
+    if (cached) {
+      set((state) => ({
+        datalayerData: { ...state.datalayerData, [workbookId]: cached }
+      }));
+      return;
+    }
+
     set({ isLoading: true, error: null })
     try {
       const data = await datalayerService.fetchDataLayer(projectId, workbookId, runId)
       if (data) {
         const mapped = mapDataLayerResponse(data)
         set((state) => ({
+          datalayerCache: {
+            ...state.datalayerCache,
+            [cacheKey]: mapped
+          },
           datalayerData: {
             ...state.datalayerData,
             [workbookId]: mapped

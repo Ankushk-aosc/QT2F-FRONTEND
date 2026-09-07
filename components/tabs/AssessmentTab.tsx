@@ -2045,10 +2045,16 @@ export function AssessmentTab({ selectedWorkbookId, projectId: propProjectId, ru
 
   const payload = assessment.payload
 
-  // If this is a Qlik assessment result (has results array of category items), render AssessmentResultsView
-  if ((payload?.results && Array.isArray(payload.results)) || Array.isArray(payload) || (assessment?.results && Array.isArray(assessment.results))) {
-    const qlikData = payload?.results ? payload : (Array.isArray(payload) ? { results: payload } : assessment)
-    const appName = payload?.workbook_name || assessment?.workbook_name || ""
+  // If this is a Qlik assessment result, render AssessmentResultsView
+  // Detect old Qlik format (results[] array)
+  const isOldQlikFormat = (payload?.results && Array.isArray(payload.results)) || Array.isArray(payload) || (assessment?.results && Array.isArray(assessment.results));
+  // Detect new Qlik format (flat structure with summary/assessment/payload.app)
+  const isNewQlikFormat = payload && typeof payload === 'object' && ('summary' in payload || ('assessment' in payload && 'complexity' in (payload.assessment as any)) || ('payload' in payload && 'app' in (payload.payload as any)));
+
+  if (isOldQlikFormat || isNewQlikFormat) {
+    const qlikData = isOldQlikFormat ? (payload?.results ? payload : (Array.isArray(payload) ? { results: payload } : assessment)) : payload;
+    const nestedApp = (payload as any)?.payload?.app;
+    const appName = payload?.workbook_name || assessment?.workbook_name || nestedApp?.name || nestedApp?.app_name || "";
     return <AssessmentResultsView assessmentData={qlikData} appName={appName} isPdfMode={isPdfMode} />
   }
 

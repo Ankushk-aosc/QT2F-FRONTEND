@@ -2,17 +2,21 @@
 
 import React from "react"
 import Link from "next/link"
-import { ArrowRight, CheckCircle2 } from "lucide-react"
+import Image from "next/image"
+import { ArrowRight, CheckCircle2, Sparkles } from "lucide-react"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Badge } from "@/components/ui/badge"
 import { useUIStore } from "@/stores/ui.store"
 
 const PLATFORMS = [
   {
-    id: "qlik",
+    id: "qlik" as const,
     href: "/migrations/qlik",
-    letter: "Q",
+    logo: "/qliklogo.png",
+    logoAlt: "Qlik Sense",
     color: "#009845",
+    colorLight: "#e6f7ee",
+    colorGlow: "rgba(0, 152, 69, 0.15)",
     badge: "Qlik Sense → Fabric",
     title: "Qlik Sense Migration",
     description:
@@ -25,10 +29,13 @@ const PLATFORMS = [
     cta: "Start Qlik Migration",
   },
   {
-    id: "tableau",
+    id: "tableau" as const,
     href: "/migrations/tableau",
-    letter: "T",
+    logo: "/tableau_logo_custom.jpg",
+    logoAlt: "Tableau",
     color: "#e97627",
+    colorLight: "#fef3eb",
+    colorGlow: "rgba(233, 118, 39, 0.15)",
     badge: "Tableau → Fabric",
     title: "Tableau Migration",
     description:
@@ -40,59 +47,88 @@ const PLATFORMS = [
     ],
     cta: "Start Tableau Migration",
   },
-] as const
+]
 
 export default function MigrationsPage() {
   const setWorkspace = useUIStore((state) => state.setWorkspace)
 
   return (
-    <div className="mx-auto max-w-[1200px] px-4 py-6">
+    <div className="mig-select-root">
       <PageHeader
         title="Migration Platform Selection"
         subtitle="Choose your source platform to launch an automated migration to Microsoft Fabric."
       />
 
-      <div className="mt-8 grid grid-cols-1 gap-7 md:grid-cols-2">
+      <div className="mig-select-grid">
         {PLATFORMS.map((platform) => (
           <div
             key={platform.id}
-            className="group flex flex-col justify-between rounded-2xl border border-border bg-surface p-8 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
-            style={{ background: `linear-gradient(180deg, var(--surface) 0%, ${platform.color}08 100%)` }}
+            className="mig-select-card"
+            style={{
+              "--card-color": platform.color,
+              "--card-color-light": platform.colorLight,
+              "--card-color-glow": platform.colorGlow,
+            } as React.CSSProperties}
           >
-            <div>
-              <div className="mb-5 flex items-center justify-between">
-                <div
-                  className="flex h-[52px] w-[52px] items-center justify-center rounded-xl text-2xl font-extrabold text-white"
-                  style={{ background: platform.color, boxShadow: `0 4px 12px ${platform.color}4d` }}
-                >
-                  {platform.letter}
-                </div>
-                <Badge
-                  variant="secondary"
-                  className="font-semibold"
-                  style={{ background: `${platform.color}1f`, color: platform.color, border: "none" }}
-                >
-                  {platform.badge}
-                </Badge>
+            {/* Header row: Logo + Badge */}
+            <div className="mig-select-card-header">
+              <div className="mig-select-logo-wrap">
+                <Image
+                  src={platform.logo}
+                  alt={platform.logoAlt}
+                  width={40}
+                  height={40}
+                  className="mig-select-logo-img"
+                />
               </div>
-
-              <h2 className="mb-2.5 text-xl font-bold text-foreground">{platform.title}</h2>
-              <p className="mb-5 text-sm leading-relaxed text-muted-foreground">{platform.description}</p>
-
-              <div className="mb-7 flex flex-col gap-2.5">
-                {platform.features.map((feature) => (
-                  <div key={feature} className="flex items-center gap-2 text-[13px] text-secondary-foreground">
-                    <CheckCircle2 size={16} style={{ color: platform.color }} className="shrink-0" />
-                    <span>{feature}</span>
-                  </div>
-                ))}
-              </div>
+              <Badge
+                variant="secondary"
+                className="mig-select-badge"
+                style={{
+                  background: `${platform.color}14`,
+                  color: platform.color,
+                  border: `1px solid ${platform.color}30`,
+                }}
+              >
+                <Sparkles size={12} style={{ marginRight: 4, opacity: 0.7 }} />
+                {platform.badge}
+              </Badge>
             </div>
 
+            {/* Title + Description */}
+            <h2 className="mig-select-title">{platform.title}</h2>
+            <p className="mig-select-desc">{platform.description}</p>
+
+            {/* Feature list */}
+            <div className="mig-select-features">
+              {platform.features.map((feature) => (
+                <div key={feature} className="mig-select-feature-row">
+                  <CheckCircle2
+                    size={16}
+                    className="mig-select-feature-icon"
+                    style={{ color: platform.color }}
+                  />
+                  <span>{feature}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Destination row: Fabric logo */}
+            <div className="mig-select-dest">
+              <Image
+                src="/Fabric_Color_48.svg"
+                alt="Microsoft Fabric"
+                width={20}
+                height={20}
+              />
+              <span>Powered by Microsoft Fabric</span>
+            </div>
+
+            {/* CTA */}
             <Link
               href={platform.href}
               onClick={() => setWorkspace(platform.id)}
-              className="flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              className="mig-select-cta"
               style={{ background: platform.color }}
             >
               {platform.cta}

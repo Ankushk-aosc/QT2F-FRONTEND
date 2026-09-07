@@ -21,6 +21,7 @@ import type {
   PlatformSettings,
   PlatformSettingsPatch,
   WorkspaceSettings,
+  AiSettings,
 } from "@/types/settings";
 
 export const THEME_MODES = ["light", "dark", "system"] as const;
@@ -156,6 +157,16 @@ export function sanitiseWorkspace(
     dashboardLayout: pickEnum(input.dashboardLayout, DASHBOARD_LAYOUTS, current.dashboardLayout),
   };
 }
+export function sanitiseAi(
+  input: Partial<AiSettings> | undefined,
+  current: AiSettings,
+): AiSettings {
+  if (!input) return current;
+  return {
+    selectedModel: pickString(input.selectedModel, current.selectedModel, 100) || "auto",
+    groqModel: pickString(input.groqModel, current.groqModel || "auto", 100) || "auto",
+  };
+}
 
 /** Applies a client patch on top of the current document, validating as it goes. */
 export function applyPatch(
@@ -167,6 +178,7 @@ export function applyPatch(
     general: sanitiseGeneral(patch.general, current.general),
     appearance: sanitiseAppearance(patch.appearance, current.appearance),
     workspace: sanitiseWorkspace(patch.workspace, current.workspace),
+    ai: sanitiseAi(patch.ai, current.ai),
   };
 }
 
@@ -183,5 +195,6 @@ export function migrateSettings(raw: unknown): PlatformSettings {
     general: sanitiseGeneral(candidate.general, DEFAULT_GENERAL_SETTINGS),
     appearance: sanitiseAppearance(candidate.appearance, DEFAULT_APPEARANCE_SETTINGS),
     workspace: sanitiseWorkspace(candidate.workspace, DEFAULT_WORKSPACE_SETTINGS),
+    ai: sanitiseAi(candidate.ai, { selectedModel: "auto", groqModel: "auto" }),
   };
 }

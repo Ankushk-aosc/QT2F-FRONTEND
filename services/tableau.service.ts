@@ -234,7 +234,12 @@ class TableauService {
 
     const payload: any = creds?.connection_id ? {
       connection_id: creds.connection_id,
-      PROJECT_ID: [projectId]
+      PROJECT_ID: [projectId],
+      project_id: projectId,
+      email: email,
+      tableau_server_url: serverUrl || creds.TABLEAU_SERVER_URL || (creds as any).tableau_server_url,
+      tableau_site_name: siteName || creds.TABLEAU_SITE_NAME || (creds as any).tableau_site_name,
+      tableau_token_name: creds.TABLEAU_TOKEN_NAME || (creds as any).tableau_token_name || "token"
     } : (effectiveEnv === "server" ? {
       TABLEAU_SERVER_URL: isCloudURL ? "" : serverUrl,
       site_id: siteId || "",

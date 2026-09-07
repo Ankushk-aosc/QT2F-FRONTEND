@@ -255,9 +255,9 @@ export function MigrationTab() {
   const [error, setError] = useState<string | null>(null)
   const [sites, setSites] = useState<Site[]>([])
   const [loadingSites, setLoadingSites] = useState(false)
-  const [currentRunId, setCurrentRunId] = useState<string | null>(null)
+  const [currentRunId, setCurrentRunId] = useState<string | null>(() => useAgentStore.getState().currentRunId || null)
   const [isStarting, setIsStarting] = useState(false)
-  const [migrationStartedLocal, setMigrationStartedLocal] = useState(false)
+  const [migrationStartedLocal, setMigrationStartedLocal] = useState(() => useAgentStore.getState().migrationStarted || useDashboardStore.getState().isProcessing)
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([])
   const [tableauEnv, setTableauEnv] = useState<"cloud" | "server" | "cloud_trial">("cloud")
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false)
@@ -279,6 +279,18 @@ export function MigrationTab() {
   const [configStatus, setConfigStatus] = useState<"idle" | "success" | "error">("idle")
 
   const [savedCredentials, setSavedCredentials] = useState<TableauCredentials[]>([])
+
+  // Re-sync with background process if user navigates back to tab
+  useEffect(() => {
+    const isGloballyStarted = useAgentStore.getState().migrationStarted || useDashboardStore.getState().isProcessing;
+    if (isGloballyStarted) {
+      setMigrationStartedLocal(true);
+      hasStartedRef.current = true;
+      if (useAgentStore.getState().currentRunId) {
+        setCurrentRunId(useAgentStore.getState().currentRunId);
+      }
+    }
+  }, []);
 
   // The Tableau connection configured in Settings. Its `connectionId` is a Key
   // Vault id in the same backend store these saved connections come from, so
@@ -1060,9 +1072,12 @@ export function MigrationTab() {
       hasStartedRef.current = true
       startProcessing()
 
+      // ★ FIX: Kick off the generic Agent Actions polling loop for Tableau
+      startPolling()
+
       setMigrationStartedLocal(true)
       setMigrationStarted(true)
-      setActiveSubTab("overview")
+      setActiveSubTab("results")
 
     } catch (err) {
       if (scope === "entire") {
@@ -1143,16 +1158,15 @@ export function MigrationTab() {
                   height: 48,
                   flexShrink: 0,
                   borderRadius: "8px",
-                  backgroundColor: "#1e40af",
-                  color: "#fff",
+                  backgroundColor: "#fff",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "20px",
-                  fontWeight: 700,
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                  border: "1px solid #e2e8f0"
                 }}
               >
-                T
+                <img src="/tableau_logo_custom.jpg" alt="Tableau" style={{ width: "32px", height: "32px", objectFit: "contain" }} />
               </div>
               <div><Text size={500} weight="semibold" style={{ color: "#1e40af" }}>Source</Text><br /><Text size={200} style={{ color: "#2563eb" }}>Tableau Environment</Text></div>
             </div>
@@ -1728,7 +1742,12 @@ export function MigrationTab() {
                       <DialogFooter>
                           <Button variant="secondary" onClick={() => setIsWorkbookDialogOpen(false)}>Cancel</Button>
                           <Button onClick={() => {
-                            setSelectedWorkbooks(draftSelectedWorkbooks);
+                            const names: Record<string, string> = {}
+                            draftSelectedWorkbooks.forEach(id => {
+                              const wb = workbooks.find(w => w.id === id)
+                              if (wb) names[id] = wb.name || id
+                            })
+                            setSelectedWorkbooks(draftSelectedWorkbooks, names);
                             setIsWorkbookDialogOpen(false);
                           }}>Apply Selection</Button>
                       </DialogFooter>
@@ -1753,13 +1772,21 @@ export function MigrationTab() {
                     onOptionSelect={(_, d) => {
                       if (d.optionValue === "select-all") {
                         if (d.selectedOptions.includes("select-all")) {
-                          setSelectedWorkbooks(workbooks.map(w => w.id))
+                          const names: Record<string, string> = {}
+                          workbooks.forEach(w => names[w.id] = w.name || w.id)
+                          setSelectedWorkbooks(workbooks.map(w => w.id), names)
                         } else {
                           setSelectedWorkbooks([])
                         }
                         setWorkbookSearchQuery("")
                       } else if (d.optionValue) {
-                        setSelectedWorkbooks(d.selectedOptions.filter(val => val !== "select-all"))
+                        const ids = d.selectedOptions.filter(val => val !== "select-all")
+                        const names: Record<string, string> = {}
+                        ids.forEach(id => {
+                          const wb = workbooks.find(w => w.id === id)
+                          if (wb) names[id] = wb.name || id
+                        })
+                        setSelectedWorkbooks(ids, names)
                         setWorkbookSearchQuery("")
                       }
                     }}
@@ -1767,14 +1794,12 @@ export function MigrationTab() {
                     style={{ width: "100%" }}
                     positioning="below"
                   >
-                    {loadingWorkbooks ? <Option disabled>Loading Workbook...</Option> : filteredWorkbooks.length === 0 ? <Option disabled>No workbooks found.</Option> : (
-                      <>
-                        {workbookSearchQuery.trim() === "" && (
+                    {loadingWorkbooks ? <Option disabled>Loading Workbook...</Option> : filteredWorkbooks.length === 0 ? <Option disabled>No workbooks found.</Option> : [
+                        workbookSearchQuery.trim() === "" ? (
                           <Option key="select-all" value="select-all" style={{ fontWeight: "bold", borderBottom: "1px solid #e2e8f0", marginBottom: "4px" }}>Select All</Option>
-                        )}
-                        {[...filteredWorkbooks].sort((a, b) => (a.name || "").localeCompare(b.name || "")).slice(0, 1000).map(w => <Option key={w.id} value={w.id}>{w.name}</Option>)}
-                      </>
-                    )}
+                        ) : null,
+                        ...[...filteredWorkbooks].sort((a, b) => (a.name || "").localeCompare(b.name || "")).slice(0, 1000).map(w => <Option key={w.id} value={w.id}>{w.name}</Option>)
+                    ]}
                   </Combobox>
                 )}
               </div>

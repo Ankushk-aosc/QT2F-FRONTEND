@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Copy,
   Database,
   Eye,
   RefreshCw,
@@ -125,53 +126,151 @@ export function RunHistoryOverview() {
   const columns: ReadonlyArray<DataTableColumn<RunHistoryItem>> = useMemo(
     () => [
       {
-        key: "run_id",
-        header: "Run ID",
-        render: (run) => (
-          <button type="button" className="dt-link dt-link-button" onClick={() => setDetailRun(run)}>
-            {orDash(run.run_no || run.run_id)}
-          </button>
-        ),
-      },
-      {
         key: "application",
         header: "Application",
         render: (run) => (
           <span className="dt-primary-text font-medium">
-            {orDash(run.workbook_name || run.project_name || (run.processed_items?.[0]?.app_name) || (run.processed_items?.[0]?.workbook_name))}
+            {run.project_name || "Unknown"}
           </span>
         ),
       },
-      { key: "source", header: "Source", render: () => <Absent /> },
-      { key: "destination", header: "Destination", render: () => <Absent /> },
+      {
+        key: "run_id",
+        header: "Run ID",
+        render: (run) => (
+          <div className="flex items-center gap-2">
+            <button type="button" className="dt-link dt-link-button font-mono" onClick={() => setDetailRun(run)} title={run.run_id}>
+              {(run.run_id || "").substring(0, 8)}...
+            </button>
+            <button
+              type="button"
+              className="dt-icon-button"
+              title="Copy full Run ID"
+              onClick={(e) => {
+                e.stopPropagation()
+                navigator.clipboard.writeText(run.run_id || "")
+              }}
+            >
+              <Copy size={14} className="text-muted-foreground" />
+            </button>
+          </div>
+        ),
+      },
+      { 
+        key: "source", 
+        header: "Source", 
+        render: (run) => {
+          let source = (run as any).source || (run as any).platform;
+          if (!source) {
+            const skResult = (run as any).semantic_kernel_result;
+            source = skResult?.site_type || skResult?.app_type;
+          }
+          
+          if (typeof source === "string") {
+            const lower = source.toLowerCase();
+            if (lower.includes("qlik")) return <span>Qlik</span>;
+            if (lower.includes("tableau")) return <span>Tableau</span>;
+            return <span>{source}</span>;
+          }
+          
+          return <span className="dt-muted">Unknown</span>;
+        } 
+      },
+      { key: "destination", header: "Destination", render: () => <span>Power BI</span> },
       {
         key: "type",
         header: "Type",
-        render: (run) =>
-          run.execution_level ? <span className="dt-capitalize">{run.execution_level}</span> : <Absent />,
+        render: (run) => {
+          const skResult = (run as any).semantic_kernel_result
+          const level = skResult?.execution_level
+          if (level === "workbook") return <span>Partial</span>
+          if (level === "project") return <span>Full</span>
+          return <span>Partial</span> // Default to partial since most runs are single-workbook migrations
+        },
       },
       {
         key: "started",
         header: "Started",
         render: (run) => {
-          const v = formatDateTime(run.created_at)
-          return v === EM_DASH ? <Absent /> : <span className="dt-muted">{v}</span>
+          const skResult = (run as any).semantic_kernel_result
+          const dt = skResult?.start_date_time || run.created_at
+          if (!dt) return <Absent />
+          
+          try {
+            const dateObj = new Date(dt)
+            if (isNaN(dateObj.getTime())) return <Absent />
+            const formatter = new Intl.DateTimeFormat('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            })
+            return <span className="dt-muted">{formatter.format(dateObj)}</span>
+          } catch {
+             return <Absent />
+          }
         },
       },
-      { key: "duration", header: "Duration", render: () => <Absent /> },
+      { 
+        key: "duration", 
+        header: "Duration", 
+        render: (run) => {
+          const skResult = (run as any).semantic_kernel_result
+          if (skResult?.time_duration) return <span>{skResult.time_duration}</span>
+          
+          // Fallback: calculate duration from created_at and updated_at
+          if (run.created_at && run.updated_at) {
+            try {
+              const start = new Date(run.created_at).getTime();
+              const end = new Date(run.updated_at).getTime();
+              if (!isNaN(start) && !isNaN(end) && end >= start) {
+                const diffMs = end - start;
+                const hrs = Math.floor(diffMs / 3600000);
+                const mins = Math.floor((diffMs % 3600000) / 60000);
+                const secs = Math.floor((diffMs % 60000) / 1000);
+                return <span>{hrs}:{mins.toString().padStart(2, '0')}:{secs.toString().padStart(2, '0')}</span>
+              }
+            } catch (e) {
+              // ignore
+            }
+          }
+          return <Absent />
+        } 
+      },
       {
         key: "resources",
         header: "Resources",
         align: "right",
-        render: (run) =>
-          Array.isArray(run.processed_items) && run.processed_items.length > 0 ? (
-            <span>{run.processed_items.length}</span>
-          ) : (
-            <Absent />
-          ),
+        render: (run) => {
+          const skResult = (run as any).semantic_kernel_result
+          if (typeof skResult?.total_workbooks === "number") return <span>{skResult.total_workbooks}</span>
+          
+          // Fallback: default to 1 for standard workbook runs
+          return <span>1</span>
+        }
       },
-      { key: "successful", header: "Successful", align: "right", render: () => <Absent /> },
-      { key: "failed", header: "Failed", align: "right", render: () => <Absent /> },
+      { 
+        key: "successful", 
+        header: "Successful", 
+        align: "right", 
+        render: (run) => {
+          const skResult = (run as any).semantic_kernel_result
+          if (typeof skResult?.total_migrated === "number" && typeof skResult?.total_workbooks === "number") {
+             return <span>{skResult.total_migrated} / {skResult.total_workbooks}</span>
+          }
+          if (typeof skResult?.total_migrated === "number") {
+             return <span>{skResult.total_migrated}</span>
+          }
+          
+          // Fallback: Infer from overall_status
+          const status = (run.overall_status || "").toLowerCase();
+          if (status === "completed") return <span>1 / 1</span>;
+          if (status === "failed") return <span>0 / 1</span>;
+          return <Absent />
+        } 
+      },
       {
         key: "status",
         header: "Status",

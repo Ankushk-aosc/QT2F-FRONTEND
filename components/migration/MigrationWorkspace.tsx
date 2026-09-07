@@ -65,6 +65,9 @@ export function MigrationWorkspace({ activeTab, forcedWorkspace }: MigrationWork
   useEffect(() => {
     if (forcedWorkspace && workspace !== forcedWorkspace) {
       setWorkspace(forcedWorkspace)
+      // ★ Reset global data when switching between Qlik and Tableau
+      import("@/stores/dashboard.store").then((m) => m.useDashboardStore.getState().resetDashboard())
+      import("@/stores/agent.store").then((m) => m.useAgentStore.getState().clearData())
     }
   }, [forcedWorkspace, workspace, setWorkspace])
 
@@ -76,11 +79,8 @@ export function MigrationWorkspace({ activeTab, forcedWorkspace }: MigrationWork
     setActiveTab(currentTab)
   }, [currentTab, setActiveTab])
 
-  useEffect(() => {
-    return () => {
-      useAgentStore.getState().stopPolling()
-    }
-  }, [])
+  // Removed stopPolling on unmount so migrations can continue in the background
+  // when navigating between tabs.
 
   const goToTab = (tab: WorkspaceTab) => {
     if (tab === currentTab) return

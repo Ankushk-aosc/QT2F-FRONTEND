@@ -31,39 +31,72 @@ export async function GET(req: NextRequest) {
     }
 
     const baseUrl = logsBase.replace(/\/$/, "");
-    // LOGS_API_BASE is ".../api". The real aggregate lives at
-    // /api/records/monitoring-summary and already returns exactly the shape
-    // MonitoringService expects (total_runs, total_workbooks, completed,
-    // failed, in_progress, pending, filters_applied).
+    
+    // First try the dedicated endpoint (either /api/records or /records depending on backend version)
     const targetUrl = new URL(`${baseUrl}/records/monitoring-summary`);
-
     if (email_id) targetUrl.searchParams.append("email_id", email_id);
     if (project_id) targetUrl.searchParams.append("project_id", project_id);
     if (status) targetUrl.searchParams.append("status", status);
-    if (search) targetUrl.searchParams.append("search", search);
-    if (created_on) targetUrl.searchParams.append("created_on", created_on);
-    if (created_from) targetUrl.searchParams.append("created_from", created_from);
-    if (created_to) targetUrl.searchParams.append("created_to", created_to);
 
-    const response = await fetch(targetUrl.toString(), {
-      method: "GET",
-      headers: {
-        Authorization: authHeader,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
+    const targetUrl2 = new URL(`${baseUrl}/api/records/monitoring-summary`);
+    if (email_id) targetUrl2.searchParams.append("email_id", email_id);
+    if (project_id) targetUrl2.searchParams.append("project_id", project_id);
 
+    let response = await fetch(targetUrl.toString(), { headers: { Authorization: authHeader } });
+    
     if (!response.ok) {
-      const errorBody = await response.text();
-      return NextResponse.json(
-        { error: `Backend returned ${response.status}`, details: errorBody },
-        { status: response.status }
-      );
+        response = await fetch(targetUrl2.toString(), { headers: { Authorization: authHeader } });
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    if (response.ok) {
+        const data = await response.json();
+        return NextResponse.json(data);
+    }
+
+    // If both fail, manually calculate the summary by pulling all runs from semantic-kernel
+    console.warn("[API monitoring-summary] Dedicated endpoints 404'd, falling back to manual aggregation");
+    const fallbackUrl = new URL(`${baseUrl}/records/semantic-kernel`);
+    if (email_id) fallbackUrl.searchParams.append("email_id", email_id);
+    if (project_id) fallbackUrl.searchParams.append("project_id", project_id);
+    fallbackUrl.searchParams.append("page", "1");
+    fallbackUrl.searchParams.append("page_size", "10000");
+
+    const fallbackResponse = await fetch(fallbackUrl.toString(), {
+        headers: { Authorization: authHeader, Accept: "application/json" }
+    });
+
+    if (!fallbackResponse.ok) {
+        return NextResponse.json(
+            { error: `Backend returned ${fallbackResponse.status}`, details: await fallbackResponse.text() },
+            { status: fallbackResponse.status }
+        );
+    }
+
+    const fallbackData = await fallbackResponse.json();
+    const items = Array.isArray(fallbackData) ? fallbackData : (fallbackData.data || fallbackData.items || fallbackData.runs || fallbackData.records || fallbackData.result || []);
+
+    let completed = 0;
+    let failed = 0;
+    let inProgress = 0;
+    let pending = 0;
+
+    for (const item of items) {
+        const st = (item.overall_status || "").toLowerCase();
+        if (st === "completed" || st === "success") completed++;
+        else if (st === "failed" || st === "error") failed++;
+        else if (st === "in progress" || st === "running") inProgress++;
+        else if (st === "pending") pending++;
+    }
+
+    return NextResponse.json({
+        email_id,
+        total_runs: items.length,
+        total_workbooks: items.length,
+        completed,
+        failed,
+        in_progress: inProgress,
+        pending
+    });
   } catch (err: any) {
     return NextResponse.json(
       { error: "Failed to fetch monitoring summary", details: getErrorMessage(err) },

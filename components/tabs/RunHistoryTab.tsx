@@ -12,6 +12,7 @@ import {
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
+    Copy,
     Folder,
     History,
     Search,
@@ -808,9 +809,16 @@ export function RunHistoryTab() {
                 <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
                     <thead>
                         <tr>
-                            <th className="rh-table-header-cell" style={{ minWidth: "200px" }}>Run Details</th>
-                            <th className="rh-table-header-cell" style={{ minWidth: "150px" }}>Migration Scope</th>
-                            <th className="rh-table-header-cell" style={{ minWidth: "100px" }}>Status</th>
+                            <th className="rh-table-header-cell" style={{ minWidth: "200px" }}>Run ID</th>
+                            <th className="rh-table-header-cell" style={{ minWidth: "120px" }}>Application</th>
+                            <th className="rh-table-header-cell" style={{ minWidth: "120px" }}>Source</th>
+                            <th className="rh-table-header-cell" style={{ minWidth: "120px" }}>Destination</th>
+                            <th className="rh-table-header-cell" style={{ minWidth: "100px" }}>Type</th>
+                            <th className="rh-table-header-cell" style={{ minWidth: "120px" }}>Status</th>
+                            <th className="rh-table-header-cell" style={{ minWidth: "160px" }}>Started</th>
+                            <th className="rh-table-header-cell" style={{ minWidth: "100px" }}>Duration</th>
+                            <th className="rh-table-header-cell" style={{ minWidth: "100px" }}>Resources</th>
+                            <th className="rh-table-header-cell" style={{ minWidth: "120px" }}>Successful</th>
                             <th className="rh-table-header-cell" style={{ width: "40px", minWidth: "40px" }}></th>
                         </tr>
                     </thead>
@@ -818,49 +826,59 @@ export function RunHistoryTab() {
                         {visibleRuns.length > 0 ? visibleRuns.map(run => (
                             <tr key={run.run_id} className="rh-table-row" onClick={() => { setSelectedHistoricalRunId(run.run_id); setHistoryLevel("workbooks"); }}>
                                 <td className="rh-table-cell">
-                                    <div style={{ display: "flex", gap: "10px" }}>
-                                        <Folder size={20} style={{ color: "var(--text-muted)", minWidth: "20px" }} />
-                                        <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                                            <span style={{ fontWeight: 600, wordBreak: "break-word" }}>{run.run_no || run.run_id}</span>
-                                            <span style={{ fontSize: "12px", color: "var(--text-muted)", wordBreak: "break-word" }}>{formatTs(run.created_at, false)}</span>
-                                        </div>
+                                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                                        <Folder size={16} style={{ color: "var(--text-muted)", minWidth: "16px" }} />
+                                        <span style={{ fontWeight: 500, wordBreak: "break-word", fontSize: "13px", fontFamily: "monospace" }} title={run.run_id}>
+                                            {(run.run_id || "").split("-")[0]}...
+                                        </span>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            style={{ width: "20px", height: "20px", color: "var(--text-muted)" }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigator.clipboard.writeText(run.run_id || "");
+                                            }}
+                                            title="Copy Run ID"
+                                        >
+                                            <Copy size={12} />
+                                        </Button>
                                     </div>
                                 </td>
-                                <td className="rh-table-cell">
-                                    <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-                                        {run.execution_level && <Badge variant="secondary">EX: {run.execution_level}</Badge>}
-                                        {run.project_type && <Badge variant="secondary">PR: {run.project_type}</Badge>}
-                                    </div>
+                                <td className="rh-table-cell" style={{ fontWeight: 500 }}>
+                                    {run.project_name || "Unknown"}
+                                </td>
+                                <td className="rh-table-cell" style={{ color: "var(--text-muted)" }}>
+                                    Qlik / Tableau
+                                </td>
+                                <td className="rh-table-cell" style={{ color: "var(--text-muted)" }}>
+                                    Power BI
                                 </td>
                                 <td className="rh-table-cell">
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
-                                        {(() => {
-                                            if (!run.counts || run.counts.total <= 1) {
-                                                return <Badge variant={statusBadgeColor(run.overall_status)}>{formatStatusText(run.overall_status)}</Badge>;
-                                            }
-                                            const { completed, failed, pending, total } = run.counts;
-
-                                            const activeCategories = [completed, failed, pending].filter(c => c > 0).length;
-                                            if (activeCategories === 1) {
-                                                if (completed > 0) return <Badge variant="success">Migration Completed ({completed})</Badge>;
-                                                if (failed > 0) return <Badge variant="destructive">Failed ({failed})</Badge>;
-                                                if (pending > 0) return <Badge variant="warning">Validation Pending ({pending})</Badge>;
-                                            }
-
-                                            const parts = [];
-                                            if (completed > 0) parts.push(<Badge key="comp" variant="success">Migration Completed ({completed}/{total})</Badge>);
-                                            if (failed > 0) parts.push(<Badge key="fail" variant="destructive">Failed ({failed}/{total})</Badge>);
-                                            if (pending > 0) parts.push(<Badge key="pend" variant="warning">Validation Pending ({pending}/{total})</Badge>);
-
-                                            return parts.length > 0 ? parts : <Badge variant={statusBadgeColor(run.overall_status)}>{formatStatusText(run.overall_status)}</Badge>;
-                                        })()}
-                                    </div>
+                                    <Badge variant="secondary">
+                                        {(run.semantic_kernel_result?.execution_level || run.execution_level) === "project" ? "Full" : "Partial"}
+                                    </Badge>
+                                </td>
+                                <td className="rh-table-cell">
+                                    <Badge variant={statusBadgeColor(run.overall_status)}>{formatStatusText(run.overall_status)}</Badge>
+                                </td>
+                                <td className="rh-table-cell" style={{ color: "var(--text-muted)", fontSize: "13px" }}>
+                                    {formatTs(run.semantic_kernel_result?.start_date_time || run.created_at, false)}
+                                </td>
+                                <td className="rh-table-cell" style={{ color: "var(--text-muted)", fontSize: "13px" }}>
+                                    {run.semantic_kernel_result?.time_duration || "—"}
+                                </td>
+                                <td className="rh-table-cell" style={{ fontWeight: 500 }}>
+                                    {run.semantic_kernel_result?.total_workbooks || 0}
+                                </td>
+                                <td className="rh-table-cell" style={{ fontWeight: 500 }}>
+                                    {run.semantic_kernel_result?.total_migrated || 0} / {run.semantic_kernel_result?.total_workbooks || 0}
                                 </td>
                                 <td className="rh-table-cell" style={{ textAlign: "center" }}><ChevronRight size={20} /></td>
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan={4} style={{ padding: 0 }}>
+                                <td colSpan={11} style={{ padding: 0 }}>
                                     <div className="rh-empty-state">
                                         <History size={32} style={{ color: "var(--text-muted)" }} />
                                         <span style={{ fontSize: "16px", fontWeight: 600 }}>{emptyStateText}</span>

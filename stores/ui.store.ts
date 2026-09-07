@@ -68,7 +68,7 @@ export const useUIStore = create<UIStore>((set, get) => ({
   setWorkspace: (workspace) => set({ workspace }),
   activeTab: "Migration",
   setActiveTab: (tab) => set({ activeTab: tab }),
-  isSidebarOpen: false,
+  isSidebarOpen: true,
   setSidebarOpen: (open) => set({ isSidebarOpen: open }),
   isNavOpen: true,
   setNavOpen: (open) => set({ isNavOpen: open }),

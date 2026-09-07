@@ -78,6 +78,13 @@ export interface WorkspaceSettings {
   dashboardLayout: DashboardLayout;
 }
 
+export interface AiSettings {
+  /** The backend model/deployment key for Azure OpenAI, or "auto". */
+  selectedModel: string;
+  /** The backend model key for Groq DAX mapping, or "auto". */
+  groqModel?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Root document
 // ---------------------------------------------------------------------------
@@ -93,6 +100,7 @@ export interface PlatformSettings {
   general: GeneralSettings;
   appearance: AppearanceSettings;
   workspace: WorkspaceSettings;
+  ai: AiSettings;
 }
 
 /** A deep-partial patch used by PATCH-style updates. */

@@ -275,6 +275,12 @@ export interface QlikAssessment {
   variableCount: number;
   bookmarkCount: number;
 
+  relationshipCount?: number;
+  extensionCount?: number;
+  storyCount?: number;
+  chartCount?: number;
+  filterPaneCount?: number;
+
   /** From `metadata.metadata` -- the Qlik Cloud app record, not the bot's own analysis. */
   ownerName: string;
   ownerEmail: string;
@@ -384,6 +390,14 @@ export function unwrapAssessment(rawDoc: any): any {
   if (!rawDoc) return null;
   const doc = Array.isArray(rawDoc) ? rawDoc[0] : rawDoc;
   if (!doc || typeof doc !== "object") return null;
+
+  // Preserve new Qlik assessment format
+  if ('summary' in doc || ('assessment' in doc && 'complexity' in (doc.assessment as any)) || ('payload' in doc && 'app' in (doc.payload as any))) {
+    return doc;
+  }
+  if (doc.payload && ('summary' in doc.payload || ('assessment' in doc.payload && 'complexity' in (doc.payload.assessment as any)))) {
+    return doc.payload;
+  }
 
   if (Array.isArray(doc.results)) return doc;
   if (doc.payload && Array.isArray(doc.payload.results)) return doc.payload;
@@ -613,14 +627,14 @@ function parseConnections(raw: unknown): ConnectionInfo[] {
     return {
       name: text("name"),
       database: text("database"),
-      driver: text("driver"),
+      driver: text("driver") || text("connector_type"),
       provider: text("provider"),
       server: text("server"),
       port: text("port"),
       schema: text("schema"),
       role: text("role"),
       warehouse: text("warehouse"),
-      sourceConnector: text("source_connector"),
+      sourceConnector: text("source_connector") || text("connector_category"),
     };
   });
 }
@@ -1120,8 +1134,141 @@ function readAppMetadata(value: unknown): {
   };
 }
 
+function mapNewFormatAssessment(source: Record<string, unknown>, rawData: AssessmentData | null | undefined): QlikAssessment {
+  const payload = asRecord(source.payload) ?? {};
+  const summary = asRecord(source.summary) ?? asRecord(payload.summary) ?? {};
+  const assessment = asRecord(source.assessment) ?? asRecord(payload.assessment) ?? {};
+  const complexity = asRecord(assessment.complexity) ?? {};
+  const dimensionalModel = asRecord(assessment.dimensional_model) ?? {};
+  const appObj = asRecord(source.app) ?? asRecord(payload.app) ?? {};
+  const tables = Array.isArray(source.tables) ? source.tables : (Array.isArray(payload.tables) ? payload.tables : []);
+
+  const text = (value: unknown): string => (typeof value === "string" && value.trim() ? value.trim() : "");
+  const num = (value: unknown): number => (typeof value === "number" ? value : Number(value) || 0);
+
+  const customSqlCount = tables.filter((t: any) => t && (t.custom_sql !== null && t.custom_sql !== undefined && String(t.custom_sql).trim() !== "")).length;
+  
+  const complexityLevel = text(complexity.level);
+  const complexityScore = typeof complexity.score === 'number' ? complexity.score : (Number(complexity.score) || null);
+
+  const datasets: DatasetTable[] = tables.map((t: any) => {
+    const tableObj = asRecord(t) ?? {};
+    const fields = Array.isArray(tableObj.fields) ? tableObj.fields : [];
+    const parsedFields: DatasetField[] = fields.map((f: any) => ({
+      name: text(f?.name),
+      type: text(f?.data_type ?? f?.type ?? "Unknown"),
+      isKey: Boolean(f?.is_key || f?.isKey || looksLikeKey(text(f?.name)))
+    }));
+    return {
+      name: text(tableObj.name ?? tableObj.table_name ?? "Unknown"),
+      fields: parsedFields,
+      fieldCount: num(tableObj.field_count ?? parsedFields.length),
+      keyCount: num(tableObj.key_count ?? parsedFields.filter(f => f.isKey).length),
+      role: text(tableObj.role) === "Fact" ? "Fact" : text(tableObj.role) === "Dimension" ? "Dimension" : "Unclassified",
+      roleReason: text(tableObj.role_reason)
+    };
+  });
+
+  const datasourcesRaw = source.datasources ?? payload.datasources ?? (source.summary as any)?.datasources ?? [];
+  const connections = parseConnections(datasourcesRaw);
+
+  return {
+    reportName: text(appObj.name ?? appObj.app_name ?? source.report_name ?? "Unknown Report"),
+    status: text(source.status ?? "completed"),
+    fileType: text(appObj.file_type ?? "Qlik Application"),
+
+    totalPages: num(summary.sheets),
+    kpiCount: num(summary.kpis),
+    kpis: [], 
+    kpisBySheet: [],
+    sheetsWithKpis: 0,
+    
+    visuals: [],
+    visualsBySheet: [],
+    visualCount: num(summary.visualizations),
+    sheetsWithVisuals: 0,
+    customColors: [],
+
+    datasets,
+    datasetCount: num(summary.tables),
+    totalFields: num(summary.fields),
+    totalKeys: datasets.reduce((sum, d) => sum + d.keyCount, 0),
+    factCount: datasets.filter((d) => d.role === "Fact").length,
+    dimensionCount: datasets.filter((d) => d.role === "Dimension").length,
+    
+    dataModelStructure: text(dimensionalModel.value),
+    dataModelStats: `${num(summary.tables)} tables, ${num(summary.fields)} fields`,
+    dataModelDetails: toStringArray(dimensionalModel.details),
+    dimensionalModelType: text(dimensionalModel.value),
+    dimensionalNotes: toStringArray(dimensionalModel.details),
+
+    connections,
+    databaseName: connections[0]?.driver || connections[0]?.name || "Unknown",
+
+    queryFindings: [],
+    queryNotes: [],
+    customSqlCount: customSqlCount,
+
+    screenshotCount: 0,
+    screenshotDetails: [],
+    screenshots: [],
+
+    powerBi: { recommendation: "", details: [], tone: "informative" },
+
+    ratings: [
+      { key: "complexity", label: "Complexity", value: complexityLevel || "Unknown", details: toStringArray(complexity.reasoning), tone: RISK_TONE[complexityLevel.toLowerCase()] ?? "informative" },
+    ],
+    challenges: [],
+    aiSummary: [],
+    masterDimensions: [],
+    masterMeasures: [],
+    masterDimensionCount: num(summary.dimensions),
+    masterMeasureCount: num(summary.measures),
+
+    sectionAccess: [],
+    hasSectionAccess: Boolean(summary.rls_enabled),
+    loadScripts: [],
+
+    variables: [],
+    bookmarks: [],
+    variableCount: num(summary.variables),
+    bookmarkCount: num(summary.bookmarks),
+
+    relationshipCount: num(summary.relationships),
+    extensionCount: num(summary.extensions),
+    storyCount: num(summary.stories),
+    chartCount: num(summary.charts),
+    filterPaneCount: num(summary.filter_panes),
+
+    ownerName: text(appObj.owner_name ?? appObj.owner),
+    ownerEmail: text(appObj.owner_email),
+    spaceName: text(appObj.space_name ?? appObj.space),
+    lastModified: text(appObj.last_modified ?? appObj.last_modified_at),
+    lastReloadTime: text(appObj.last_reload_time),
+    createdDate: text(appObj.created_date ?? appObj.created_at),
+    appFileSizeBytes: num(appObj.app_file_size_bytes ?? appObj.file_size_bytes),
+    privileges: toStringArray(appObj.privileges),
+
+    complexityScore: complexityScore,
+    reworkEffort: text(complexity.estimated_migration_hours ? `${complexity.estimated_migration_hours} hours` : ""),
+    piiFields: [],
+    complianceRisk: "",
+    syntheticKeysDetected: false,
+    circularReferencesDetected: false,
+    rowCountEstimate: "",
+    storageModeRecommendation: "",
+    raw: rawData as AssessmentData,
+  };
+}
+
 export function mapQlikAssessment(data: AssessmentData | null | undefined): QlikAssessment {
   const source = unwrapAssessment(data);
+  const newFormatSource = source as Record<string, unknown> | null;
+  const isNewFormat = newFormatSource && ('summary' in newFormatSource || ('assessment' in newFormatSource && 'complexity' in (newFormatSource.assessment as any)) || ('payload' in newFormatSource && 'app' in (newFormatSource.payload as any)));
+  if (isNewFormat) {
+    return mapNewFormatAssessment(newFormatSource, data);
+  }
+
   const read = makeReader(source);
 
   const complexity = read("Complexity");

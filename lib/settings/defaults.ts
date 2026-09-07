@@ -19,6 +19,7 @@ import type {
   ThemeMode,
   WorkspaceKind,
   WorkspaceSettings,
+  AiSettings,
 } from "@/types/settings";
 
 /**
@@ -55,11 +56,17 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   dashboardLayout: "grid",
 };
 
+export const DEFAULT_AI_SETTINGS: AiSettings = {
+  selectedModel: "auto",
+  groqModel: "auto",
+};
+
 export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   schemaVersion: SETTINGS_SCHEMA_VERSION,
   general: DEFAULT_GENERAL_SETTINGS,
   appearance: DEFAULT_APPEARANCE_SETTINGS,
   workspace: DEFAULT_WORKSPACE_SETTINGS,
+  ai: DEFAULT_AI_SETTINGS,
 };
 
 // ---------------------------------------------------------------------------

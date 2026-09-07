@@ -15,44 +15,7 @@ import { ApplicationError } from "@/lib/error-handler";
  * then reads status.
  */
 
-export interface AiModelOption {
-  /** Backend key, e.g. "azure_openai" or "auto" — sent as `model` when starting a run. */
-  id: string
-  /** Human label supplied by the backend, e.g. "Azure OpenAI". */
-  name: string
-  /** False when the provider has no credentials configured on the backend. */
-  configured: boolean
-}
 
-/**
- * The live backend returns `{ models: [{ id, name, available }] }`.
- * Earlier documentation described a keyed object (`{ azure_openai: { name,
- * configured } }`), so both are accepted and normalised to `AiModelOption` —
- * whichever shape arrives, callers see one contract.
- */
-function normaliseModels(raw: unknown): AiModelOption[] {
-  if (!raw || typeof raw !== "object") return []
-
-  const list = (raw as { models?: unknown }).models
-  if (Array.isArray(list)) {
-    return list
-      .filter((m): m is Record<string, unknown> => !!m && typeof m === "object")
-      .map((m) => ({
-        id: String(m.id ?? ""),
-        name: String(m.name ?? m.id ?? ""),
-        configured: m.available === true || m.configured === true,
-      }))
-      .filter((m) => m.id !== "")
-  }
-
-  return Object.entries(raw as Record<string, { name?: string; configured?: boolean; available?: boolean }>)
-    .filter(([, value]) => !!value && typeof value === "object")
-    .map(([id, value]) => ({
-      id,
-      name: value?.name || id,
-      configured: value?.configured === true || value?.available === true,
-    }))
-}
 
 export interface TokenPreflightInput {
   fabric_access_token?: string
@@ -108,16 +71,15 @@ export interface InvokeBatchInput {
 
 class SemanticKernelService {
   /**
-   * Providers the backend has configured, for a model picker.
-   *
-   * Returned as a list rather than the backend's keyed object so callers can
-   * render it directly. Provider names are never hardcoded on the client — an
-   * empty list means the backend reported none, which callers should surface
-   * rather than silently falling back to a default provider.
+   * Pings the backend to check if the migration service is healthy.
    */
-  async getAvailableModels(): Promise<AiModelOption[]> {
-    const raw = await fetchWithAuth<unknown>("/api/models")
-    return normaliseModels(raw)
+  async ping(): Promise<boolean> {
+    try {
+      const response = await fetchWithAuth<{ status: string }>("/api/migration/health", { method: "GET" });
+      return response?.status === "healthy";
+    } catch {
+      return false;
+    }
   }
 
   /**
